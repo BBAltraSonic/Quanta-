@@ -13,7 +13,6 @@ A Flutter-based social media UI showcase demonstrating common social app pattern
 * [Getting Started](#getting-started)
 * [Running on Platforms](#running-on-platforms)
 * [Project Status](#project-status)
-* [Roadmap / TODO](#roadmap--todo)
 * [Contributing](#contributing)
 * [License](#license)
 
@@ -186,31 +185,6 @@ flutter test
 * Accessibility & i18n beyond defaults
 
 *Builds successfully on supported platforms from a clean clone.*
-
----
-
-## Roadmap / TODO
-
-**Short term:**
-
-* Sample feed with ListView on home tab
-* Enhance empty states & loading skeletons
-* Dark mode and theme toggling
-* Expand widget and navigation tests
-
-**Medium term:**
-
-* Introduce state management (Provider/Riverpod/Bloc)
-* Add repository layer and data abstraction
-* Local persistence for drafts & cache
-
-**Long term:**
-
-* Backend integration (Supabase/Firebase)
-* Media upload & CDN delivery
-* Real-time chat & notifications
-* Accessibility audit & localization
-* Performance profiling & optimizations
 
 ---
 
