@@ -99,7 +99,9 @@ class ProfileScreen extends StatelessWidget {
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
-                  sliver: SliverToBoxAdapter(child: _headerBlock()),
+                  sliver: SliverToBoxAdapter(
+                    child: _HeaderCard(child: _headerBlock()),
+                  ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
@@ -118,32 +120,43 @@ class ProfileScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: const [
             CircleAvatar(
-              radius: 22,
+              radius: 24,
               backgroundImage: AssetImage('assets/images/p.jpg'),
             ),
-            SizedBox(width: 10),
-            Text(
-              'Lana Smith',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 22,
-                height: 1.1,
+            SizedBox(width: 12),
+            // Name with inline verification badge (to the right of the name)
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Lana Smith',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.verified, color: kPrimaryColor, size: 18),
+                ],
               ),
             ),
-            SizedBox(width: 6),
-            Icon(Icons.verified, color: kPrimaryColor, size: 18),
           ],
         ),
         const SizedBox(height: 8),
         const Text(
           'Photographer | Traveler | Coffee lover',
-          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35),
+          style: TextStyle(color: Colors.black54, fontSize: 13.5, height: 1.35),
         ),
         const SizedBox(height: 14),
         // Metrics chips
@@ -156,7 +169,6 @@ class ProfileScreen extends StatelessWidget {
             _MetricChip(value: '50', label: 'Posts'),
           ],
         ),
-        const SizedBox(height: 18),
       ],
     );
   }
@@ -344,6 +356,32 @@ class ProfileScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// Card wrapper for the header that appears over the photo
+class _HeaderCard extends StatelessWidget {
+  final Widget child;
+  const _HeaderCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: child,
     );
   }
 }

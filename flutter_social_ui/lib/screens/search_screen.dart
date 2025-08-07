@@ -36,25 +36,26 @@ class _SearchScreenState extends State<SearchScreen> {
             child: Container(
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.white.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 16,
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 18,
                     offset: const Offset(0, 8),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   SvgPicture.asset(
                     'assets/icons/search.svg',
                     width: 20,
                     height: 20,
-                    colorFilter: ColorFilter.mode(
-                      theme.colorScheme.onSurface.withOpacity(0.6),
+                    colorFilter: const ColorFilter.mode(
+                      Colors.white70,
                       BlendMode.srcIn,
                     ),
                   ),
@@ -67,7 +68,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         border: InputBorder.none,
                         hintText: 'Search',
                         hintStyle: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          color: Colors.white60,
                           fontWeight: FontWeight.w500,
                           letterSpacing: 0.1,
                         ),
@@ -107,12 +108,12 @@ class _SearchScreenState extends State<SearchScreen> {
               height: 56,
               width: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF171717),
+                color: const Color(0xFF8B0000), // Dark red for the button
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.10),
-                    blurRadius: 16,
+                    color: Colors.black.withOpacity(0.20), // Stronger shadow
+                    blurRadius: 18,
                     offset: const Offset(0, 8),
                   ),
                 ],
@@ -123,7 +124,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   width: 20,
                   height: 20,
                   colorFilter: const ColorFilter.mode(
-                    Colors.white,
+                    Colors.white, // Keep icon white for contrast
                     BlendMode.srcIn,
                   ),
                 ),
@@ -218,45 +219,59 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7F9),
-      body: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(
-                  children: [
-                    // Title row (replaces AppBar visually)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Text(
-                          'Search',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 20,
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF000000), Color(0xFF3A0006)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(
+                    children: [
+                      // Title row (replaces AppBar visually)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text(
+                            'Search',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                              letterSpacing: 0.2,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSearchBar(context),
-                    const SizedBox(height: 12),
-                    _buildChips(context),
-                    const SizedBox(height: 16),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSearchBar(context),
+                      const SizedBox(
+                        height: 20,
+                      ), // Further increased top margin for chips
+                      _buildChips(context),
+                      const SizedBox(
+                        height: 30,
+                      ), // Further increased bottom margin for chips
+                    ],
+                  ),
                 ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: _VideoGrid.sliver(),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-          ],
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: _VideoGrid.sliver(),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
+          ),
         ),
       ),
     );
@@ -264,7 +279,7 @@ class _SearchScreenState extends State<SearchScreen> {
 }
 
 class _VideoGrid extends StatelessWidget {
-  _VideoGrid({Key? key}) : super(key: key);
+  _VideoGrid({super.key});
 
   final List<_VideoItem> items = List.generate(
     12,
@@ -311,7 +326,7 @@ class _VideoItem {
 }
 
 class _VideoCard extends StatelessWidget {
-  const _VideoCard({Key? key, required this.item}) : super(key: key);
+  const _VideoCard({super.key, required this.item});
   final _VideoItem item;
 
   @override
