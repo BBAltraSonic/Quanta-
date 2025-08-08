@@ -1,9 +1,98 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_social_ui/constants.dart';
+import '../models/user_model.dart';
+import '../models/avatar_model.dart';
+import '../services/profile_service.dart';
+import '../services/auth_service_wrapper.dart';
+import '../screens/settings_screen.dart';
+import '../screens/edit_profile_screen.dart';
+import '../screens/avatar_management_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final ProfileService _profileService = ProfileService();
+  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  
+  UserModel? _user;
+  List<AvatarModel> _avatars = [];
+  Map<String, dynamic> _stats = {};
+  bool _isLoading = true;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+  
+  Future<void> _loadProfileData() async {
+    try {
+      final userId = _authService.currentUserId;
+      if (userId != null) {
+        final profileData = await _profileService.getUserProfileData(userId);
+        setState(() {
+          _user = profileData['user'] as UserModel;
+          _avatars = profileData['avatars'] as List<AvatarModel>;
+          _stats = profileData['stats'] as Map<String, dynamic>;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _navigateToEditProfile() async {
+    if (_user == null) return;
+    
+    final updatedUser = await Navigator.push<UserModel>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(user: _user!),
+      ),
+    );
+    
+    if (updatedUser != null) {
+      setState(() {
+        _user = updatedUser;
+      });
+    }
+  }
+  
+  void _navigateToSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
+  
+  void _navigateToAvatarManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AvatarManagementScreen(),
+      ),
+    );
+  }
+  
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,9 +109,7 @@ class ProfileScreen extends StatelessWidget {
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: IconButton(
-            onPressed: () {
-              // TODO: navigate to settings screen
-            },
+            onPressed: _navigateToSettings,
             icon: SvgPicture.asset(
               'assets/icons/settings-minimalistic-svgrepo-com.svg',
               width: 22,
@@ -39,9 +126,7 @@ class ProfileScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: IconButton(
-              onPressed: () {
-                // TODO: open edit profile
-              },
+              onPressed: _navigateToEditProfile,
               icon: SvgPicture.asset(
                 'assets/icons/pen-new-square-svgrepo-com.svg',
                 width: 22,
@@ -56,17 +141,35 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Stack(
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+          : Stack(
         children: [
           // Fullscreen profile photo background with dark + red overlays
           Positioned.fill(
             child: Stack(
               fit: StackFit.expand,
               children: [
-                const Image(
-                  image: AssetImage('assets/images/We.jpg'),
-                  fit: BoxFit.cover,
-                ),
+                _user?.profileImageUrl != null
+                    ? _user!.profileImageUrl!.startsWith('assets/')
+                        ? Image.asset(
+                            _user!.profileImageUrl!,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            _user!.profileImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Image(
+                                image: AssetImage('assets/images/We.jpg'),
+                                fit: BoxFit.cover,
+                              );
+                            },
+                          )
+                    : const Image(
+                        image: AssetImage('assets/images/We.jpg'),
+                        fit: BoxFit.cover,
+                      ),
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -99,7 +202,15 @@ class ProfileScreen extends StatelessWidget {
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
-                  sliver: SliverToBoxAdapter(child: _headerBlock()),
+                  sliver: SliverToBoxAdapter(
+                    child: _HeaderCard(child: _headerBlock()),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildAvatarsSection(),
+                  ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
@@ -115,49 +226,169 @@ class ProfileScreen extends StatelessWidget {
 
   // Header (name + bio + metrics)
   Widget _headerBlock() {
+    final displayName = _user?.displayName ?? _user?.username ?? 'User';
+    final activeAvatar = _avatars.isNotEmpty ? _avatars.first : null;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: const [
+          children: [
             CircleAvatar(
-              radius: 22,
-              backgroundImage: AssetImage('assets/images/p.jpg'),
+              radius: 24,
+              backgroundImage: _user?.profileImageUrl != null
+                  ? _user!.profileImageUrl!.startsWith('assets/')
+                      ? AssetImage(_user!.profileImageUrl!) as ImageProvider
+                      : NetworkImage(_user!.profileImageUrl!)
+                  : const AssetImage('assets/images/p.jpg'),
             ),
-            SizedBox(width: 10),
-            Text(
-              'Lana Smith',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 22,
-                height: 1.1,
+            const SizedBox(width: 12),
+            // Name with inline verification badge (to the right of the name)
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.verified, color: kPrimaryColor, size: 18),
+                ],
               ),
             ),
-            SizedBox(width: 6),
-            Icon(Icons.verified, color: kPrimaryColor, size: 18),
           ],
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Photographer | Traveler | Coffee lover',
-          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.35),
+        Text(
+          activeAvatar?.bio ?? 'Virtual influencer creator',
+          style: const TextStyle(color: Colors.black54, fontSize: 13.5, height: 1.35),
         ),
         const SizedBox(height: 14),
         // Metrics chips
         Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: const [
-            _MetricChip(value: '50', label: 'Following'),
-            _MetricChip(value: '8,000', label: 'Followers'),
-            _MetricChip(value: '50', label: 'Posts'),
+          children: [
+            _MetricChip(value: _formatNumber(_stats['total_followers'] ?? 0), label: 'Followers'),
+            _MetricChip(value: _formatNumber(_stats['total_posts'] ?? 0), label: 'Posts'),
+            _MetricChip(value: '${_avatars.length}', label: 'Avatars'),
           ],
         ),
-        const SizedBox(height: 18),
       ],
+    );
+  }
+  
+  // Avatars section
+  Widget _buildAvatarsSection() {
+    if (_avatars.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'My Avatars',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              TextButton(
+                onPressed: _navigateToAvatarManagement,
+                child: const Text(
+                  'View All',
+                  style: TextStyle(
+                    color: kPrimaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _avatars.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final avatar = _avatars[index];
+                return Container(
+                  width: 90,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundImage: avatar.avatarImageUrl != null
+                            ? avatar.avatarImageUrl!.startsWith('assets/')
+                                ? AssetImage(avatar.avatarImageUrl!) as ImageProvider
+                                : NetworkImage(avatar.avatarImageUrl!)
+                            : null,
+                        child: avatar.avatarImageUrl == null
+                            ? const Icon(Icons.person, color: kLightTextColor)
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        avatar.name,
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_formatNumber(avatar.followersCount)} followers',
+                        style: const TextStyle(
+                          color: kLightTextColor,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -344,6 +575,32 @@ class ProfileScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// Card wrapper for the header that appears over the photo
+class _HeaderCard extends StatelessWidget {
+  final Widget child;
+  const _HeaderCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+        border: Border.all(color: Colors.white.withOpacity(0.95)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: child,
     );
   }
 }

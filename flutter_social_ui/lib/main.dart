@@ -1,8 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
-import 'package:flutter_social_ui/screens/app_shell.dart';
+import 'package:flutter_social_ui/screens/auth_wrapper.dart';
+import 'package:flutter_social_ui/config/app_config.dart';
+import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase if not in demo mode
+  if (!AppConfig.demoMode) {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    );
+  }
+  
+  // Initialize auth service
+  await AuthServiceWrapper().initialize();
+  
   runApp(const MyApp());
 }
 
@@ -12,7 +28,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Social UI',
+      title: 'Quanta - AI Avatar Platform',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
@@ -48,7 +64,7 @@ class MyApp extends StatelessWidget {
           brightness: Brightness.dark, // Explicitly set brightness to dark
         ),
       ),
-      home: const AppShell(),
+      home: const AuthWrapper(),
     );
   }
 }

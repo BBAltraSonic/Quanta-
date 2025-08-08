@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'comments_modal.dart';
 
 class PostItem extends StatelessWidget {
@@ -9,6 +10,11 @@ class PostItem extends StatelessWidget {
   final String description;
   final String likes;
   final String comments;
+  final VoidCallback? onLike;
+  final VoidCallback? onComment;
+  final VoidCallback? onShare;
+  final VoidCallback? onSave;
+  final VoidCallback? onAvatarTap;
 
   const PostItem({
     super.key,
@@ -17,6 +23,11 @@ class PostItem extends StatelessWidget {
     required this.description,
     required this.likes,
     required this.comments,
+    this.onLike,
+    this.onComment,
+    this.onShare,
+    this.onSave,
+    this.onAvatarTap,
   });
 
   Widget _iconWithCounter({required String asset, String? count}) {
@@ -68,9 +79,45 @@ class PostItem extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                    radius: 16,
-                    backgroundImage: AssetImage('assets/images/p.jpg'),
+                  GestureDetector(
+                    onTap: onAvatarTap ?? () {
+                      // Fallback navigation to avatar chat
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            name: author,
+                            avatar: 'assets/images/p.jpg',
+                          ),
+                        ),
+                      );
+                    },
+                    child: Stack(
+                      children: [
+                        const CircleAvatar(
+                          radius: 16,
+                          backgroundImage: AssetImage('assets/images/p.jpg'),
+                        ),
+                        // AI indicator
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                            child: const Icon(
+                              Icons.smart_toy,
+                              size: 8,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -110,12 +157,15 @@ class PostItem extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    _iconWithCounter(
-                      asset: 'assets/icons/heart-svgrepo-com.svg', // like
-                      count: likes,
+                    GestureDetector(
+                      onTap: onLike,
+                      child: _iconWithCounter(
+                        asset: 'assets/icons/heart-svgrepo-com.svg', // like
+                        count: likes,
+                      ),
                     ),
                     GestureDetector(
-                      onTap: () {
+                      onTap: onComment ?? () {
                         openCommentsModal(context);
                       },
                       child: _iconWithCounter(
@@ -124,11 +174,17 @@ class PostItem extends StatelessWidget {
                         count: comments,
                       ),
                     ),
-                    _iconWithCounter(
-                      asset: 'assets/icons/reply-svgrepo-com.svg', // share
+                    GestureDetector(
+                      onTap: onShare,
+                      child: _iconWithCounter(
+                        asset: 'assets/icons/reply-svgrepo-com.svg', // share
+                      ),
                     ),
-                    _iconWithCounter(
-                      asset: 'assets/icons/bookmark-svgrepo-com.svg', // save
+                    GestureDetector(
+                      onTap: onSave,
+                      child: _iconWithCounter(
+                        asset: 'assets/icons/bookmark-svgrepo-com.svg', // save
+                      ),
                     ),
                   ],
                 ),

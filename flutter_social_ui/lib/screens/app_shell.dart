@@ -5,8 +5,8 @@ import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/screens/create_post_screen.dart';
 import 'package:flutter_social_ui/screens/profile_screen.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:flutter_social_ui/screens/search_screen.dart';
-import 'package:flutter_social_ui/screens/notifications_screen.dart';
+import 'package:flutter_social_ui/screens/search_screen_new.dart';
+import 'package:flutter_social_ui/screens/notifications_screen_new.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -22,9 +22,9 @@ class _AppShellState extends State<AppShell> {
   // [Post (Home), Search (left of center), Create (center), Notifications (right of center), Profile]
   static final List<Widget> _widgetOptions = <Widget>[
     const PostDetailScreen(), // Home / Post screen remains
-    const SearchScreen(), // Left of center
+    const SearchScreenNew(), // Left of center
     const CreatePostScreen(), // Center FAB highlight
-    const NotificationsScreen(), // Right of center
+    const NotificationsScreenNew(), // Right of center
     const ProfileScreen(), // Far right
   ];
 
