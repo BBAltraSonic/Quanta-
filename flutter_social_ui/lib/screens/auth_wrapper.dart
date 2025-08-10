@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
-import '../services/auth_service_wrapper.dart';
+import '../services/auth_service.dart';
 import 'app_shell.dart';
 import 'auth/login_screen.dart';
 import 'onboarding/onboarding_screen.dart';
@@ -13,7 +13,7 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
   bool _isInitializing = true;
   String? _initializationError;
 
@@ -186,7 +186,7 @@ class _ErrorScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Container(
+Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: kCardColor,
@@ -196,12 +196,12 @@ class _ErrorScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '🎭 Demo Mode Active',
+                        '⚙️ Configuration Check',
                         style: TextStyle(color: kPrimaryColor, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 8),
                       Text(
-                        'This is running in demo mode. All features work without backend setup.',
+                        'Please verify your Supabase configuration and internet connection.',
                         style: TextStyle(color: kLightTextColor, fontSize: 14),
                       ),
                     ],

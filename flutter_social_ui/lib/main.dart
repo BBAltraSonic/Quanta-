@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/screens/auth_wrapper.dart';
-import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
+import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/services/performance_service.dart';
 import 'package:flutter_social_ui/services/theme_service.dart';
 import 'package:flutter_social_ui/services/accessibility_service.dart';
@@ -19,7 +19,7 @@ void main() async {
 
   // Initialize core services
   await Future.wait([
-    AuthServiceWrapper().initialize(),
+    AuthService().initialize(),
     PerformanceService().initialize(),
     ThemeService().initialize(),
     AccessibilityService().initialize(),

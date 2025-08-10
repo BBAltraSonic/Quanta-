@@ -14,25 +14,18 @@ class AppConfig {
   static const bool isDevelopment = true;
 
   // Feature Flags
-  static const bool enableAI = !isDevelopment;
-  static const bool enableSupabase = !isDevelopment;
+  static const bool enableAI = true;
+  static const bool enableSupabase = true;
   static const bool enableContentUpload = true;
   static const bool enableSearch = true;
 
-  // Demo Mode Configuration
-  static const bool demoMode = isDevelopment;
-
   // Validation
   static bool get isConfigured {
-    if (demoMode) return true; // Always return true in demo mode
-
     return supabaseUrl != 'https://your-project.supabase.co' &&
         supabaseAnonKey != 'your-anon-key-here';
   }
 
   static String get configurationError {
-    if (demoMode) return '';
-
     if (supabaseUrl == 'https://your-project.supabase.co') {
       return 'Supabase URL not configured';
     }

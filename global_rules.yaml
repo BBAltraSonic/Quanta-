@@ -1,0 +1,52 @@
+# Global Rules Configuration
+# These rules govern how tasks should be approached and executed
+
+rules:
+  - id: spec_driven_task_decomposition
+    name: "Spec-Driven Task Decomposition with Checklists"
+    description: >
+      Always request or confirm a complete specification before coding.
+      Break the specification into small, actionable tasks and track them
+      using a checkbox checklist format. Complete tasks one at a time and
+      verify against the specification before final delivery.
+
+    steps:
+      - step: "Request or confirm specification"
+        actions:
+          - Ensure specification includes:
+            - Purpose: clear reason for the feature/task
+            - Inputs: required data, formats, sources
+            - Outputs: expected results, formats
+            - AcceptanceCriteria: measurable completion conditions
+            - Constraints: tech stack, performance, security rules
+          - If missing or unclear, prompt user for details before proceeding.
+
+      - step: "Break specification into smaller tasks"
+        actions:
+          - Analyze specification and identify independent, achievable tasks
+          - Ensure each task is clear, measurable, and completable in 1–2 hours
+          - Number and label tasks sequentially
+
+      - step: "Create checklist"
+        actions:
+          - Represent tasks in markdown checklist format:
+            example: |
+              [ ] Set up project folder structure
+              [ ] Configure API endpoint
+              [ ] Implement data validation
+              [ ] Write unit tests for API
+          - Maintain checklist and mark completed tasks with `[x]`
+
+      - step: "Work iteratively"
+        actions:
+          - Complete one task at a time
+          - Update checklist after each task
+          - If new tasks arise, add them to the checklist before proceeding
+
+      - step: "Verify and deliver"
+        actions:
+          - Compare final implementation against specification
+          - Produce:
+            - Final code
+            - Updated checklist
+            - Spec compliance report mapping tasks to acceptance criteria
