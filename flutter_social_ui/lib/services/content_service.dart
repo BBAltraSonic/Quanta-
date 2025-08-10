@@ -14,6 +14,13 @@ class ContentService {
 
   final SupabaseClient _supabase = Supabase.instance.client;
   final AuthService _authService = AuthService();
+  
+  // Initialize the service
+  Future<void> initialize() async {
+    // Initialization logic can be added here if needed
+    // For now, this is just a placeholder to satisfy the interface
+    debugPrint('ContentService initialized');
+  }
 
   // Upload limits and validation
   static const int maxVideoSizeMB = 100;

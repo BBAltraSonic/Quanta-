@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service.dart;
+import '../services/auth_service.dart';
 import '../screens/auth_wrapper.dart';
 
 class SettingsScreen extends StatefulWidget {

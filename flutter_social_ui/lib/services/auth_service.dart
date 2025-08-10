@@ -300,4 +300,26 @@ class AuthService {
       return false;
     }
   }
+  
+  // Mark onboarding as completed
+  Future<void> markOnboardingCompleted() async {
+    if (_currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+    
+    try {
+      await _supabase
+          .from('users')
+          .update({
+            'onboarding_completed': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', _currentUser!.id);
+          
+      // Update local user model if needed
+      await _loadUserProfile(_currentUser!.id);
+    } catch (e) {
+      print('Failed to mark onboarding as completed: $e');
+    }
+  }
 }

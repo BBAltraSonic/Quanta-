@@ -647,4 +647,80 @@ class SearchService {
     _trendingCacheTime = null;
     debugPrint('🗑️ Search cache cleared');
   }
+  
+  // Public search methods that return specific types for compatibility
+  Future<List<AvatarModel>> searchAvatars({
+    required String query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('avatars')
+          .select()
+          .eq('is_active', true)
+          .or('name.ilike.%$query%,bio.ilike.%$query%,niche.ilike.%$query%')
+          .order('followers_count', ascending: false)
+          .order('engagement_rate', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return response
+          .map<AvatarModel>((json) => AvatarModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error searching avatars: $e');
+      return [];
+    }
+  }
+  
+  Future<List<PostModel>> searchPosts({
+    required String query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('posts')
+          .select()
+          .eq('is_active', true)
+          .eq('status', 'published')
+          .or('caption.ilike.%$query%,hashtags.cs.{"#${query.toLowerCase()}"}')
+          .order('engagement_rate', ascending: false)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return response
+          .map<PostModel>((json) => PostModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error searching posts: $e');
+      return [];
+    }
+  }
+  
+  Future<List<String>> searchHashtags({
+    required String query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      // Use a stored procedure or raw SQL for hashtag aggregation
+      final response = await _supabase.rpc('search_hashtags', params: {
+        'search_query': query.startsWith('#') ? query : '#$query',
+        'limit_count': limit,
+        'offset_count': offset,
+      });
+
+      return (response as List)
+          .map<String>((item) => item['hashtag'] as String)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error searching hashtags: $e');
+      // Fallback: return some common hashtags
+      final fallback = ['#ai', '#avatar', '#tech', '#creative', '#viral', '#trending']
+          .where((tag) => tag.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+      return fallback.take(limit).toList();
+    }
+  }
 }

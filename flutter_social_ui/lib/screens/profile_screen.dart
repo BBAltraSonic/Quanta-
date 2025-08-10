@@ -4,7 +4,7 @@ import 'package:flutter_social_ui/constants.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service.dart;
+import '../services/auth_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';

@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../constants.dart';
 import '../models/user_model.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service.dart;
+import '../services/auth_service.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 
