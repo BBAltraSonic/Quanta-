@@ -15,6 +15,9 @@ class FollowService {
   final AuthService _authService = AuthService();
   final AvatarService _avatarService = AvatarService();
   
+  // Following data storage
+  final Map<String, List<String>> _userFollowingAvatars = {};
+  
   // Supabase client
   SupabaseClient get _supabase => Supabase.instance.client;
   

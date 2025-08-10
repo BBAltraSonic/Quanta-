@@ -1,5 +1,4 @@
 import '../services/content_service.dart';
-import '../models/post_model.dart';
 
 // Export the ContentService from the wrapper for easy importing
 export '../services/content_service.dart' show ContentService;

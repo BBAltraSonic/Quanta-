@@ -53,14 +53,16 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         0,
         Comment(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          postId: 'demo-post',
           userId: 'me',
-          userName: 'You',
-          userAvatar: 'assets/images/p.jpg',
+          authorId: 'me',
+          authorType: CommentAuthorType.user,
           text: text,
           createdAt: DateTime.now(),
-          likes: 0,
+          updatedAt: DateTime.now(),
+          userName: 'You',
+          userAvatar: 'assets/images/p.jpg',
           hasLiked: false,
-          repliesCount: 0,
         ),
       );
       _controller.clear();

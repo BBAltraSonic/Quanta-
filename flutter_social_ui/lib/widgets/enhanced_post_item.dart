@@ -8,6 +8,7 @@ import 'comments_modal.dart';
 enum PostMediaType { image, video }
 
 class EnhancedPostItem extends StatefulWidget {
+  final String? postId;
   final String? imageUrl;
   final String? videoUrl;
   final PostMediaType mediaType;
@@ -28,6 +29,7 @@ class EnhancedPostItem extends StatefulWidget {
 
   const EnhancedPostItem({
     super.key,
+    this.postId,
     this.imageUrl,
     this.videoUrl,
     this.mediaType = PostMediaType.image,

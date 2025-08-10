@@ -14,6 +14,11 @@ class EnhancedChatService {
   final AIService _aiService = AIService();
   final AuthService _authService = AuthService();
   
+  // Chat history storage
+  final Map<String, List<ChatMessage>> _chatHistory = {};
+  
+  // Conversation suggestions storage
+  final Map<String, List<String>> _conversationSuggestions = {};
 
 
   /// Send a message to an avatar and get AI response

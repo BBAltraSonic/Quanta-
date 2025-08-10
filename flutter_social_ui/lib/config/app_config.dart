@@ -10,13 +10,14 @@ class AppConfig {
   // App Configuration
   static const String appName = 'Quanta';
   static const String appVersion = '1.0.0';
-  static const bool isDevelopment = false;
+  static const bool isDevelopment = false; // PRODUCTION MODE ENABLED
 
-  // Feature Flags
+  // Feature Flags  
   static const bool enableAI = true;
   static const bool enableSupabase = true;
   static const bool enableContentUpload = true;
   static const bool enableSearch = true;
+  static const bool enableRealTimeFeatures = true;
 
   // Validation
   static bool get isConfigured {

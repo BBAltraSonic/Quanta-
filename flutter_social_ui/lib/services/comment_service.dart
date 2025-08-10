@@ -14,6 +14,9 @@ class CommentService {
   CommentService._internal();
 
   final AuthService _authService = AuthService();
+  
+  // Comment counts cache for demo mode
+  final Map<String, int> _commentCounts = {};
   final AIService _aiService = AIService();
   final AvatarService _avatarService = AvatarService();
   
@@ -79,7 +82,7 @@ class CommentService {
     int maxReplies = 3,
   }) async {
     try {
-      final avatars = await _avatarService.getAllAvatars();
+      final avatars = await _avatarService.getPopularAvatars(limit: 10);
       final aiComments = <Comment>[];
       
       // Select random avatars to comment

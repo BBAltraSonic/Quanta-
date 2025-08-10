@@ -16,6 +16,11 @@ class InteractionService {
   final AuthService _authService = AuthService();
   final SupabaseClient _supabase = Supabase.instance.client;
   
+  // Liked posts storage
+  final Set<String> _likedPosts = {};
+  
+  // Saved posts storage
+  final Set<String> _savedPosts = {};
 
 
   /// Like or unlike a post

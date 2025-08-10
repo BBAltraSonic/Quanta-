@@ -354,4 +354,128 @@ class AIService {
       return false;
     }
   }
+
+  // Generate comment for avatar based on post content
+  Future<String> generateComment({
+    required AvatarModel avatar,
+    required String postContent,
+    String? postType,
+    AIProvider provider = AIProvider.openRouter,
+  }) async {
+    try {
+      // Create a context for comment generation
+      final context = _buildCommentContext(avatar, postContent, postType);
+      
+      String response;
+      switch (provider) {
+        case AIProvider.openRouter:
+          response = await _generateOpenRouterResponse(context, avatar);
+          break;
+        case AIProvider.huggingFace:
+          response = await _generateHuggingFaceResponse(context, avatar);
+          break;
+      }
+
+      // Process and clean the comment
+      return _processCommentResponse(response, avatar);
+    } catch (e) {
+      // Fallback to personality-based comment
+      return _generateFallbackComment(avatar, postContent);
+    }
+  }
+
+  // Build context for comment generation
+  String _buildCommentContext(AvatarModel avatar, String postContent, String? postType) {
+    final contextBuffer = StringBuffer();
+
+    contextBuffer.writeln('You are ${avatar.name}, commenting on a social media post.');
+    contextBuffer.writeln('Your personality: ${avatar.personalityTraitsDisplayText}');
+    contextBuffer.writeln('Your niche: ${avatar.nicheDisplayName}');
+    contextBuffer.writeln('');
+    contextBuffer.writeln('Post content: "$postContent"');
+    if (postType != null) {
+      contextBuffer.writeln('Post type: $postType');
+    }
+    contextBuffer.writeln('');
+    contextBuffer.writeln('Write a natural, engaging comment that reflects your personality.');
+    contextBuffer.writeln('Keep it under 280 characters and authentic to your persona.');
+    contextBuffer.writeln('Comment: ');
+
+    return contextBuffer.toString();
+  }
+
+  // Process comment response
+  String _processCommentResponse(String response, AvatarModel avatar) {
+    String cleaned = response.trim();
+
+    // Remove any prefixes
+    cleaned = cleaned.replaceFirst(RegExp(r'^(Comment:|${avatar.name}:)\s*'), '');
+    
+    // Limit length for social media
+    if (cleaned.length > 280) {
+      cleaned = '${cleaned.substring(0, 277)}...';
+    }
+
+    // Ensure response is not empty
+    if (cleaned.isEmpty) {
+      return _generateFallbackComment(avatar, '');
+    }
+
+    return cleaned;
+  }
+
+  // Generate fallback comment based on avatar personality
+  String _generateFallbackComment(AvatarModel avatar, String postContent) {
+    final traits = avatar.personalityTraits;
+    final responses = <String>[];
+
+    if (traits.contains(PersonalityTrait.friendly)) {
+      responses.addAll([
+        "Love this! 😊",
+        "This is amazing!",
+        "Great content!",
+        "Thanks for sharing! 💕",
+      ]);
+    }
+
+    if (traits.contains(PersonalityTrait.humorous)) {
+      responses.addAll([
+        "Haha, this is gold! 😂",
+        "You got me laughing! 🤣",
+        "Comedy gold right here!",
+        "This made my day! 😄",
+      ]);
+    }
+
+    if (traits.contains(PersonalityTrait.professional)) {
+      responses.addAll([
+        "Excellent work!",
+        "Very insightful content.",
+        "Well presented!",
+        "Quality post.",
+      ]);
+    }
+
+    if (traits.contains(PersonalityTrait.inspiring)) {
+      responses.addAll([
+        "So inspiring! 🌟",
+        "This motivates me!",
+        "Keep shining! ✨",
+        "You're amazing!",
+      ]);
+    }
+
+    // Default responses
+    if (responses.isEmpty) {
+      responses.addAll([
+        "Great post!",
+        "Love this!",
+        "Awesome content!",
+        "Thanks for sharing!",
+      ]);
+    }
+
+    responses.shuffle();
+    return responses.first;
+  }
 }

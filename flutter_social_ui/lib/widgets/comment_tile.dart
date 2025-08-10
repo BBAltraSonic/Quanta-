@@ -36,7 +36,7 @@ class CommentTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundImage: AssetImage(comment.userAvatar),
+            backgroundImage: AssetImage(comment.userAvatar ?? 'assets/images/p.jpg'),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -48,7 +48,7 @@ class CommentTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        comment.userName,
+                        comment.userName ?? 'User',
                         style: text.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),

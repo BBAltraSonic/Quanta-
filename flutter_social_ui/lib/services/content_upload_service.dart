@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
-import '../config/app_config.dart';
+
 import 'auth_service.dart';
 import 'content_service.dart';
 

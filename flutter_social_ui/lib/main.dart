@@ -8,10 +8,14 @@ import 'package:flutter_social_ui/services/offline_service.dart';
 import 'package:flutter_social_ui/services/video_service.dart';
 import 'package:flutter_social_ui/services/content_moderation_service.dart';
 import 'package:flutter_social_ui/services/user_safety_service.dart';
+import 'package:flutter_social_ui/services/simple_supabase_service.dart';
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase first (required for other services)
+  await SimpleSupabaseService.initialize();
 
   // Initialize performance services
   await PerformanceService.warmupApp();
@@ -26,7 +30,6 @@ void main() async {
     VideoService().initialize(),
     ContentModerationService().initialize(),
     UserSafetyService().initialize(),
-
   ]);
 
   runApp(const MyApp());
