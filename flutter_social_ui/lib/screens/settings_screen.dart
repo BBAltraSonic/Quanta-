@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service_wrapper.dart';
+import '../services/auth_service.dart;
 import '../screens/auth_wrapper.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final ProfileService _profileService = ProfileService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
 
   Map<String, dynamic> _preferences = {};
   bool _isLoading = true;

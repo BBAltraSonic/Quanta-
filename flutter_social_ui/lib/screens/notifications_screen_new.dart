@@ -71,9 +71,9 @@ class NotificationsScreenNew extends StatefulWidget {
 
 class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     with SingleTickerProviderStateMixin {
-  final ContentServiceWrapper _contentService = ContentServiceWrapper();
+  final ContentService _contentService = ContentService();
   final AvatarService _avatarService = AvatarService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
   late TabController _tabController;
 
   List<NotificationItem> _allNotifications = [];

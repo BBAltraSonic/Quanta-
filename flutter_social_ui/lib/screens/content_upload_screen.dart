@@ -18,9 +18,9 @@ class ContentUploadScreen extends StatefulWidget {
 
 class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final TextEditingController _captionController = TextEditingController();
-  final ContentServiceWrapper _contentService = ContentServiceWrapper();
+  final ContentService _contentService = ContentService();
   final AvatarService _avatarService = AvatarService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
 
   List<AvatarModel> _userAvatars = [];
   AvatarModel? _selectedAvatar;

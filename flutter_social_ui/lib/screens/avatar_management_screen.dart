@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../models/avatar_model.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service_wrapper.dart';
+import '../services/auth_service.dart';
 import '../widgets/custom_button.dart';
 import '../screens/avatar_creation_wizard.dart';
 
@@ -15,7 +15,7 @@ class AvatarManagementScreen extends StatefulWidget {
 
 class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
   final ProfileService _profileService = ProfileService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
 
   List<AvatarModel> _avatars = [];
   String? _activeAvatarId;

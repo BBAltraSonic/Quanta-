@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../constants.dart';
 import '../models/user_model.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service_wrapper.dart';
+import '../services/auth_service.dart;
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 
@@ -19,7 +19,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileService _profileService = ProfileService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
 
   late TextEditingController _displayNameController;

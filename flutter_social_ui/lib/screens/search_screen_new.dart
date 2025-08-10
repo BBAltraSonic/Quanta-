@@ -17,8 +17,8 @@ class SearchScreenNew extends StatefulWidget {
 class _SearchScreenNewState extends State<SearchScreenNew>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  final SearchServiceWrapper _searchService = SearchServiceWrapper();
-  final ContentServiceWrapper _contentService = ContentServiceWrapper();
+  final SearchService _searchService = SearchService();
+  final ContentService _contentService = ContentService();
   late TabController _tabController;
 
   List<AvatarModel> _avatarResults = [];

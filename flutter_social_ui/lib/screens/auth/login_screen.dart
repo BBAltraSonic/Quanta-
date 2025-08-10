@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants.dart';
-import '../../services/auth_service_wrapper.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import 'signup_screen.dart';
@@ -16,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthServiceWrapper();
+  final _authService = AuthService();
   
   bool _isLoading = false;
   bool _obscurePassword = true;

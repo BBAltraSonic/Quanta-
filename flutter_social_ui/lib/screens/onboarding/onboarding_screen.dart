@@ -3,7 +3,7 @@ import '../../constants.dart';
 import '../../widgets/custom_button.dart';
 import '../app_shell.dart';
 import '../avatar_creation_wizard.dart';
-import '../../services/auth_service_wrapper.dart';
+import '../../services/auth_service.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -101,7 +101,7 @@ class OnboardingScreen extends StatelessWidget {
                     text: 'Create My Avatar',
                     onPressed: () async {
                       // Mark onboarding completed and navigate to avatar creation wizard
-                      final authService = AuthServiceWrapper();
+                      final authService = AuthService();
                       await authService.markOnboardingCompleted();
                       
                       Navigator.of(context).pushReplacement(
@@ -117,7 +117,7 @@ class OnboardingScreen extends StatelessWidget {
                     text: 'Skip for Now',
                     onPressed: () async {
                       // Mark onboarding completed and navigate to main app
-                      final authService = AuthServiceWrapper();
+                      final authService = AuthService();
                       await authService.markOnboardingCompleted();
                       
                       Navigator.of(context).pushReplacement(
@@ -157,7 +157,7 @@ class OnboardingScreen extends StatelessWidget {
               Navigator.of(context).pop();
               
               // Mark onboarding completed and navigate to main app
-              final authService = AuthServiceWrapper();
+              final authService = AuthService();
               await authService.markOnboardingCompleted();
               
                     Navigator.of(context).pushReplacement(

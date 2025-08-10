@@ -31,7 +31,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final ChatService _chatService = ChatService();
   final AvatarService _avatarService = AvatarService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
 
   List<ChatMessage> _messages = [];
   AvatarModel? _avatar;

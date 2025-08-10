@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
-import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
+import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/screens/app_shell.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -17,7 +17,7 @@ class AvatarCreationWizard extends StatefulWidget {
 class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   final PageController _pageController = PageController();
   final AvatarService _avatarService = AvatarService();
-  final AuthServiceWrapper _authService = AuthServiceWrapper();
+  final AuthService _authService = AuthService();
 
   int _currentStep = 0;
   bool _isCreating = false;

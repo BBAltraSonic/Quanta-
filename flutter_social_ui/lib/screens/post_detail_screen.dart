@@ -16,7 +16,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final PageController _pageController = PageController();
-  final ContentServiceWrapper _contentService = ContentServiceWrapper();
+  final ContentService _contentService = ContentService();
   final AvatarService _avatarService = AvatarService();
 
   List<PostModel> _posts = [];
