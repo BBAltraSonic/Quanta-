@@ -4,7 +4,7 @@ import 'package:flutter_social_ui/widgets/chat_bubble.dart';
 import 'package:flutter_social_ui/widgets/day_separator.dart';
 import 'package:flutter_social_ui/services/chat_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
-import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
+import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import '../constants.dart';
 
