@@ -209,6 +209,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
                   sliver: SliverToBoxAdapter(
+                    child: _buildAnalyticsSection(),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                  sliver: SliverToBoxAdapter(
                     child: _buildAvatarsSection(),
                   ),
                 ),
@@ -286,6 +292,235 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ],
+    );
+  }
+  
+  // Analytics section
+  Widget _buildAnalyticsSection() {
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Analytics Overview',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Performance metrics row
+          Row(
+            children: [
+              Expanded(
+                child: _buildAnalyticsCard(
+                  title: 'Total Views',
+                  value: _formatNumber(_stats['total_views'] ?? 0),
+                  subtitle: '+12% this week',
+                  icon: Icons.visibility,
+                  color: Colors.blue,
+                  isPositive: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  title: 'Engagement',
+                  value: '${((_stats['engagement_rate'] ?? 0.0) * 100).toStringAsFixed(1)}%',
+                  subtitle: '+3.2% this week',
+                  icon: Icons.favorite,
+                  color: Colors.red,
+                  isPositive: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Revenue and growth metrics row
+          Row(
+            children: [
+              Expanded(
+                child: _buildAnalyticsCard(
+                  title: 'Revenue',
+                  value: '\$${_formatNumber(_stats['total_revenue'] ?? 0)}',
+                  subtitle: '+8.5% this month',
+                  icon: Icons.attach_money,
+                  color: Colors.green,
+                  isPositive: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  title: 'Growth Rate',
+                  value: '+${(_stats['growth_rate'] ?? 0.0).toStringAsFixed(1)}%',
+                  subtitle: 'Follower growth',
+                  icon: Icons.trending_up,
+                  color: Colors.purple,
+                  isPositive: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Top performing avatar
+          if (_avatars.isNotEmpty) ...[
+            const Text(
+              'Top Performing Avatar',
+              style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildTopAvatarCard(),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildAnalyticsCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isPositive,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Icon(
+                isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                color: isPositive ? Colors.green : Colors.red,
+                size: 12,
+              ),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: isPositive ? Colors.green : Colors.red,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTopAvatarCard() {
+    final topAvatar = _avatars.first; // In real app, this would be sorted by performance
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kPrimaryColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kPrimaryColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundImage: topAvatar.avatarImageUrl != null
+                ? topAvatar.avatarImageUrl!.startsWith('assets/')
+                    ? AssetImage(topAvatar.avatarImageUrl!) as ImageProvider
+                    : NetworkImage(topAvatar.avatarImageUrl!)
+                : null,
+            child: topAvatar.avatarImageUrl == null
+                ? const Icon(Icons.person, color: kLightTextColor, size: 20)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  topAvatar.name,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '${_formatNumber(topAvatar.followersCount)} followers • ${(topAvatar.engagementRate * 100).toStringAsFixed(1)}% engagement',
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: kPrimaryColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'TOP',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
   

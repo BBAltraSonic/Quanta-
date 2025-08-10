@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/avatar_model.dart';
-import '../models/user_model.dart';
 import '../utils/environment.dart';
 import 'auth_service.dart';
 
@@ -51,7 +50,9 @@ class AvatarService {
       // Check if user already has an avatar (MVP: one avatar per user)
       final existingAvatar = await getUserAvatar();
       if (existingAvatar != null) {
-        throw Exception('You already have an avatar. Please delete it first to create a new one.');
+        throw Exception(
+          'You already have an avatar. Please delete it first to create a new one.',
+        );
       }
 
       // Validate input
@@ -205,10 +206,12 @@ class AvatarService {
       // Soft delete avatar (set is_active to false)
       await _supabase
           .from('avatars')
-          .update({'is_active': false, 'updated_at': DateTime.now().toIso8601String()})
+          .update({
+            'is_active': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', avatarId)
           .eq('owner_user_id', userId);
-
     } catch (e) {
       throw Exception('Failed to delete avatar: $e');
     }
@@ -225,7 +228,9 @@ class AvatarService {
           .order('followers_count', ascending: false)
           .limit(limit);
 
-      return response.map<AvatarModel>((json) => AvatarModel.fromJson(json)).toList();
+      return response
+          .map<AvatarModel>((json) => AvatarModel.fromJson(json))
+          .toList();
     } catch (e) {
       throw Exception('Failed to load trending avatars: $e');
     }
@@ -246,23 +251,35 @@ class AvatarService {
           .eq('is_active', true);
 
       if (query != null && query.isNotEmpty) {
-        queryBuilder = queryBuilder.or('name.ilike.%$query%,bio.ilike.%$query%');
+        queryBuilder = queryBuilder.or(
+          'name.ilike.%$query%,bio.ilike.%$query%',
+        );
       }
 
       if (niche != null) {
-        queryBuilder = queryBuilder.eq('niche', niche.toString().split('.').last);
+        queryBuilder = queryBuilder.eq(
+          'niche',
+          niche.toString().split('.').last,
+        );
       }
 
       if (traits != null && traits.isNotEmpty) {
-        final traitStrings = traits.map((t) => t.toString().split('.').last).toList();
-        queryBuilder = queryBuilder.overlaps('personality_traits', traitStrings);
+        final traitStrings = traits
+            .map((t) => t.toString().split('.').last)
+            .toList();
+        queryBuilder = queryBuilder.overlaps(
+          'personality_traits',
+          traitStrings,
+        );
       }
 
       final response = await queryBuilder
           .order('followers_count', ascending: false)
           .range(offset, offset + limit - 1);
 
-      return response.map<AvatarModel>((json) => AvatarModel.fromJson(json)).toList();
+      return response
+          .map<AvatarModel>((json) => AvatarModel.fromJson(json))
+          .toList();
     } catch (e) {
       throw Exception('Failed to search avatars: $e');
     }
@@ -274,16 +291,16 @@ class AvatarService {
       // Validate file
       final fileSize = await imageFile.length();
       if (fileSize > Environment.maxImageSizeMB * 1024 * 1024) {
-        throw Exception('Image size must be less than ${Environment.maxImageSizeMB}MB');
+        throw Exception(
+          'Image size must be less than ${Environment.maxImageSizeMB}MB',
+        );
       }
 
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = '$userId/$fileName';
 
       // Upload to Supabase storage
-      await _supabase.storage
-          .from('avatars')
-          .upload(filePath, imageFile);
+      await _supabase.storage.from('avatars').upload(filePath, imageFile);
 
       // Get public URL
       final publicUrl = _supabase.storage
@@ -303,10 +320,10 @@ class AvatarService {
       final uri = Uri.parse(imageUrl);
       final pathSegments = uri.pathSegments;
       if (pathSegments.length >= 2) {
-        final filePath = pathSegments.sublist(pathSegments.length - 2).join('/');
-        await _supabase.storage
-            .from('avatars')
-            .remove([filePath]);
+        final filePath = pathSegments
+            .sublist(pathSegments.length - 2)
+            .join('/');
+        await _supabase.storage.from('avatars').remove([filePath]);
       }
     } catch (e) {
       // Log error but don't throw - image deletion is not critical
@@ -339,12 +356,16 @@ class AvatarService {
 
     // Validate name contains only allowed characters
     if (!RegExp(r'^[a-zA-Z0-9\s\-_.]+$').hasMatch(name.trim())) {
-      throw Exception('Avatar name can only contain letters, numbers, spaces, hyphens, underscores, and periods');
+      throw Exception(
+        'Avatar name can only contain letters, numbers, spaces, hyphens, underscores, and periods',
+      );
     }
   }
 
   // Pick image from gallery or camera
-  Future<File?> pickAvatarImage({ImageSource source = ImageSource.gallery}) async {
+  Future<File?> pickAvatarImage({
+    ImageSource source = ImageSource.gallery,
+  }) async {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
@@ -358,6 +379,31 @@ class AvatarService {
       return File(image.path);
     } catch (e) {
       throw Exception('Failed to pick image: $e');
+    }
+  }
+
+  // Additional method aliases for backward compatibility
+  Future<AvatarModel?> getAvatar(String avatarId) async {
+    return await getAvatarById(avatarId);
+  }
+
+  Future<List<AvatarModel>> getUserAvatars([String? userId]) async {
+    try {
+      final uid = userId ?? _authService.currentUserId;
+      if (uid == null) throw Exception('User not authenticated');
+
+      final response = await _supabase
+          .from('avatars')
+          .select()
+          .eq('owner_user_id', uid)
+          .eq('is_active', true)
+          .order('created_at', ascending: false);
+
+      return response
+          .map<AvatarModel>((json) => AvatarModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to load user avatars: $e');
     }
   }
 }

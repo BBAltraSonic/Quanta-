@@ -5,7 +5,7 @@ import '../constants.dart';
 class DaySeparator extends StatelessWidget {
   final DateTime date;
 
-  const DaySeparator({Key? key, required this.date}) : super(key: key);
+  const DaySeparator({super.key, required this.date});
 
   @override
   Widget build(BuildContext context) {

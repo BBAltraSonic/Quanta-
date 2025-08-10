@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum MessageGroupPosition { single, first, middle, last }
 
 class ChatMessage {
@@ -11,6 +9,7 @@ class ChatMessage {
   final bool showAvatar;
   final bool showTime;
   final MessageGroupPosition groupPosition;
+  final bool isAiGenerated;
 
   ChatMessage({
     required this.id,
@@ -21,5 +20,6 @@ class ChatMessage {
     this.showAvatar = false,
     this.showTime = false,
     this.groupPosition = MessageGroupPosition.single,
+    this.isAiGenerated = false,
   });
 }

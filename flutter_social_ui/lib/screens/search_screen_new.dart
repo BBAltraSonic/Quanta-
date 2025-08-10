@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/services/search_service.dart';
-import 'package:flutter_social_ui/services/content_service.dart';
+import 'package:flutter_social_ui/services/search_service_wrapper.dart';
+import 'package:flutter_social_ui/services/content_service_wrapper.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/widgets/post_item.dart';
 import 'dart:async';
 
 class SearchScreenNew extends StatefulWidget {
@@ -15,29 +14,30 @@ class SearchScreenNew extends StatefulWidget {
   _SearchScreenNewState createState() => _SearchScreenNewState();
 }
 
-class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProviderStateMixin {
+class _SearchScreenNewState extends State<SearchScreenNew>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  final SearchService _searchService = SearchService();
-  final ContentService _contentService = ContentService();
+  final SearchServiceWrapper _searchService = SearchServiceWrapper();
+  final ContentServiceWrapper _contentService = ContentServiceWrapper();
   late TabController _tabController;
-  
+
   List<AvatarModel> _avatarResults = [];
   List<PostModel> _postResults = [];
   List<String> _hashtagResults = [];
   List<String> _trendingHashtags = [];
-  
+
   bool _isSearching = false;
   bool _hasSearched = false;
   String _currentQuery = '';
   Timer? _debounceTimer;
-  
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadTrendingContent();
   }
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -71,15 +71,24 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                         decoration: InputDecoration(
                           hintText: 'Search avatars, posts, hashtags...',
                           hintStyle: TextStyle(color: kLightTextColor),
-                          prefixIcon: Icon(Icons.search, color: kLightTextColor),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: kLightTextColor,
+                          ),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
-                                  icon: Icon(Icons.clear, color: kLightTextColor),
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: kLightTextColor,
+                                  ),
                                   onPressed: _clearSearch,
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                         onChanged: _onSearchChanged,
                         onSubmitted: _performSearch,
@@ -90,13 +99,16 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                     SizedBox(width: 8),
                     TextButton(
                       onPressed: _clearSearch,
-                      child: Text('Cancel', style: TextStyle(color: kPrimaryColor)),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: kPrimaryColor),
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            
+
             // Tab bar (only show when searching)
             if (_hasSearched)
               Container(
@@ -113,17 +125,19 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                   ],
                 ),
               ),
-            
+
             // Content
             Expanded(
-              child: _hasSearched ? _buildSearchResults() : _buildDiscoverContent(),
+              child: _hasSearched
+                  ? _buildSearchResults()
+                  : _buildDiscoverContent(),
             ),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildSearchResults() {
     if (_isSearching) {
       return Center(
@@ -132,12 +146,15 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
           children: [
             CircularProgressIndicator(color: kPrimaryColor),
             SizedBox(height: 16),
-            Text('Searching...', style: kBodyTextStyle.copyWith(color: kLightTextColor)),
+            Text(
+              'Searching...',
+              style: kBodyTextStyle.copyWith(color: kLightTextColor),
+            ),
           ],
         ),
       );
     }
-    
+
     return TabBarView(
       controller: _tabController,
       children: [
@@ -147,12 +164,15 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       ],
     );
   }
-  
+
   Widget _buildAvatarResults() {
     if (_avatarResults.isEmpty) {
-      return _buildEmptyState('No avatars found', 'Try searching for different keywords');
+      return _buildEmptyState(
+        'No avatars found',
+        'Try searching for different keywords',
+      );
     }
-    
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
       itemCount: _avatarResults.length,
@@ -181,12 +201,22 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(avatar.name, style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
-                    Text(avatar.niche.displayName, style: kCaptionTextStyle.copyWith(color: kLightTextColor)),
+                    Text(
+                      avatar.name,
+                      style: kBodyTextStyle.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      avatar.niche.displayName,
+                      style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                    ),
                     if (avatar.bio.isNotEmpty)
                       Text(
                         avatar.bio,
-                        style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                        style: kCaptionTextStyle.copyWith(
+                          color: kLightTextColor,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -203,12 +233,15 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       },
     );
   }
-  
+
   Widget _buildPostResults() {
     if (_postResults.isEmpty) {
-      return _buildEmptyState('No posts found', 'Try searching for different keywords or hashtags');
+      return _buildEmptyState(
+        'No posts found',
+        'Try searching for different keywords or hashtags',
+      );
     }
-    
+
     return GridView.builder(
       padding: EdgeInsets.all(16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -233,13 +266,19 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
                       color: kBackgroundColor,
                     ),
                     child: post.hasMedia
                         ? Image.network(post.mediaUrl, fit: BoxFit.cover)
                         : Center(
-                            child: Icon(Icons.image, color: kLightTextColor, size: 48),
+                            child: Icon(
+                              Icons.image,
+                              color: kLightTextColor,
+                              size: 48,
+                            ),
                           ),
                   ),
                 ),
@@ -261,7 +300,9 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                           SizedBox(width: 4),
                           Text(
                             _formatCount(post.likesCount),
-                            style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                            style: kCaptionTextStyle.copyWith(
+                              color: kLightTextColor,
+                            ),
                           ),
                         ],
                       ),
@@ -275,12 +316,15 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       },
     );
   }
-  
+
   Widget _buildHashtagResults() {
     if (_hashtagResults.isEmpty) {
-      return _buildEmptyState('No hashtags found', 'Try searching for trending topics');
+      return _buildEmptyState(
+        'No hashtags found',
+        'Try searching for trending topics',
+      );
     }
-    
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
       itemCount: _hashtagResults.length,
@@ -299,15 +343,22 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
               child: Icon(Icons.tag, color: kPrimaryColor),
             ),
             title: Text(hashtag, style: kBodyTextStyle),
-            subtitle: Text('Trending hashtag', style: kCaptionTextStyle.copyWith(color: kLightTextColor)),
-            trailing: Icon(Icons.arrow_forward_ios, color: kLightTextColor, size: 16),
+            subtitle: Text(
+              'Trending hashtag',
+              style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios,
+              color: kLightTextColor,
+              size: 16,
+            ),
             onTap: () => _searchHashtag(hashtag),
           ),
         );
       },
     );
   }
-  
+
   Widget _buildDiscoverContent() {
     return SingleChildScrollView(
       child: Column(
@@ -349,7 +400,9 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
                             SizedBox(height: 8),
                             Text(
                               hashtag,
-                              style: kCaptionTextStyle.copyWith(fontWeight: FontWeight.bold),
+                              style: kCaptionTextStyle.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                               textAlign: TextAlign.center,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -363,7 +416,7 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
               ),
             ),
           ],
-          
+
           // Popular search suggestions
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -372,18 +425,31 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
               style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
-          ...['AI avatars', 'Technology', 'Travel', 'Fitness', 'Cooking', 'Art', 'Music']
-              .map((suggestion) => ListTile(
-                    leading: Icon(Icons.trending_up, color: kPrimaryColor),
-                    title: Text(suggestion, style: kBodyTextStyle),
-                    trailing: Icon(Icons.arrow_forward_ios, color: kLightTextColor, size: 16),
-                    onTap: () => _performSearch(suggestion),
-                  )),
+          ...[
+            'AI avatars',
+            'Technology',
+            'Travel',
+            'Fitness',
+            'Cooking',
+            'Art',
+            'Music',
+          ].map(
+            (suggestion) => ListTile(
+              leading: Icon(Icons.trending_up, color: kPrimaryColor),
+              title: Text(suggestion, style: kBodyTextStyle),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                color: kLightTextColor,
+                size: 16,
+              ),
+              onTap: () => _performSearch(suggestion),
+            ),
+          ),
         ],
       ),
     );
   }
-  
+
   Widget _buildEmptyState(String title, String subtitle) {
     return Center(
       child: Column(
@@ -402,12 +468,14 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       ),
     );
   }
-  
+
   Future<void> _loadTrendingContent() async {
     try {
       final hashtags = await _contentService.getTrendingHashtags(limit: 10);
       setState(() {
-        _trendingHashtags = hashtags.map((h) => h['hashtag'].toString()).toList();
+        _trendingHashtags = hashtags
+            .map((h) => h['hashtag'].toString())
+            .toList();
       });
     } catch (e) {
       // Use fallback hashtags
@@ -416,7 +484,7 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       });
     }
   }
-  
+
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(Duration(milliseconds: 500), () {
@@ -425,24 +493,24 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       }
     });
   }
-  
+
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
-    
+
     setState(() {
       _isSearching = true;
       _hasSearched = true;
       _currentQuery = query;
       _searchController.text = query;
     });
-    
+
     try {
       final results = await Future.wait([
         _searchService.searchAvatars(query: query, limit: 20),
         _searchService.searchPosts(query: query, limit: 20),
         _searchService.searchHashtags(query: query, limit: 20),
       ]);
-      
+
       setState(() {
         _avatarResults = results[0] as List<AvatarModel>;
         _postResults = results[1] as List<PostModel>;
@@ -453,12 +521,12 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       setState(() {
         _isSearching = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Search error: $e')));
     }
   }
-  
+
   void _clearSearch() {
     setState(() {
       _searchController.clear();
@@ -469,11 +537,11 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       _hashtagResults.clear();
     });
   }
-  
+
   void _searchHashtag(String hashtag) {
     _performSearch(hashtag);
   }
-  
+
   void _navigateToChat(AvatarModel avatar) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -485,14 +553,16 @@ class _SearchScreenNewState extends State<SearchScreenNew> with SingleTickerProv
       ),
     );
   }
-  
+
   void _viewPost(PostModel post) {
     // For now, just show a snackbar - could navigate to post detail
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Viewing post: ${post.caption.substring(0, 30)}...')),
+      SnackBar(
+        content: Text('Viewing post: ${post.caption.substring(0, 30)}...'),
+      ),
     );
   }
-  
+
   String _formatCount(int count) {
     if (count < 1000) return count.toString();
     if (count < 1000000) return '${(count / 1000).toStringAsFixed(1)}k';

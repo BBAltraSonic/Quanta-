@@ -10,12 +10,17 @@ class AuthServiceWrapper {
   factory AuthServiceWrapper() => _instance;
   AuthServiceWrapper._internal();
 
-  late final dynamic _service;
+  dynamic _service;
+  bool _isInitialized = false;
   
   AuthServiceWrapper get instance => this;
   
   // Initialize the appropriate service
   Future<void> initialize() async {
+    if (_isInitialized) {
+      return; // Already initialized, skip
+    }
+    
     if (AppConfig.demoMode) {
       _service = DemoAuthService();
     } else {
@@ -23,12 +28,13 @@ class AuthServiceWrapper {
     }
     
     await _service.initialize();
+    _isInitialized = true;
   }
   
   // Getters
-  UserModel? get currentUser => _service.currentUser;
-  bool get isAuthenticated => _service.isAuthenticated;
-  String? get currentUserId => _service.currentUserId;
+  UserModel? get currentUser => _service?.currentUser;
+  bool get isAuthenticated => _service?.isAuthenticated ?? false;
+  String? get currentUserId => _service?.currentUserId;
   
   // Auth methods
   Future<UserModel> signUp({

@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/avatar_model.dart';
 import '../models/chat_message.dart';
 import '../services/auth_service.dart';
 import '../services/avatar_service.dart';
@@ -58,7 +57,7 @@ class ChatService {
   final AuthService _authService = AuthService();
   final AvatarService _avatarService = AvatarService();
   final AIService _aiService = AIService();
-  
+
   SupabaseClient get _supabase => _authService.supabase;
 
   // Get or create chat session with avatar
@@ -123,7 +122,9 @@ class ChatService {
       }
 
       if (messageText.length > Environment.maxMessageLength) {
-        throw Exception('Message too long. Maximum ${Environment.maxMessageLength} characters.');
+        throw Exception(
+          'Message too long. Maximum ${Environment.maxMessageLength} characters.',
+        );
       }
 
       // Check rate limiting
@@ -209,7 +210,10 @@ class ChatService {
   }
 
   // Get recent messages for context (internal use)
-  Future<List<ChatMessage>> getRecentMessages(String sessionId, {int limit = 10}) async {
+  Future<List<ChatMessage>> getRecentMessages(
+    String sessionId, {
+    int limit = 10,
+  }) async {
     try {
       final response = await _supabase
           .from('chat_messages')
@@ -241,14 +245,18 @@ class ChatService {
           .eq('is_active', true)
           .order('last_message_at', ascending: false);
 
-      return response.map<ChatSession>((json) => ChatSession.fromJson(json)).toList();
+      return response
+          .map<ChatSession>((json) => ChatSession.fromJson(json))
+          .toList();
     } catch (e) {
       throw Exception('Failed to load chat sessions: $e');
     }
   }
 
   // Get chat session with avatar details
-  Future<Map<String, dynamic>> getChatSessionWithAvatar(String sessionId) async {
+  Future<Map<String, dynamic>> getChatSessionWithAvatar(
+    String sessionId,
+  ) async {
     try {
       final userId = _authService.currentUserId;
       if (userId == null) throw Exception('User not authenticated');
@@ -267,10 +275,7 @@ class ChatService {
         throw Exception('Avatar not found');
       }
 
-      return {
-        'session': session,
-        'avatar': avatar,
-      };
+      return {'session': session, 'avatar': avatar};
     } catch (e) {
       throw Exception('Failed to load chat session: $e');
     }
@@ -283,9 +288,10 @@ class ChatService {
 
     final messageCount = await _supabase
         .from('chat_messages')
-        .select('id', const FetchOptions(count: CountOption.exact))
+        .select('id')
         .eq('sender_user_id', userId)
-        .gte('created_at', startOfDay.toIso8601String());
+        .gte('created_at', startOfDay.toIso8601String())
+        .count();
 
     final count = messageCount.count ?? 0;
     if (count >= Environment.maxChatMessagesPerDay) {
@@ -306,12 +312,15 @@ class ChatService {
 
       final messageCount = await _supabase
           .from('chat_messages')
-          .select('id', const FetchOptions(count: CountOption.exact))
+          .select('id')
           .eq('sender_user_id', userId)
-          .gte('created_at', startOfDay.toIso8601String());
+          .gte('created_at', startOfDay.toIso8601String())
+          .count();
 
       final count = messageCount.count ?? 0;
-      return (Environment.maxChatMessagesPerDay - count).clamp(0, Environment.maxChatMessagesPerDay);
+      return (Environment.maxChatMessagesPerDay - count)
+          .clamp(0, Environment.maxChatMessagesPerDay)
+          .toInt();
     } catch (e) {
       return Environment.maxChatMessagesPerDay;
     }

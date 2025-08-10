@@ -279,7 +279,7 @@ class _SearchScreenState extends State<SearchScreen> {
 }
 
 class _VideoGrid extends StatelessWidget {
-  _VideoGrid({super.key});
+  _VideoGrid();
 
   final List<_VideoItem> items = List.generate(
     12,
@@ -326,7 +326,7 @@ class _VideoItem {
 }
 
 class _VideoCard extends StatelessWidget {
-  const _VideoCard({super.key, required this.item});
+  const _VideoCard({required this.item});
   final _VideoItem item;
 
   @override

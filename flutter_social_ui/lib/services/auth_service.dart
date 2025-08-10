@@ -22,11 +22,23 @@ class AuthService {
     try {
       Environment.validateConfiguration();
       
-      await Supabase.initialize(
-        url: Environment.supabaseUrl,
-        anonKey: Environment.supabaseAnonKey,
-        debug: false,
-      );
+      // Debug: Print the URL being used
+      print('🔍 DEBUG: Using Supabase URL: ${Environment.supabaseUrl}');
+      print('🔍 DEBUG: Using Supabase Key: ${Environment.supabaseAnonKey.substring(0, 20)}...');
+      
+      // Initialize Supabase (handle if already initialized)
+      try {
+        await Supabase.initialize(
+          url: Environment.supabaseUrl,
+          anonKey: Environment.supabaseAnonKey,
+          debug: false,
+        );
+      } catch (e) {
+        // If already initialized, that's fine, just continue
+        if (!e.toString().contains('already initialized')) {
+          rethrow;
+        }
+      }
       
       _supabase = Supabase.instance.client;
       
@@ -107,15 +119,28 @@ class AuthService {
       );
       
       // Save user profile to database
+      // NOTE: Temporarily removing display_name from initial insert due to Supabase schema cache issue
       await _supabase.from('users').insert({
         'id': response.user!.id,
         'email': user.email,
         'username': user.username,
-        'display_name': user.displayName,
         'role': user.role.toString().split('.').last,
         'created_at': user.createdAt.toIso8601String(),
         'updated_at': user.updatedAt.toIso8601String(),
       });
+      
+      // If display name was provided, update it separately
+      if (displayName != null && displayName.isNotEmpty) {
+        try {
+          await _supabase
+              .from('users')
+              .update({'display_name': displayName})
+              .eq('id', response.user!.id);
+        } catch (e) {
+          // Log but don't fail registration if display_name update fails
+          print('Warning: Could not update display_name: $e');
+        }
+      }
       
       _currentUser = user.copyWith();
       await _saveToLocalStorage();

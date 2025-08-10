@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../constants.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service_wrapper.dart';
-import '../widgets/custom_button.dart';
 import '../screens/auth_wrapper.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -65,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           userId: userId,
           preferences: _preferences,
         );
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -115,7 +113,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: kLightTextColor)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: kLightTextColor),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -136,7 +137,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (userId != null) {
         await _profileService.deleteAccount(userId);
         await _authService.signOut();
-        
+
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const AuthWrapper()),
@@ -186,10 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         title: const Text(
           'Settings',
-          style: TextStyle(
-            color: kTextColor,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w600),
         ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -222,9 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: kPrimaryColor),
-            )
+          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -248,9 +244,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icons.email,
                   ),
                 ]),
-                
+
                 const SizedBox(height: 24),
-                
+
                 _buildSection('Appearance', [
                   _buildSwitchTile(
                     'Dark Mode',
@@ -259,9 +255,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icons.dark_mode,
                   ),
                 ]),
-                
+
                 const SizedBox(height: 24),
-                
+
                 _buildSection('Content', [
                   _buildSwitchTile(
                     'Auto-play Videos',
@@ -276,9 +272,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icons.data_saver_on,
                   ),
                 ]),
-                
+
                 const SizedBox(height: 24),
-                
+
                 _buildSection('Privacy', [
                   _buildDropdownTile(
                     'Account Privacy',
@@ -292,9 +288,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                 ]),
-                
+
                 const SizedBox(height: 32),
-                
+
                 _buildSection('Account', [
                   _buildActionTile(
                     'Change Password',
@@ -322,9 +318,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     textColor: Colors.red,
                   ),
                 ]),
-                
+
                 const SizedBox(height: 24),
-                
+
                 _buildSection('About', [
                   _buildInfoTile('Version', '1.0.0', Icons.info),
                   _buildActionTile(
@@ -340,7 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     () => _showComingSoon('Privacy Policy'),
                   ),
                 ]),
-                
+
                 const SizedBox(height: 100),
               ],
             ),
@@ -421,10 +417,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             .map(
               (e) => DropdownMenuItem(
                 value: e.key,
-                child: Text(
-                  e.value,
-                  style: const TextStyle(color: kTextColor),
-                ),
+                child: Text(e.value, style: const TextStyle(color: kTextColor)),
               ),
             )
             .toList(),
@@ -454,10 +447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle,
         style: const TextStyle(color: kLightTextColor, fontSize: 13),
       ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: textColor ?? kLightTextColor,
-      ),
+      trailing: Icon(Icons.chevron_right, color: textColor ?? kLightTextColor),
       onTap: onTap,
     );
   }
@@ -469,10 +459,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title,
         style: const TextStyle(color: kTextColor, fontWeight: FontWeight.w500),
       ),
-      trailing: Text(
-        value,
-        style: const TextStyle(color: kLightTextColor),
-      ),
+      trailing: Text(value, style: const TextStyle(color: kLightTextColor)),
     );
   }
 
@@ -481,10 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: kCardColor,
-        title: Text(
-          feature,
-          style: const TextStyle(color: kTextColor),
-        ),
+        title: Text(feature, style: const TextStyle(color: kTextColor)),
         content: Text(
           '$feature is coming soon! Stay tuned for updates.',
           style: const TextStyle(color: kLightTextColor),
@@ -492,10 +476,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'OK',
-              style: TextStyle(color: kPrimaryColor),
-            ),
+            child: const Text('OK', style: TextStyle(color: kPrimaryColor)),
           ),
         ],
       ),

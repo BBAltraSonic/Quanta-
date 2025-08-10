@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/widgets/post_item.dart';
 import 'package:flutter_social_ui/widgets/overlay_icon.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/services/content_service.dart';
+import 'package:flutter_social_ui/services/content_service_wrapper.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
@@ -16,21 +16,31 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final PageController _pageController = PageController();
-  final ContentService _contentService = ContentService();
+  final ContentServiceWrapper _contentService = ContentServiceWrapper();
   final AvatarService _avatarService = AvatarService();
-  
+
   List<PostModel> _posts = [];
   Map<String, AvatarModel> _avatarCache = {};
   bool _isLoading = true;
   bool _hasError = false;
-  String _errorMessage = '';
+  final String _errorMessage = '';
   int _currentPage = 0;
   bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialPosts();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await _contentService.initialize();
+      _loadInitialPosts();
+    } catch (e) {
+      debugPrint('Error initializing services: $e');
+      _loadDemoData();
+    }
   }
 
   Future<void> _loadInitialPosts() async {
@@ -48,7 +58,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (posts.isNotEmpty) {
         // Cache avatars for loaded posts
         await _cacheAvatarsForPosts(posts);
-        
+
         setState(() {
           _posts = posts;
           _isLoading = false;
@@ -68,7 +78,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     // Create demo posts for when backend is not available
     final demoAvatars = _createDemoAvatars();
     final demoPosts = _createDemoPosts(demoAvatars);
-    
+
     setState(() {
       _posts = demoPosts;
       _avatarCache = {for (var avatar in demoAvatars) avatar.id: avatar};
@@ -80,25 +90,34 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   List<AvatarModel> _createDemoAvatars() {
     return [
       AvatarModel.create(
+        ownerUserId: 'demo-user-1',
         name: 'Chris Glasser',
-        niche: 'travel',
-        personalityTraits: ['adventurous', 'creative'],
-        imageUrl: 'assets/images/p.jpg',
-        ownerId: 'demo-user-1',
+        bio: 'Travel enthusiast and adventure seeker',
+        niche: AvatarNiche.travel,
+        personalityTraits: [
+          PersonalityTrait.creative,
+          PersonalityTrait.energetic,
+        ],
+        avatarImageUrl: 'assets/images/p.jpg',
       ),
       AvatarModel.create(
+        ownerUserId: 'demo-user-2',
         name: 'Ocean Explorer',
-        niche: 'nature',
-        personalityTraits: ['peaceful', 'inspiring'],
-        imageUrl: 'assets/images/p.jpg',
-        ownerId: 'demo-user-2',
+        bio: 'Nature lover and ocean conservationist',
+        niche: AvatarNiche.travel,
+        personalityTraits: [PersonalityTrait.calm, PersonalityTrait.inspiring],
+        avatarImageUrl: 'assets/images/p.jpg',
       ),
       AvatarModel.create(
+        ownerUserId: 'demo-user-3',
         name: 'History Hunter',
-        niche: 'education',
-        personalityTraits: ['curious', 'analytical'],
-        imageUrl: 'assets/images/p.jpg',
-        ownerId: 'demo-user-3',
+        bio: 'Curious about the past and ancient civilizations',
+        niche: AvatarNiche.education,
+        personalityTraits: [
+          PersonalityTrait.analytical,
+          PersonalityTrait.friendly,
+        ],
+        avatarImageUrl: 'assets/images/p.jpg',
       ),
     ];
   }
@@ -109,41 +128,30 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         avatarId: avatars[0].id,
         type: PostType.image,
         imageUrl: 'assets/images/p.jpg',
-        caption: 'Drone hyperlapse of the Dubai skyline during golden hour. #dubai #hyperlapse',
+        caption:
+            'Drone hyperlapse of the Dubai skyline during golden hour. #dubai #hyperlapse',
         hashtags: ['#dubai', '#hyperlapse'],
-      ).copyWith(
-        likesCount: 12200,
-        commentsCount: 137,
-        viewsCount: 45000,
-      ),
+      ).copyWith(likesCount: 12200, commentsCount: 137, viewsCount: 45000),
       PostModel.create(
         avatarId: avatars[1].id,
         type: PostType.image,
         imageUrl: 'assets/images/p.jpg',
         caption: 'Beautiful sunset over the ocean. #travel #beach',
         hashtags: ['#travel', '#beach'],
-      ).copyWith(
-        likesCount: 5100,
-        commentsCount: 50,
-        viewsCount: 18000,
-      ),
+      ).copyWith(likesCount: 5100, commentsCount: 50, viewsCount: 18000),
       PostModel.create(
         avatarId: avatars[2].id,
         type: PostType.image,
         imageUrl: 'assets/images/p.jpg',
         caption: 'Exploring ancient ruins. #history #adventure',
         hashtags: ['#history', '#adventure'],
-      ).copyWith(
-        likesCount: 8900,
-        commentsCount: 90,
-        viewsCount: 32000,
-      ),
+      ).copyWith(likesCount: 8900, commentsCount: 90, viewsCount: 32000),
     ];
   }
 
   Future<void> _cacheAvatarsForPosts(List<PostModel> posts) async {
     final avatarIds = posts.map((p) => p.avatarId).toSet();
-    
+
     for (String avatarId in avatarIds) {
       if (!_avatarCache.containsKey(avatarId)) {
         try {
@@ -160,7 +168,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Future<void> _loadMorePosts() async {
     if (_isLoadingMore) return;
-    
+
     setState(() {
       _isLoadingMore = true;
     });
@@ -174,7 +182,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       if (newPosts.isNotEmpty) {
         await _cacheAvatarsForPosts(newPosts);
-        
+
         setState(() {
           _posts.addAll(newPosts);
         });
@@ -195,7 +203,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         likesIncrement: 1,
         viewsIncrement: 1,
       );
-      
+
       // Update local state
       final index = _posts.indexWhere((p) => p.id == post.id);
       if (index != -1) {
@@ -219,11 +227,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   void _onCommentAdded(PostModel post) async {
     try {
-      await _contentService.updatePostEngagement(
-        post.id,
-        commentsIncrement: 1,
-      );
-      
+      await _contentService.updatePostEngagement(post.id, commentsIncrement: 1);
+
       final index = _posts.indexWhere((p) => p.id == post.id);
       if (index != -1) {
         setState(() {
@@ -285,11 +290,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                color: Colors.red,
-                size: 64,
-              ),
+              Icon(Icons.error_outline, color: Colors.red, size: 64),
               SizedBox(height: 16),
               Text(
                 'Something went wrong',
@@ -319,11 +320,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.post_add,
-                color: Colors.white54,
-                size: 64,
-              ),
+              Icon(Icons.post_add, color: Colors.white54, size: 64),
               SizedBox(height: 16),
               Text(
                 'No posts yet',
@@ -369,12 +366,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 setState(() {
                   _currentPage = index;
                 });
-                
+
                 // Load more posts when near end
                 if (index >= _posts.length - 2) {
                   _loadMorePosts();
                 }
-                
+
                 // Update view count for current post
                 if (index < _posts.length) {
                   _contentService.updatePostEngagement(
@@ -386,16 +383,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               itemBuilder: (context, index) {
                 if (index >= _posts.length) {
                   // Loading indicator at end
-                  return Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return Center(child: CircularProgressIndicator());
                 }
-                
+
                 final post = _posts[index];
                 final avatar = _avatarCache[post.avatarId];
-                
+
                 return PostItem(
-                  imageUrl: post.hasMedia ? post.mediaUrl : 'assets/images/p.jpg',
+                  imageUrl: post.hasMedia
+                      ? post.mediaUrl
+                      : 'assets/images/p.jpg',
                   author: avatar?.name ?? 'Unknown Avatar',
                   description: post.caption,
                   likes: _formatCount(post.likesCount),
@@ -449,7 +446,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       ),
                       SizedBox(width: 8),

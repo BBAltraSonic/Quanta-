@@ -6,7 +6,6 @@ import 'package:flutter_social_ui/services/chat_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:intl/intl.dart';
 import '../constants.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -16,12 +15,12 @@ class ChatScreen extends StatefulWidget {
   final String? avatarId; // Added for backend integration
 
   const ChatScreen({
-    Key? key,
+    super.key,
     required this.name,
     required this.avatar,
     this.isGroup = false,
     this.avatarId,
-  }) : super(key: key);
+  });
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -40,7 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _hasError = false;
-  String _errorMessage = '';
+  final String _errorMessage = '';
   String? _actualAvatarId;
 
   @override
@@ -67,17 +66,17 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_actualAvatarId != null) {
         // Load avatar details
         _avatar = await _avatarService.getAvatar(_actualAvatarId!);
-        
+
         // Create or get existing chat session
         await _loadOrCreateChatSession();
-        
+
         // Load existing messages
         await _loadChatHistory();
       } else {
         // Use demo mode if avatar not found
         _loadDemoMessages();
       }
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -102,9 +101,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadOrCreateChatSession() async {
     if (_actualAvatarId == null) return;
-    
+
     try {
-      final session = await _chatService.getOrCreateChatSession(_actualAvatarId!);
+      final session = await _chatService.getOrCreateChatSession(
+        _actualAvatarId!,
+      );
       _chatSessionId = session.id;
     } catch (e) {
       debugPrint('Error loading chat session: $e');
@@ -113,15 +114,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadChatHistory() async {
     if (_chatSessionId == null) return;
-    
+
     try {
       final messages = await _chatService.getChatMessages(
         sessionId: _chatSessionId!,
         limit: 50,
       );
-      
+
       setState(() {
-        _messages = messages.reversed.toList(); // Reverse to show newest at bottom
+        _messages = messages.reversed
+            .toList(); // Reverse to show newest at bottom
       });
     } catch (e) {
       debugPrint('Error loading chat history: $e');
@@ -146,7 +148,7 @@ class _ChatScreenState extends State<ChatScreen> {
         avatarUrl: widget.avatar,
       ),
     ];
-    
+
     setState(() {
       _messages = demoMessages;
       _isLoading = false;
@@ -186,40 +188,47 @@ class _ChatScreenState extends State<ChatScreen> {
 
         // Add AI response
         setState(() {
-          _messages.add(ChatMessage(
-            id: aiResponse.id,
-            text: aiResponse.text,
-            isMe: false,
-            time: aiResponse.time,
-            avatarUrl: widget.avatar,
-          ));
+          _messages.add(
+            ChatMessage(
+              id: aiResponse.id,
+              text: aiResponse.text,
+              isMe: false,
+              time: aiResponse.time,
+              avatarUrl: widget.avatar,
+            ),
+          );
         });
       } else {
         // Demo mode - generate simple response
         await Future.delayed(Duration(seconds: 1));
         final demoResponse = _generateDemoResponse(messageText);
-        
+
         setState(() {
-          _messages.add(ChatMessage(
-            id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
-            text: demoResponse,
-            isMe: false,
-            time: DateTime.now(),
-            avatarUrl: widget.avatar,
-          ));
+          _messages.add(
+            ChatMessage(
+              id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
+              text: demoResponse,
+              isMe: false,
+              time: DateTime.now(),
+              avatarUrl: widget.avatar,
+            ),
+          );
         });
       }
     } catch (e) {
       debugPrint('Error sending message: $e');
       // Show error or add fallback response
       setState(() {
-        _messages.add(ChatMessage(
-          id: 'error_${DateTime.now().millisecondsSinceEpoch}',
-          text: 'Sorry, I had trouble understanding that. Could you try again?',
-          isMe: false,
-          time: DateTime.now(),
-          avatarUrl: widget.avatar,
-        ));
+        _messages.add(
+          ChatMessage(
+            id: 'error_${DateTime.now().millisecondsSinceEpoch}',
+            text:
+                'Sorry, I had trouble understanding that. Could you try again?',
+            isMe: false,
+            time: DateTime.now(),
+            avatarUrl: widget.avatar,
+          ),
+        );
       });
     } finally {
       setState(() {
@@ -239,7 +248,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'What\'s your favorite part about that?',
       'That sounds really cool! How did you get into that?',
     ];
-    
+
     responses.shuffle();
     return responses.first;
   }
@@ -264,7 +273,7 @@ class _ChatScreenState extends State<ChatScreen> {
     for (int i = 0; i < _messages.length; i++) {
       final message = _messages[i];
       final bool isNewDay =
-          lastMessageTime == null || !isSameDay(message.time, lastMessageTime!);
+          lastMessageTime == null || !isSameDay(message.time, lastMessageTime);
 
       if (isNewDay) {
         widgets.add(DaySeparator(date: message.time));
@@ -275,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
           lastSenderId; // Placeholder logic, actual sender ID needed
       final bool isCloseInTime =
           lastMessageTime != null &&
-          message.time.difference(lastMessageTime!).inMinutes < 5;
+          message.time.difference(lastMessageTime).inMinutes < 5;
 
       MessageGroupPosition groupPosition = MessageGroupPosition.single;
       bool showAvatar = true;
@@ -419,7 +428,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         SizedBox(width: 8),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Color(0xFF2A2A2A),
                             borderRadius: BorderRadius.circular(12),

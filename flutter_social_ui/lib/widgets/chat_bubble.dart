@@ -5,7 +5,7 @@ import '../models/chat_message.dart';
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
 
-  const ChatBubble({Key? key, required this.message}) : super(key: key);
+  const ChatBubble({super.key, required this.message});
 
   BorderRadius _getBorderRadius() {
     const double radius = kChatBubbleRadius;

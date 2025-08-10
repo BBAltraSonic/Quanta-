@@ -1,71 +1,100 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/post_model.dart';
 import '../models/avatar_model.dart';
+import '../models/post_model.dart';
+import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
-enum SearchType { all, posts, avatars, hashtags }
-enum TrendingPeriod { hour, day, week, month }
+enum SearchType {
+  all,
+  avatars,
+  posts,
+  users,
+  hashtags,
+}
 
 class SearchResult {
-  final List<PostModel> posts;
-  final List<AvatarModel> avatars;
-  final List<HashtagInfo> hashtags;
-  final int totalResults;
-  final String query;
+  final String id;
   final SearchType type;
+  final String title;
+  final String subtitle;
+  final String? imageUrl;
+  final Map<String, dynamic> data;
+  final double relevanceScore;
 
   SearchResult({
-    required this.posts,
-    required this.avatars,
-    required this.hashtags,
-    required this.totalResults,
-    required this.query,
+    required this.id,
     required this.type,
-  });
-}
-
-class HashtagInfo {
-  final String hashtag;
-  final int postCount;
-  final int totalEngagement;
-  final double trendingScore;
-  final DateTime lastUsed;
-  final List<String> relatedHashtags;
-
-  HashtagInfo({
-    required this.hashtag,
-    required this.postCount,
-    required this.totalEngagement,
-    required this.trendingScore,
-    required this.lastUsed,
-    required this.relatedHashtags,
+    required this.title,
+    required this.subtitle,
+    this.imageUrl,
+    required this.data,
+    this.relevanceScore = 0.0,
   });
 
-  factory HashtagInfo.fromJson(Map<String, dynamic> json) {
-    return HashtagInfo(
-      hashtag: json['hashtag'] as String,
-      postCount: json['post_count'] as int? ?? 0,
-      totalEngagement: json['total_engagement'] as int? ?? 0,
-      trendingScore: (json['trending_score'] as num?)?.toDouble() ?? 0.0,
-      lastUsed: DateTime.parse(json['last_used'] as String),
-      relatedHashtags: (json['related_hashtags'] as List<dynamic>?)?.cast<String>() ?? [],
+  factory SearchResult.fromAvatar(AvatarModel avatar) {
+    return SearchResult(
+      id: avatar.id,
+      type: SearchType.avatars,
+      title: avatar.name,
+      subtitle: '${avatar.niche.displayName} • ${avatar.followersCount} followers',
+      imageUrl: avatar.avatarImageUrl,
+      data: avatar.toJson(),
+      relevanceScore: _calculateAvatarRelevance(avatar),
     );
   }
-}
 
-class TrendingData {
-  final List<HashtagInfo> trendingHashtags;
-  final List<PostModel> trendingPosts;
-  final List<AvatarModel> trendingAvatars;
-  final Map<String, dynamic> analytics;
+  factory SearchResult.fromPost(PostModel post, {String? avatarName}) {
+    return SearchResult(
+      id: post.id,
+      type: SearchType.posts,
+      title: avatarName ?? 'Post',
+      subtitle: post.caption.length > 100 
+          ? '${post.caption.substring(0, 100)}...' 
+          : post.caption,
+      imageUrl: post.type == PostType.image ? post.imageUrl : post.thumbnailUrl,
+      data: post.toJson(),
+      relevanceScore: _calculatePostRelevance(post),
+    );
+  }
 
-  TrendingData({
-    required this.trendingHashtags,
-    required this.trendingPosts,
-    required this.trendingAvatars,
-    required this.analytics,
-  });
+  factory SearchResult.fromUser(UserModel user) {
+    return SearchResult(
+      id: user.id,
+      type: SearchType.users,
+      title: user.displayName ?? user.username,
+      subtitle: '@${user.username}',
+      imageUrl: user.profileImageUrl,
+      data: user.toJson(),
+      relevanceScore: 1.0,
+    );
+  }
+
+  factory SearchResult.fromHashtag(String hashtag, int count) {
+    return SearchResult(
+      id: hashtag,
+      type: SearchType.hashtags,
+      title: hashtag,
+      subtitle: '$count posts',
+      data: {'hashtag': hashtag, 'count': count},
+      relevanceScore: count.toDouble(),
+    );
+  }
+
+  static double _calculateAvatarRelevance(AvatarModel avatar) {
+    // Simple relevance scoring based on followers and engagement
+    final followerScore = (avatar.followersCount / 1000).clamp(0.0, 10.0);
+    final engagementScore = avatar.engagementRate / 10;
+    return (followerScore + engagementScore).clamp(0.0, 10.0);
+  }
+
+  static double _calculatePostRelevance(PostModel post) {
+    // Simple relevance scoring based on engagement
+    final likeScore = (post.likesCount / 100).clamp(0.0, 5.0);
+    final commentScore = (post.commentsCount / 10).clamp(0.0, 3.0);
+    final viewScore = (post.viewsCount / 1000).clamp(0.0, 2.0);
+    return (likeScore + commentScore + viewScore).clamp(0.0, 10.0);
+  }
 }
 
 class SearchService {
@@ -73,469 +102,549 @@ class SearchService {
   factory SearchService() => _instance;
   SearchService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
   final AuthService _authService = AuthService();
+  SupabaseClient get _supabase => _authService.supabase;
 
   // Cache for recent searches and trending data
-  final Map<String, SearchResult> _searchCache = {};
-  final Map<String, DateTime> _cacheTimestamps = {};
-  TrendingData? _cachedTrendingData;
-  DateTime? _trendingCacheTimestamp;
+  List<String> _recentSearches = [];
+  List<String>? _trendingHashtags;
+  DateTime? _trendingCacheTime;
+  static const Duration _cacheExpiry = Duration(minutes: 15);
 
-  static const Duration _cacheExpiration = Duration(minutes: 5);
-  static const Duration _trendingCacheExpiration = Duration(minutes: 15);
+  // Initialize search service
+  Future<void> initialize() async {
+    try {
+      debugPrint('🔍 Initializing Search Service');
+      await _loadRecentSearches();
+      await _loadTrendingHashtags();
+    } catch (e) {
+      debugPrint('❌ Error initializing search service: $e');
+    }
+  }
 
-  // Comprehensive search functionality
-  Future<SearchResult> search({
+  // Comprehensive search across all content types
+  Future<List<SearchResult>> search({
     required String query,
     SearchType type = SearchType.all,
     int limit = 20,
     int offset = 0,
-    Map<String, dynamic>? filters,
   }) async {
     try {
-      // Check cache first
-      final cacheKey = '${query}_${type.name}_${limit}_$offset';
-      if (_isValidCache(cacheKey)) {
-        return _searchCache[cacheKey]!;
+      if (query.trim().isEmpty) {
+        return await _getDefaultResults(type: type, limit: limit);
       }
 
-      debugPrint('🔍 Searching: "$query" (type: ${type.name})');
+      final results = <SearchResult>[];
+      final cleanQuery = query.trim().toLowerCase();
 
-      List<PostModel> posts = [];
-      List<AvatarModel> avatars = [];
-      List<HashtagInfo> hashtags = [];
+      // Save search query
+      await _saveRecentSearch(cleanQuery);
 
-      if (type == SearchType.all || type == SearchType.posts) {
-        posts = await _searchPosts(query, limit: limit, offset: offset, filters: filters);
+      switch (type) {
+        case SearchType.all:
+          // Search all types and combine results
+          final avatarResults = await _searchAvatars(cleanQuery, limit: limit ~/ 4);
+          final postResults = await _searchPosts(cleanQuery, limit: limit ~/ 4);
+          final userResults = await _searchUsers(cleanQuery, limit: limit ~/ 4);
+          final hashtagResults = await _searchHashtags(cleanQuery, limit: limit ~/ 4);
+          
+          results.addAll(avatarResults);
+          results.addAll(postResults);
+          results.addAll(userResults);
+          results.addAll(hashtagResults);
+          break;
+
+        case SearchType.avatars:
+          results.addAll(await _searchAvatars(cleanQuery, limit: limit, offset: offset));
+          break;
+
+        case SearchType.posts:
+          results.addAll(await _searchPosts(cleanQuery, limit: limit, offset: offset));
+          break;
+
+        case SearchType.users:
+          results.addAll(await _searchUsers(cleanQuery, limit: limit, offset: offset));
+          break;
+
+        case SearchType.hashtags:
+          results.addAll(await _searchHashtags(cleanQuery, limit: limit, offset: offset));
+          break;
       }
 
-      if (type == SearchType.all || type == SearchType.avatars) {
-        avatars = await _searchAvatars(query, limit: limit, offset: offset, filters: filters);
-      }
+      // Sort by relevance score
+      results.sort((a, b) => b.relevanceScore.compareTo(a.relevanceScore));
 
-      if (type == SearchType.all || type == SearchType.hashtags) {
-        hashtags = await _searchHashtags(query, limit: limit, offset: offset);
-      }
-
-      final result = SearchResult(
-        posts: posts,
-        avatars: avatars,
-        hashtags: hashtags,
-        totalResults: posts.length + avatars.length + hashtags.length,
-        query: query,
-        type: type,
-      );
-
-      // Cache the result
-      _searchCache[cacheKey] = result;
-      _cacheTimestamps[cacheKey] = DateTime.now();
-
-      // Save search history
-      await _saveSearchHistory(query, type);
-
-      return result;
-
+      debugPrint('✅ Search completed: ${results.length} results for "$query"');
+      return results.take(limit).toList();
     } catch (e) {
-      debugPrint('❌ Search error: $e');
-      return SearchResult(
-        posts: [],
-        avatars: [],
-        hashtags: [],
-        totalResults: 0,
-        query: query,
-        type: type,
-      );
-    }
-  }
-
-  // Search posts with advanced filters
-  Future<List<PostModel>> _searchPosts(
-    String query, {
-    int limit = 20,
-    int offset = 0,
-    Map<String, dynamic>? filters,
-  }) async {
-    var searchQuery = _supabase
-        .from('posts')
-        .select('*')
-        .eq('is_active', true);
-
-    // Text search in caption
-    if (query.isNotEmpty) {
-      searchQuery = searchQuery.ilike('caption', '%$query%');
-    }
-
-    // Apply filters
-    if (filters != null) {
-      if (filters['post_type'] != null) {
-        searchQuery = searchQuery.eq('type', filters['post_type']);
-      }
-      if (filters['date_from'] != null) {
-        searchQuery = searchQuery.gte('created_at', filters['date_from']);
-      }
-      if (filters['date_to'] != null) {
-        searchQuery = searchQuery.lte('created_at', filters['date_to']);
-      }
-      if (filters['min_engagement'] != null) {
-        searchQuery = searchQuery.gte('engagement_rate', filters['min_engagement']);
-      }
-      if (filters['hashtags'] != null && filters['hashtags'] is List) {
-        searchQuery = searchQuery.overlaps('hashtags', filters['hashtags']);
-      }
-    }
-
-    final response = await searchQuery
-        .order('engagement_rate', ascending: false)
-        .order('created_at', ascending: false)
-        .range(offset, offset + limit - 1);
-
-    return response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
-  }
-
-  // Search avatars by name, niche, or traits
-  Future<List<AvatarModel>> _searchAvatars(
-    String query, {
-    int limit = 20,
-    int offset = 0,
-    Map<String, dynamic>? filters,
-  }) async {
-    var searchQuery = _supabase
-        .from('avatars')
-        .select('*')
-        .eq('is_active', true);
-
-    if (query.isNotEmpty) {
-      searchQuery = searchQuery.or('name.ilike.%$query%,niche.ilike.%$query%,bio.ilike.%$query%');
-    }
-
-    // Apply filters
-    if (filters != null) {
-      if (filters['niche'] != null) {
-        searchQuery = searchQuery.eq('niche', filters['niche']);
-      }
-      if (filters['personality_traits'] != null && filters['personality_traits'] is List) {
-        searchQuery = searchQuery.overlaps('personality_traits', filters['personality_traits']);
-      }
-      if (filters['min_followers'] != null) {
-        searchQuery = searchQuery.gte('followers_count', filters['min_followers']);
-      }
-    }
-
-    final response = await searchQuery
-        .order('followers_count', ascending: false)
-        .order('created_at', ascending: false)
-        .range(offset, offset + limit - 1);
-
-    return response.map<AvatarModel>((json) => AvatarModel.fromJson(json)).toList();
-  }
-
-  // Search hashtags with trending data
-  Future<List<HashtagInfo>> _searchHashtags(
-    String query, {
-    int limit = 20,
-    int offset = 0,
-  }) async {
-    try {
-      final response = await _supabase
-          .rpc('search_hashtags', params: {
-            'search_term': query.startsWith('#') ? query : '#$query',
-            'limit_count': limit,
-            'offset_count': offset,
-          });
-
-      return List<HashtagInfo>.from(
-        response.map((json) => HashtagInfo.fromJson(json))
-      );
-
-    } catch (e) {
-      debugPrint('❌ Hashtag search error: $e');
+      debugPrint('❌ Error performing search: $e');
       return [];
     }
   }
 
-  // Get trending data for different periods
-  Future<TrendingData> getTrendingData({
-    TrendingPeriod period = TrendingPeriod.day,
-    bool forceRefresh = false,
+  // Search avatars
+  Future<List<SearchResult>> _searchAvatars(
+    String query, {
+    int limit = 20,
+    int offset = 0,
   }) async {
     try {
-      // Check cache
-      if (!forceRefresh && _isValidTrendingCache()) {
-        return _cachedTrendingData!;
-      }
-
-      debugPrint('📈 Fetching trending data for period: ${period.name}');
-
-      final periodHours = _getPeriodHours(period);
-      
-      // Get trending hashtags
-      final hashtagsResponse = await _supabase
-          .rpc('get_trending_hashtags_period', params: {
-            'period_hours': periodHours,
-            'limit_count': 20,
-          });
-      
-      final trendingHashtags = List<HashtagInfo>.from(
-        hashtagsResponse.map((json) => HashtagInfo.fromJson(json))
-      );
-
-      // Get trending posts
-      final postsResponse = await _supabase
-          .rpc('get_trending_posts', params: {
-            'period_hours': periodHours,
-            'limit_count': 15,
-          });
-      
-      final trendingPosts = postsResponse
-          .map<PostModel>((json) => PostModel.fromJson(json))
-          .toList();
-
-      // Get trending avatars
-      final avatarsResponse = await _supabase
-          .rpc('get_trending_avatars', params: {
-            'period_hours': periodHours,
-            'limit_count': 10,
-          });
-      
-      final trendingAvatars = avatarsResponse
-          .map<AvatarModel>((json) => AvatarModel.fromJson(json))
-          .toList();
-
-      // Get analytics data
-      final analyticsResponse = await _supabase
-          .rpc('get_platform_analytics', params: {
-            'period_hours': periodHours,
-          });
-
-      final analytics = analyticsResponse as Map<String, dynamic>;
-
-      final trendingData = TrendingData(
-        trendingHashtags: trendingHashtags,
-        trendingPosts: trendingPosts,
-        trendingAvatars: trendingAvatars,
-        analytics: analytics,
-      );
-
-      // Cache the data
-      _cachedTrendingData = trendingData;
-      _trendingCacheTimestamp = DateTime.now();
-
-      return trendingData;
-
-    } catch (e) {
-      debugPrint('❌ Trending data error: $e');
-      return TrendingData(
-        trendingHashtags: [],
-        trendingPosts: [],
-        trendingAvatars: [],
-        analytics: {},
-      );
-    }
-  }
-
-  // Get search suggestions based on query
-  Future<List<String>> getSearchSuggestions(String query) async {
-    if (query.length < 2) return [];
-
-    try {
       final response = await _supabase
-          .rpc('get_search_suggestions', params: {
-            'search_term': query,
-            'limit_count': 10,
-          });
+          .from('avatars')
+          .select()
+          .eq('is_active', true)
+          .or('name.ilike.%$query%,bio.ilike.%$query%,niche.ilike.%$query%')
+          .order('followers_count', ascending: false)
+          .order('engagement_rate', ascending: false)
+          .range(offset, offset + limit - 1);
 
-      return List<String>.from(response);
-
+      return response
+          .map<SearchResult>((json) => SearchResult.fromAvatar(AvatarModel.fromJson(json)))
+          .toList();
     } catch (e) {
-      debugPrint('❌ Search suggestions error: $e');
+      debugPrint('❌ Error searching avatars: $e');
       return [];
     }
   }
 
-  // Get user's search history
-  Future<List<String>> getSearchHistory({int limit = 10}) async {
+  // Search posts
+  Future<List<SearchResult>> _searchPosts(
+    String query, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
     try {
-      final user = _authService.currentUser;
-      if (user == null) return [];
-
       final response = await _supabase
-          .from('search_history')
-          .select('query')
-          .eq('user_id', user.id)
+          .from('posts')
+          .select('''
+            *,
+            avatars:avatar_id (name, avatar_image_url)
+          ''')
+          .eq('is_active', true)
+          .eq('status', 'published')
+          .or('caption.ilike.%$query%,hashtags.cs.{"#${query.toLowerCase()}"}')
+          .order('engagement_rate', ascending: false)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return response.map<SearchResult>((json) {
+        final post = PostModel.fromJson(json);
+        final avatarName = json['avatars']?['name'] as String?;
+        return SearchResult.fromPost(post, avatarName: avatarName);
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ Error searching posts: $e');
+      return [];
+    }
+  }
+
+  // Search users
+  Future<List<SearchResult>> _searchUsers(
+    String query, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('users')
+          .select()
+          .or('username.ilike.%$query%,display_name.ilike.%$query%')
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      return response
+          .map<SearchResult>((json) => SearchResult.fromUser(UserModel.fromJson(json)))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error searching users: $e');
+      return [];
+    }
+  }
+
+  // Search hashtags
+  Future<List<SearchResult>> _searchHashtags(
+    String query, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      // Use a stored procedure or raw SQL for hashtag aggregation
+      final response = await _supabase.rpc('search_hashtags', params: {
+        'search_query': query.startsWith('#') ? query : '#$query',
+        'limit_count': limit,
+        'offset_count': offset,
+      });
+
+      return (response as List).map<SearchResult>((item) {
+        return SearchResult.fromHashtag(
+          item['hashtag'] as String,
+          item['count'] as int,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ Error searching hashtags: $e');
+      // Fallback: search in posts table directly
+      return await _searchHashtagsFallback(query, limit: limit, offset: offset);
+    }
+  }
+
+  // Fallback hashtag search
+  Future<List<SearchResult>> _searchHashtagsFallback(
+    String query, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final searchTag = query.startsWith('#') ? query : '#$query';
+      
+      final response = await _supabase
+          .from('posts')
+          .select('hashtags')
+          .eq('is_active', true)
+          .eq('status', 'published')
+          .contains('hashtags', [searchTag]);
+
+      // Count hashtag occurrences
+      final hashtagCounts = <String, int>{};
+      for (final post in response) {
+        final hashtags = post['hashtags'] as List<dynamic>?;
+        if (hashtags != null) {
+          for (final hashtag in hashtags) {
+            final tag = hashtag.toString().toLowerCase();
+            if (tag.contains(query.toLowerCase())) {
+              hashtagCounts[tag] = (hashtagCounts[tag] ?? 0) + 1;
+            }
+          }
+        }
+      }
+
+      // Convert to search results and sort by count
+      final results = hashtagCounts.entries
+          .map((entry) => SearchResult.fromHashtag(entry.key, entry.value))
+          .toList();
+      
+      results.sort((a, b) => b.relevanceScore.compareTo(a.relevanceScore));
+      
+      return results.skip(offset).take(limit).toList();
+    } catch (e) {
+      debugPrint('❌ Error in hashtag fallback search: $e');
+      return [];
+    }
+  }
+
+  // Get default results when no query is provided
+  Future<List<SearchResult>> _getDefaultResults({
+    SearchType type = SearchType.all,
+    int limit = 20,
+  }) async {
+    try {
+      final results = <SearchResult>[];
+
+      switch (type) {
+        case SearchType.all:
+          // Show trending avatars and recent posts
+          final trendingAvatars = await _getTrendingAvatars(limit: limit ~/ 2);
+          final recentPosts = await _getRecentPosts(limit: limit ~/ 2);
+          results.addAll(trendingAvatars);
+          results.addAll(recentPosts);
+          break;
+
+        case SearchType.avatars:
+          results.addAll(await _getTrendingAvatars(limit: limit));
+          break;
+
+        case SearchType.posts:
+          results.addAll(await _getRecentPosts(limit: limit));
+          break;
+
+        case SearchType.users:
+          results.addAll(await _getRecentUsers(limit: limit));
+          break;
+
+        case SearchType.hashtags:
+          results.addAll(await _getTrendingHashtagResults(limit: limit));
+          break;
+      }
+
+      return results;
+    } catch (e) {
+      debugPrint('❌ Error getting default results: $e');
+      return [];
+    }
+  }
+
+  // Get trending avatars
+  Future<List<SearchResult>> _getTrendingAvatars({int limit = 10}) async {
+    try {
+      final response = await _supabase
+          .from('avatars')
+          .select()
+          .eq('is_active', true)
+          .order('engagement_rate', ascending: false)
+          .order('followers_count', ascending: false)
+          .limit(limit);
+
+      return response
+          .map<SearchResult>((json) => SearchResult.fromAvatar(AvatarModel.fromJson(json)))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error getting trending avatars: $e');
+      return [];
+    }
+  }
+
+  // Get recent posts
+  Future<List<SearchResult>> _getRecentPosts({int limit = 10}) async {
+    try {
+      final response = await _supabase
+          .from('posts')
+          .select('''
+            *,
+            avatars:avatar_id (name, avatar_image_url)
+          ''')
+          .eq('is_active', true)
+          .eq('status', 'published')
           .order('created_at', ascending: false)
           .limit(limit);
 
-      return response.map<String>((json) => json['query'] as String).toList();
-
+      return response.map<SearchResult>((json) {
+        final post = PostModel.fromJson(json);
+        final avatarName = json['avatars']?['name'] as String?;
+        return SearchResult.fromPost(post, avatarName: avatarName);
+      }).toList();
     } catch (e) {
-      debugPrint('❌ Search history error: $e');
+      debugPrint('❌ Error getting recent posts: $e');
       return [];
     }
   }
 
-  // Clear search history
-  Future<void> clearSearchHistory() async {
-    try {
-      final user = _authService.currentUser;
-      if (user == null) return;
-
-      await _supabase
-          .from('search_history')
-          .delete()
-          .eq('user_id', user.id);
-
-      debugPrint('✅ Search history cleared');
-
-    } catch (e) {
-      debugPrint('❌ Clear search history error: $e');
-    }
-  }
-
-  // Get popular searches
-  Future<List<String>> getPopularSearches({int limit = 10}) async {
+  // Get recent users
+  Future<List<SearchResult>> _getRecentUsers({int limit = 10}) async {
     try {
       final response = await _supabase
-          .rpc('get_popular_searches', params: {
-            'limit_count': limit,
-            'period_hours': 168, // Last week
-          });
+          .from('users')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-      return List<String>.from(response.map((json) => json['query']));
-
+      return response
+          .map<SearchResult>((json) => SearchResult.fromUser(UserModel.fromJson(json)))
+          .toList();
     } catch (e) {
-      debugPrint('❌ Popular searches error: $e');
+      debugPrint('❌ Error getting recent users: $e');
       return [];
     }
   }
 
-  // Advanced search with multiple criteria
-  Future<SearchResult> advancedSearch({
-    String? textQuery,
-    List<String>? hashtags,
-    List<String>? niches,
-    List<String>? personalityTraits,
-    PostType? postType,
-    DateTime? dateFrom,
-    DateTime? dateTo,
-    double? minEngagementRate,
-    int limit = 20,
-    int offset = 0,
-  }) async {
+  // Get trending hashtags as search results
+  Future<List<SearchResult>> _getTrendingHashtagResults({int limit = 10}) async {
+    final hashtags = await getTrendingHashtags(limit: limit);
+    return hashtags.map((item) => SearchResult.fromHashtag(
+      item['hashtag'] as String,
+      item['count'] as int,
+    )).toList();
+  }
+
+  // Get trending hashtags
+  Future<List<Map<String, dynamic>>> getTrendingHashtags({int limit = 20}) async {
     try {
-      final filters = <String, dynamic>{};
+      // Check cache first
+      if (_trendingHashtags != null && 
+          _trendingCacheTime != null &&
+          DateTime.now().difference(_trendingCacheTime!) < _cacheExpiry) {
+        return _trendingHashtags!
+            .take(limit)
+            .map((hashtag) => {'hashtag': hashtag, 'count': 0})
+            .toList();
+      }
+
+      // Try to use stored procedure
+      try {
+        final response = await _supabase.rpc('get_trending_hashtags', params: {
+          'limit_count': limit,
+        });
+
+        final results = List<Map<String, dynamic>>.from(response);
+        _trendingHashtags = results.map((item) => item['hashtag'] as String).toList();
+        _trendingCacheTime = DateTime.now();
+        
+        return results;
+      } catch (e) {
+        debugPrint('⚠️ Stored procedure not available, using fallback: $e');
+        return await _getTrendingHashtagsFallback(limit: limit);
+      }
+    } catch (e) {
+      debugPrint('❌ Error getting trending hashtags: $e');
+      return [];
+    }
+  }
+
+  // Fallback method for trending hashtags
+  Future<List<Map<String, dynamic>>> _getTrendingHashtagsFallback({int limit = 20}) async {
+    try {
+      // Get recent posts with hashtags
+      final response = await _supabase
+          .from('posts')
+          .select('hashtags')
+          .eq('is_active', true)
+          .eq('status', 'published')
+          .gte('created_at', DateTime.now().subtract(Duration(days: 7)).toIso8601String())
+          .not('hashtags', 'is', null);
+
+      // Count hashtag occurrences
+      final hashtagCounts = <String, int>{};
+      for (final post in response) {
+        final hashtags = post['hashtags'] as List<dynamic>?;
+        if (hashtags != null) {
+          for (final hashtag in hashtags) {
+            final tag = hashtag.toString().toLowerCase();
+            hashtagCounts[tag] = (hashtagCounts[tag] ?? 0) + 1;
+          }
+        }
+      }
+
+      // Sort by count and return top results
+      final sortedHashtags = hashtagCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      final results = sortedHashtags
+          .take(limit)
+          .map((entry) => {'hashtag': entry.key, 'count': entry.value})
+          .toList();
+
+      // Cache results
+      _trendingHashtags = results.map((item) => item['hashtag'] as String).toList();
+      _trendingCacheTime = DateTime.now();
+
+      return results;
+    } catch (e) {
+      debugPrint('❌ Error in trending hashtags fallback: $e');
+      return [];
+    }
+  }
+
+  // Get search suggestions
+  Future<List<String>> getSearchSuggestions(String query) async {
+    try {
+      if (query.trim().isEmpty) {
+        return _recentSearches.take(5).toList();
+      }
+
+      final suggestions = <String>[];
+      final cleanQuery = query.trim().toLowerCase();
+
+      // Add matching recent searches
+      suggestions.addAll(
+        _recentSearches
+            .where((search) => search.toLowerCase().contains(cleanQuery))
+            .take(3),
+      );
+
+      // Add trending hashtags that match
+      final trendingHashtags = await getTrendingHashtags(limit: 10);
+      suggestions.addAll(
+        trendingHashtags
+            .map((item) => item['hashtag'] as String)
+            .where((hashtag) => hashtag.toLowerCase().contains(cleanQuery))
+            .take(3),
+      );
+
+      // Add avatar names that match
+      try {
+        final avatarResponse = await _supabase
+            .from('avatars')
+            .select('name')
+            .eq('is_active', true)
+            .ilike('name', '%$cleanQuery%')
+            .limit(3);
+
+        suggestions.addAll(
+          avatarResponse.map((item) => item['name'] as String),
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error getting avatar suggestions: $e');
+      }
+
+      // Remove duplicates and return
+      return suggestions.toSet().take(8).toList();
+    } catch (e) {
+      debugPrint('❌ Error getting search suggestions: $e');
+      return _recentSearches.take(5).toList();
+    }
+  }
+
+  // Get recent searches
+  List<String> getRecentSearches() {
+    return List.from(_recentSearches);
+  }
+
+  // Clear recent searches
+  Future<void> clearRecentSearches() async {
+    try {
+      _recentSearches.clear();
+      await _saveRecentSearches();
+      debugPrint('✅ Recent searches cleared');
+    } catch (e) {
+      debugPrint('❌ Error clearing recent searches: $e');
+    }
+  }
+
+  // Save recent search
+  Future<void> _saveRecentSearch(String query) async {
+    try {
+      // Remove if already exists
+      _recentSearches.remove(query);
       
-      if (postType != null) {
-        filters['post_type'] = postType.toString().split('.').last;
+      // Add to beginning
+      _recentSearches.insert(0, query);
+      
+      // Keep only last 20 searches
+      if (_recentSearches.length > 20) {
+        _recentSearches = _recentSearches.take(20).toList();
       }
-      if (dateFrom != null) {
-        filters['date_from'] = dateFrom.toIso8601String();
-      }
-      if (dateTo != null) {
-        filters['date_to'] = dateTo.toIso8601String();
-      }
-      if (minEngagementRate != null) {
-        filters['min_engagement'] = minEngagementRate;
-      }
-      if (hashtags != null && hashtags.isNotEmpty) {
-        filters['hashtags'] = hashtags;
-      }
-      if (niches != null && niches.isNotEmpty) {
-        filters['niche'] = niches.first; // Simplified for now
-      }
-      if (personalityTraits != null && personalityTraits.isNotEmpty) {
-        filters['personality_traits'] = personalityTraits;
-      }
-
-      return await search(
-        query: textQuery ?? '',
-        type: SearchType.all,
-        limit: limit,
-        offset: offset,
-        filters: filters,
-      );
-
+      
+      await _saveRecentSearches();
     } catch (e) {
-      debugPrint('❌ Advanced search error: $e');
-      return SearchResult(
-        posts: [],
-        avatars: [],
-        hashtags: [],
-        totalResults: 0,
-        query: textQuery ?? '',
-        type: SearchType.all,
-      );
+      debugPrint('❌ Error saving recent search: $e');
     }
   }
 
-  // Save search to history
-  Future<void> _saveSearchHistory(String query, SearchType type) async {
+  // Load recent searches from storage
+  Future<void> _loadRecentSearches() async {
     try {
-      final user = _authService.currentUser;
-      if (user == null) return;
-
-      await _supabase.from('search_history').upsert({
-        'user_id': user.id,
-        'query': query,
-        'search_type': type.name,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-
+      // In a real app, this would load from SharedPreferences or similar
+      // For now, we'll keep it in memory
+      debugPrint('📝 Recent searches loaded');
     } catch (e) {
-      debugPrint('⚠️ Could not save search history: $e');
+      debugPrint('❌ Error loading recent searches: $e');
     }
   }
 
-  // Clear expired cache entries
-  void _cleanupCache() {
-    final now = DateTime.now();
-    final expiredKeys = _cacheTimestamps.entries
-        .where((entry) => now.difference(entry.value) > _cacheExpiration)
-        .map((entry) => entry.key)
-        .toList();
-
-    for (final key in expiredKeys) {
-      _searchCache.remove(key);
-      _cacheTimestamps.remove(key);
+  // Save recent searches to storage
+  Future<void> _saveRecentSearches() async {
+    try {
+      // In a real app, this would save to SharedPreferences or similar
+      // For now, we'll keep it in memory
+      debugPrint('💾 Recent searches saved');
+    } catch (e) {
+      debugPrint('❌ Error saving recent searches: $e');
     }
   }
 
-  // Helper methods
-  bool _isValidCache(String key) {
-    _cleanupCache();
-    final timestamp = _cacheTimestamps[key];
-    if (timestamp == null) return false;
-    
-    return DateTime.now().difference(timestamp) < _cacheExpiration;
-  }
-
-  bool _isValidTrendingCache() {
-    if (_cachedTrendingData == null || _trendingCacheTimestamp == null) {
-      return false;
-    }
-    
-    return DateTime.now().difference(_trendingCacheTimestamp!) < _trendingCacheExpiration;
-  }
-
-  int _getPeriodHours(TrendingPeriod period) {
-    switch (period) {
-      case TrendingPeriod.hour:
-        return 1;
-      case TrendingPeriod.day:
-        return 24;
-      case TrendingPeriod.week:
-        return 168;
-      case TrendingPeriod.month:
-        return 720;
+  // Load trending hashtags
+  Future<void> _loadTrendingHashtags() async {
+    try {
+      await getTrendingHashtags(limit: 20);
+      debugPrint('📈 Trending hashtags loaded');
+    } catch (e) {
+      debugPrint('❌ Error loading trending hashtags: $e');
     }
   }
 
-  // Clear all caches
+  // Clear cache
   void clearCache() {
-    _searchCache.clear();
-    _cacheTimestamps.clear();
-    _cachedTrendingData = null;
-    _trendingCacheTimestamp = null;
-    debugPrint('🧹 Search cache cleared');
+    _trendingHashtags = null;
+    _trendingCacheTime = null;
+    debugPrint('🗑️ Search cache cleared');
   }
 }

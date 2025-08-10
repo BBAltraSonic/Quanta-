@@ -10,11 +10,8 @@ import '../widgets/custom_button.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel user;
-  
-  const EditProfileScreen({
-    super.key,
-    required this.user,
-  });
+
+  const EditProfileScreen({super.key, required this.user});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -24,20 +21,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileService _profileService = ProfileService();
   final AuthServiceWrapper _authService = AuthServiceWrapper();
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   late TextEditingController _displayNameController;
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
-  
+
   File? _selectedImage;
   String? _currentImageUrl;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _displayNameController = TextEditingController(text: widget.user.displayName ?? '');
+    _displayNameController = TextEditingController(
+      text: widget.user.displayName ?? '',
+    );
     _usernameController = TextEditingController(text: widget.user.username);
     _emailController = TextEditingController(text: widget.user.email);
     _currentImageUrl = widget.user.profileImageUrl;
@@ -59,7 +58,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         maxWidth: 800,
         maxHeight: 800,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
@@ -87,7 +86,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       String? imageUrl = _currentImageUrl;
-      
+
       // Upload new image if selected
       if (_selectedImage != null) {
         imageUrl = await _profileService.uploadProfileImage(
@@ -99,8 +98,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Update profile
       final updatedUser = await _profileService.updateUserProfile(
         userId: widget.user.id,
-        displayName: _displayNameController.text.trim().isEmpty 
-            ? null 
+        displayName: _displayNameController.text.trim().isEmpty
+            ? null
             : _displayNameController.text.trim(),
         username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
@@ -130,10 +129,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
   }
@@ -147,10 +143,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         title: const Text(
           'Edit Profile',
-          style: TextStyle(
-            color: kTextColor,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w600),
         ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -183,9 +176,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: kPrimaryColor),
-            )
+          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -217,27 +208,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                           fit: BoxFit.cover,
                                         )
                                       : _currentImageUrl != null
-                                          ? _currentImageUrl!.startsWith('assets/')
-                                              ? Image.asset(
-                                                  _currentImageUrl!,
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : Image.network(
-                                                  _currentImageUrl!,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return const Icon(
-                                                      Icons.person,
-                                                      size: 60,
-                                                      color: kLightTextColor,
-                                                    );
-                                                  },
-                                                )
-                                          : const Icon(
-                                              Icons.person,
-                                              size: 60,
-                                              color: kLightTextColor,
-                                            ),
+                                      ? _currentImageUrl!.startsWith('assets/')
+                                            ? Image.asset(
+                                                _currentImageUrl!,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.network(
+                                                _currentImageUrl!,
+                                                fit: BoxFit.cover,
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) {
+                                                      return const Icon(
+                                                        Icons.person,
+                                                        size: 60,
+                                                        color: kLightTextColor,
+                                                      );
+                                                    },
+                                              )
+                                      : const Icon(
+                                          Icons.person,
+                                          size: 60,
+                                          color: kLightTextColor,
+                                        ),
                                 ),
                               ),
                               Positioned(
@@ -278,9 +274,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Form Fields
                   Container(
                     padding: const EdgeInsets.all(24),
@@ -311,9 +307,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   // Save Button
                   SizedBox(
                     width: double.infinity,
@@ -323,9 +319,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       icon: _isSaving ? null : Icons.save,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Cancel Button
                   SizedBox(
                     width: double.infinity,

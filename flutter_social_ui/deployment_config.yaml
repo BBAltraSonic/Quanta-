@@ -1,0 +1,107 @@
+# Quanta AI Avatar Platform - Deployment Configuration
+# Production deployment settings and environment configuration
+
+app:
+  name: "Quanta - AI Avatar Platform"
+  version: "1.0.0"
+  build_number: 1
+  bundle_id: "com.quanta.ai.avatar.platform"
+  
+environments:
+  development:
+    api_base_url: "http://localhost:3000/api"
+    supabase_url: "https://your-dev-project.supabase.co"
+    supabase_anon_key: "your-dev-anon-key"
+    openrouter_api_key: "your-dev-openrouter-key"
+    debug_mode: true
+    analytics_enabled: false
+    
+  staging:
+    api_base_url: "https://staging-api.quanta.ai/api"
+    supabase_url: "https://your-staging-project.supabase.co"
+    supabase_anon_key: "your-staging-anon-key"
+    openrouter_api_key: "your-staging-openrouter-key"
+    debug_mode: false
+    analytics_enabled: true
+    
+  production:
+    api_base_url: "https://api.quanta.ai/api"
+    supabase_url: "https://your-prod-project.supabase.co"
+    supabase_anon_key: "your-prod-anon-key"
+    openrouter_api_key: "your-prod-openrouter-key"
+    debug_mode: false
+    analytics_enabled: true
+
+build_settings:
+  android:
+    min_sdk_version: 21
+    target_sdk_version: 34
+    compile_sdk_version: 34
+    proguard_enabled: true
+    signing_config: "release"
+    
+  ios:
+    deployment_target: "12.0"
+    swift_version: "5.0"
+    bitcode_enabled: false
+    
+performance:
+  image_cache_size_mb: 100
+  memory_cache_size_mb: 50
+  network_timeout_seconds: 30
+  max_concurrent_requests: 10
+  
+security:
+  certificate_pinning: true
+  obfuscation_enabled: true
+  root_detection: true
+  debug_detection: true
+  
+features:
+  offline_mode: true
+  push_notifications: true
+  analytics: true
+  crash_reporting: true
+  performance_monitoring: true
+  content_moderation: true
+  
+app_store:
+  android:
+    store: "Google Play Store"
+    package_name: "com.quanta.ai.avatar.platform"
+    version_code: 1
+    
+  ios:
+    store: "Apple App Store"
+    bundle_identifier: "com.quanta.ai.avatar.platform"
+    version: "1.0.0"
+    
+deployment_scripts:
+  build_android: |
+    flutter clean
+    flutter pub get
+    flutter build apk --release --target-platform android-arm64
+    
+  build_ios: |
+    flutter clean
+    flutter pub get
+    flutter build ios --release
+    
+  deploy_staging: |
+    # Deploy to staging environment
+    echo "Deploying to staging..."
+    
+  deploy_production: |
+    # Deploy to production environment
+    echo "Deploying to production..."
+    
+monitoring:
+  error_tracking: "Sentry"
+  analytics: "Firebase Analytics"
+  performance: "Firebase Performance"
+  crash_reporting: "Firebase Crashlytics"
+  
+backup:
+  database_backup_frequency: "daily"
+  media_backup_frequency: "weekly"
+  retention_period_days: 30

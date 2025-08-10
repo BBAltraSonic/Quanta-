@@ -51,17 +51,23 @@ class UserModel {
   // From JSON (for Supabase data)
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      username: json['username'] as String,
-      displayName: json['display_name'] as String?,
-      profileImageUrl: json['profile_image_url'] as String?,
+      id: json['id']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      username: json['username']?.toString() ?? '',
+      displayName: json['display_name']?.toString(),
+      profileImageUrl: json['profile_image_url']?.toString(),
       role: UserRole.values.firstWhere(
-        (e) => e.toString().split('.').last == json['role'],
+        (e) =>
+            e.toString().split('.').last ==
+            (json['role']?.toString() ?? 'creator'),
         orElse: () => UserRole.creator,
       ),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'].toString())
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'].toString())
+          : DateTime.now(),
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }

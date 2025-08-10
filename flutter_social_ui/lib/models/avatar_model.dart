@@ -16,6 +16,39 @@ enum AvatarNiche {
   other,
 }
 
+extension AvatarNicheExtension on AvatarNiche {
+  String get displayName {
+    switch (this) {
+      case AvatarNiche.fashion:
+        return 'Fashion';
+      case AvatarNiche.fitness:
+        return 'Fitness';
+      case AvatarNiche.comedy:
+        return 'Comedy';
+      case AvatarNiche.tech:
+        return 'Tech';
+      case AvatarNiche.music:
+        return 'Music';
+      case AvatarNiche.art:
+        return 'Art';
+      case AvatarNiche.cooking:
+        return 'Cooking';
+      case AvatarNiche.travel:
+        return 'Travel';
+      case AvatarNiche.gaming:
+        return 'Gaming';
+      case AvatarNiche.education:
+        return 'Education';
+      case AvatarNiche.lifestyle:
+        return 'Lifestyle';
+      case AvatarNiche.business:
+        return 'Business';
+      case AvatarNiche.other:
+        return 'Other';
+    }
+  }
+}
+
 enum PersonalityTrait {
   friendly,
   professional,
@@ -27,6 +60,33 @@ enum PersonalityTrait {
   energetic,
   calm,
   mysterious,
+}
+
+extension PersonalityTraitExtension on PersonalityTrait {
+  String get displayName {
+    switch (this) {
+      case PersonalityTrait.friendly:
+        return 'Friendly';
+      case PersonalityTrait.professional:
+        return 'Professional';
+      case PersonalityTrait.humorous:
+        return 'Humorous';
+      case PersonalityTrait.inspiring:
+        return 'Inspiring';
+      case PersonalityTrait.creative:
+        return 'Creative';
+      case PersonalityTrait.analytical:
+        return 'Analytical';
+      case PersonalityTrait.empathetic:
+        return 'Empathetic';
+      case PersonalityTrait.energetic:
+        return 'Energetic';
+      case PersonalityTrait.calm:
+        return 'Calm';
+      case PersonalityTrait.mysterious:
+        return 'Mysterious';
+    }
+  }
 }
 
 class AvatarModel {
@@ -258,6 +318,9 @@ Remember: You are a virtual influencer with your own unique personality and styl
         .map((t) => t.toString().split('.').last.replaceAll('_', ' '))
         .join(', ');
   }
+
+  // Backward compatibility getter
+  String? get imageUrl => avatarImageUrl;
 
   @override
   bool operator ==(Object other) {

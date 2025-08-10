@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/services/content_service.dart';
+import 'package:flutter_social_ui/services/content_service_wrapper.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'dart:io';
@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
 class ContentUploadScreen extends StatefulWidget {
-  const ContentUploadScreen({Key? key}) : super(key: key);
+  const ContentUploadScreen({super.key});
 
   @override
   _ContentUploadScreenState createState() => _ContentUploadScreenState();
@@ -18,24 +18,34 @@ class ContentUploadScreen extends StatefulWidget {
 
 class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final TextEditingController _captionController = TextEditingController();
-  final ContentService _contentService = ContentService();
+  final ContentServiceWrapper _contentService = ContentServiceWrapper();
   final AvatarService _avatarService = AvatarService();
   final AuthServiceWrapper _authService = AuthServiceWrapper();
-  
+
   List<AvatarModel> _userAvatars = [];
   AvatarModel? _selectedAvatar;
   File? _selectedMedia;
   PostType _postType = PostType.image;
   VideoPlayerController? _videoController;
   List<String> _extractedHashtags = [];
-  bool _isLoading = false;
+  final bool _isLoading = false;
   bool _isUploading = false;
   bool _loadingAvatars = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUserAvatars();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await _contentService.initialize();
+      _loadUserAvatars();
+    } catch (e) {
+      debugPrint('Error initializing services: $e');
+      _loadUserAvatars(); // Still load avatars
+    }
   }
 
   @override
@@ -55,9 +65,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       });
     } catch (e) {
       setState(() => _loadingAvatars = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading avatars: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading avatars: $e')));
     }
   }
 
@@ -70,9 +80,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           title: Text('Create Post'),
           backgroundColor: kBackgroundColor,
         ),
-        body: Center(
-          child: CircularProgressIndicator(color: kPrimaryColor),
-        ),
+        body: Center(child: CircularProgressIndicator(color: kPrimaryColor)),
       );
     }
 
@@ -144,7 +152,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Avatar selection
-            Text('Post as:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Post as:',
+              style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -178,7 +189,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                               Text(avatar.name, style: kBodyTextStyle),
                               Text(
                                 avatar.niche.displayName,
-                                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                                style: kCaptionTextStyle.copyWith(
+                                  color: kLightTextColor,
+                                ),
                               ),
                             ],
                           ),
@@ -192,13 +205,16 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 24),
-            
+
             // Media picker section
-            Text('Content:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Content:',
+              style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 8),
-            
+
             // Media preview or picker
             GestureDetector(
               onTap: _pickMedia,
@@ -223,7 +239,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                           SizedBox(height: 12),
                           Text(
                             'Tap to add photo or video',
-                            style: kBodyTextStyle.copyWith(color: kPrimaryColor),
+                            style: kBodyTextStyle.copyWith(
+                              color: kPrimaryColor,
+                            ),
                           ),
                           SizedBox(height: 8),
                           Row(
@@ -232,13 +250,19 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                               _MediaTypeButton(
                                 icon: Icons.photo,
                                 label: 'Photo',
-                                onTap: () => _pickMedia(source: ImageSource.gallery, isVideo: false),
+                                onTap: () => _pickMedia(
+                                  source: ImageSource.gallery,
+                                  isVideo: false,
+                                ),
                               ),
                               SizedBox(width: 16),
                               _MediaTypeButton(
                                 icon: Icons.videocam,
                                 label: 'Video',
-                                onTap: () => _pickMedia(source: ImageSource.gallery, isVideo: true),
+                                onTap: () => _pickMedia(
+                                  source: ImageSource.gallery,
+                                  isVideo: true,
+                                ),
                               ),
                               SizedBox(width: 16),
                               _MediaTypeButton(
@@ -252,7 +276,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                       ),
               ),
             ),
-            
+
             if (_selectedMedia != null) ...[
               SizedBox(height: 16),
               Row(
@@ -271,23 +295,30 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                   TextButton.icon(
                     onPressed: _pickMedia,
                     icon: Icon(Icons.swap_horiz, color: kPrimaryColor),
-                    label: Text('Change', style: TextStyle(color: kPrimaryColor)),
+                    label: Text(
+                      'Change',
+                      style: TextStyle(color: kPrimaryColor),
+                    ),
                   ),
                 ],
               ),
             ],
-            
+
             SizedBox(height: 24),
-            
+
             // Caption section
-            Text('Caption:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              'Caption:',
+              style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 8),
             TextField(
               controller: _captionController,
               style: kBodyTextStyle,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Write a caption... Use #hashtags to reach more people',
+                hintText:
+                    'Write a caption... Use #hashtags to reach more people',
                 filled: true,
                 fillColor: kCardColor,
                 border: OutlineInputBorder(
@@ -303,11 +334,14 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                 });
               },
             ),
-            
+
             // Hashtags preview
             if (_extractedHashtags.isNotEmpty) ...[
               SizedBox(height: 16),
-              Text('Hashtags:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Hashtags:',
+                style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -327,9 +361,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                 }).toList(),
               ),
             ],
-            
+
             SizedBox(height: 32),
-            
+
             // Upload button
             SizedBox(
               width: double.infinity,
@@ -346,14 +380,20 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                           SizedBox(width: 16),
                           Text('Uploading...'),
                         ],
                       )
                     : Text(
                         'Share Post',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),
@@ -387,7 +427,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               },
               backgroundColor: Colors.black54,
               child: Icon(
-                _videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                _videoController!.value.isPlaying
+                    ? Icons.pause
+                    : Icons.play_arrow,
                 color: Colors.white,
               ),
             ),
@@ -404,13 +446,13 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         ),
       );
     }
-    
+
     return Container();
   }
 
   Future<void> _pickMedia({ImageSource? source, bool? isVideo}) async {
     final picker = ImagePicker();
-    
+
     if (source == null) {
       // Show bottom sheet to choose source
       showModalBottomSheet(
@@ -424,7 +466,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Choose Media', style: kHeadingTextStyle.copyWith(fontSize: 18)),
+              Text(
+                'Choose Media',
+                style: kHeadingTextStyle.copyWith(fontSize: 18),
+              ),
               SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -464,7 +509,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
 
     try {
       final XFile? pickedFile;
-      
+
       if (isVideo == true) {
         pickedFile = await picker.pickVideo(source: source);
         _postType = PostType.video;
@@ -475,7 +520,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
 
       if (pickedFile != null) {
         setState(() {
-          _selectedMedia = File(pickedFile.path);
+          _selectedMedia = File(pickedFile!.path);
         });
 
         if (_postType == PostType.video) {
@@ -487,9 +532,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking media: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking media: $e')));
     }
   }
 
@@ -505,7 +550,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Camera Options', style: kHeadingTextStyle.copyWith(fontSize: 18)),
+            Text(
+              'Camera Options',
+              style: kHeadingTextStyle.copyWith(fontSize: 18),
+            ),
             SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -535,10 +583,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   }
 
   bool _canUpload() {
-    return _selectedAvatar != null && 
-           _selectedMedia != null && 
-           _captionController.text.trim().isNotEmpty &&
-           !_isUploading;
+    return _selectedAvatar != null &&
+        _selectedMedia != null &&
+        _captionController.text.trim().isNotEmpty &&
+        !_isUploading;
   }
 
   Future<void> _uploadContent() async {
@@ -603,10 +651,7 @@ class _MediaTypeButton extends StatelessWidget {
             child: Icon(icon, color: kPrimaryColor),
           ),
           SizedBox(height: 4),
-          Text(
-            label,
-            style: kCaptionTextStyle.copyWith(color: kPrimaryColor),
-          ),
+          Text(label, style: kCaptionTextStyle.copyWith(color: kPrimaryColor)),
         ],
       ),
     );

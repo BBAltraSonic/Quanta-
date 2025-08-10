@@ -62,8 +62,77 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Edge-to-edge media
-        Positioned.fill(child: Image.asset(imageUrl, fit: BoxFit.cover)),
+        // Edge-to-edge media with optimized loading
+        Positioned.fill(
+          child: imageUrl.startsWith('http')
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded) return child;
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: const Duration(milliseconds: 300),
+                          child: child,
+                        );
+                      },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey[900],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                              : null,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[900],
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white54,
+                          size: 48,
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : Image.asset(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded) return child;
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: const Duration(milliseconds: 300),
+                          child: child,
+                        );
+                      },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[900],
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white54,
+                          size: 48,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
 
         // Top overlay: search, Spacer, volume, 12, menu
 
@@ -80,17 +149,19 @@ class PostItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: onAvatarTap ?? () {
-                      // Fallback navigation to avatar chat
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ChatScreen(
-                            name: author,
-                            avatar: 'assets/images/p.jpg',
-                          ),
-                        ),
-                      );
-                    },
+                    onTap:
+                        onAvatarTap ??
+                        () {
+                          // Fallback navigation to avatar chat
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreen(
+                                name: author,
+                                avatar: 'assets/images/p.jpg',
+                              ),
+                            ),
+                          );
+                        },
                     child: Stack(
                       children: [
                         const CircleAvatar(
@@ -165,9 +236,11 @@ class PostItem extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap: onComment ?? () {
-                        openCommentsModal(context);
-                      },
+                      onTap:
+                          onComment ??
+                          () {
+                            openCommentsModal(context);
+                          },
                       child: _iconWithCounter(
                         asset:
                             'assets/icons/chat-round-svgrepo-com.svg', // comment

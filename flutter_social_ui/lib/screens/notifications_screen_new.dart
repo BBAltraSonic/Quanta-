@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/services/content_service.dart';
+import 'package:flutter_social_ui/services/content_service_wrapper.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
@@ -72,14 +71,14 @@ class NotificationsScreenNew extends StatefulWidget {
 
 class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     with SingleTickerProviderStateMixin {
-  final ContentService _contentService = ContentService();
+  final ContentServiceWrapper _contentService = ContentServiceWrapper();
   final AvatarService _avatarService = AvatarService();
   final AuthServiceWrapper _authService = AuthServiceWrapper();
   late TabController _tabController;
 
   List<NotificationItem> _allNotifications = [];
   List<NotificationItem> _unreadNotifications = [];
-  Map<String, AvatarModel> _avatarCache = {};
+  final Map<String, AvatarModel> _avatarCache = {};
 
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -88,7 +87,17 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadNotifications();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      await _contentService.initialize();
+      _loadNotifications();
+    } catch (e) {
+      debugPrint('Error initializing services: $e');
+      _loadNotifications(); // Still load demo notifications
+    }
   }
 
   @override
@@ -125,7 +134,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 ],
               ),
             ),
-            
+
             // Tab bar
             Container(
               margin: EdgeInsets.symmetric(horizontal: 16),
@@ -217,7 +226,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: _getNotificationColor(notification.type).withOpacity(0.2),
+                  color: _getNotificationColor(
+                    notification.type,
+                  ).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Icon(
@@ -226,9 +237,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                   size: 24,
                 ),
               ),
-              
+
               SizedBox(width: 12),
-              
+
               // Content
               Expanded(
                 child: Column(
@@ -263,7 +274,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                   ],
                 ),
               ),
-              
+
               // Unread indicator
               if (!notification.isRead)
                 Container(
@@ -286,11 +297,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.notifications_none,
-            size: 64,
-            color: kLightTextColor,
-          ),
+          Icon(Icons.notifications_none, size: 64, color: kLightTextColor),
           SizedBox(height: 16),
           Text(
             'No notifications yet',
@@ -372,7 +379,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         id: '1',
         type: NotificationType.like,
         title: 'New like on your post',
-        message: 'Your avatar "Tech Guru" received a like on their latest post about AI trends.',
+        message:
+            'Your avatar "Tech Guru" received a like on their latest post about AI trends.',
         timestamp: DateTime.now().subtract(Duration(minutes: 15)),
         isRead: false,
       ),
@@ -380,7 +388,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         id: '2',
         type: NotificationType.avatarReply,
         title: 'Avatar auto-replied',
-        message: 'Your avatar "Fitness Coach" automatically replied to a comment on your workout video.',
+        message:
+            'Your avatar "Fitness Coach" automatically replied to a comment on your workout video.',
         timestamp: DateTime.now().subtract(Duration(hours: 1)),
         isRead: false,
       ),
@@ -388,7 +397,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         id: '3',
         type: NotificationType.comment,
         title: 'New comment',
-        message: 'Someone commented: "This is amazing! How did you create this avatar?"',
+        message:
+            'Someone commented: "This is amazing! How did you create this avatar?"',
         timestamp: DateTime.now().subtract(Duration(hours: 2)),
         isRead: true,
       ),
@@ -420,7 +430,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         id: '7',
         type: NotificationType.systemUpdate,
         title: 'Welcome to Quanta!',
-        message: 'Your AI avatar platform is ready. Start creating amazing content!',
+        message:
+            'Your AI avatar platform is ready. Start creating amazing content!',
         timestamp: DateTime.now().subtract(Duration(days: 2)),
         isRead: true,
       ),
@@ -454,7 +465,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           SnackBar(content: Text('Navigate to post: ${notification.postId}')),
         );
         break;
-        
+
       case NotificationType.chatMessage:
       case NotificationType.avatarReply:
         // Navigate to chat (would need avatar info)
@@ -462,15 +473,17 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           _navigateToAvatarChat(notification.avatarId!);
         }
         break;
-        
+
       case NotificationType.follow:
       case NotificationType.mention:
         // Navigate to profile or relevant screen
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Navigate to profile: ${notification.userId}')),
+          SnackBar(
+            content: Text('Navigate to profile: ${notification.userId}'),
+          ),
         );
         break;
-        
+
       case NotificationType.systemUpdate:
         // Show system update details or navigate to settings
         _showNotificationDetails(notification);
@@ -481,7 +494,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   void _markAsRead(NotificationItem notification) {
     setState(() {
       // Update the notification
-      final index = _allNotifications.indexWhere((n) => n.id == notification.id);
+      final index = _allNotifications.indexWhere(
+        (n) => n.id == notification.id,
+      );
       if (index != -1) {
         _allNotifications[index] = NotificationItem(
           id: notification.id,
@@ -496,7 +511,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           metadata: notification.metadata,
         );
       }
-      
+
       // Update unread list
       _unreadNotifications = _allNotifications.where((n) => !n.isRead).toList();
     });
@@ -518,7 +533,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           metadata: notification.metadata,
         );
       }).toList();
-      
+
       _unreadNotifications.clear();
     });
   }
@@ -538,9 +553,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading avatar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading avatar: $e')));
     }
   }
 
@@ -553,10 +568,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           notification.title,
           style: kHeadingTextStyle.copyWith(fontSize: 18),
         ),
-        content: Text(
-          notification.message,
-          style: kBodyTextStyle,
-        ),
+        content: Text(notification.message, style: kBodyTextStyle),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

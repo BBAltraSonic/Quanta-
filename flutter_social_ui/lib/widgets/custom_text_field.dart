@@ -16,6 +16,7 @@ class CustomTextField extends StatefulWidget {
   final void Function()? onTap;
   final void Function(String)? onFieldSubmitted;
   final IconData? prefixIcon;
+  final IconData? icon; // Alias for prefixIcon for backward compatibility
   final Widget? suffixIcon;
   final bool enabled;
   final bool readOnly;
@@ -41,6 +42,7 @@ class CustomTextField extends StatefulWidget {
     this.onTap,
     this.onFieldSubmitted,
     this.prefixIcon,
+    this.icon,
     this.suffixIcon,
     this.enabled = true,
     this.readOnly = false,
@@ -132,9 +134,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
               color: Colors.red,
               fontSize: 12,
             ),
-            prefixIcon: widget.prefixIcon != null
+            prefixIcon: (widget.prefixIcon ?? widget.icon) != null
                 ? Icon(
-                    widget.prefixIcon,
+                    widget.prefixIcon ?? widget.icon,
                     color: _isFocused ? kPrimaryColor : kLightTextColor,
                     size: 20,
                   )

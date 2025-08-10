@@ -3,10 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import '../models/post_model.dart';
-import '../models/avatar_model.dart';
 import '../services/auth_service.dart';
 
 class ContentService {
@@ -87,7 +85,6 @@ class ContentService {
 
       debugPrint('✅ Post created successfully: ${savedPost.id}');
       return savedPost;
-
     } catch (e) {
       debugPrint('❌ Error creating post: $e');
       rethrow;
@@ -105,10 +102,7 @@ class ContentService {
     bool orderByTrending = true,
   }) async {
     try {
-      var query = _supabase
-          .from('posts')
-          .select('*')
-          .eq('is_active', true);
+      var query = _supabase.from('posts').select('*').eq('is_active', true);
 
       // Apply filters
       if (avatarId != null) {
@@ -121,23 +115,29 @@ class ContentService {
         query = query.overlaps('hashtags', hashtags);
       }
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.or('caption.ilike.%$searchQuery%,hashtags.cs.{"#${searchQuery.toLowerCase()}"}');
+        query = query.or(
+          'caption.ilike.%$searchQuery%,hashtags.cs.{"#${searchQuery.toLowerCase()}"}',
+        );
       }
 
-      // Apply ordering
+      // Apply ordering and execute query
+      final dynamic response;
       if (orderByTrending) {
-        query = query.order('engagement_rate', ascending: false)
-                    .order('created_at', ascending: false);
+        response = await query
+            .order('engagement_rate', ascending: false)
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1)
+            .limit(limit);
       } else {
-        query = query.order('created_at', ascending: false);
+        response = await query
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1)
+            .limit(limit);
       }
 
-      final response = await query
-          .range(offset, offset + limit - 1)
-          .limit(limit);
-
-      return response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
-
+      return (response as List)
+          .map<PostModel>((json) => PostModel.fromJson(json))
+          .toList();
     } catch (e) {
       debugPrint('❌ Error fetching feed posts: $e');
       return [];
@@ -160,7 +160,6 @@ class ContentService {
           .single();
 
       return response;
-
     } catch (e) {
       debugPrint('❌ Error fetching post with avatar: $e');
       return null;
@@ -194,15 +193,11 @@ class ContentService {
       if (updates.isNotEmpty) {
         updates['updated_at'] = DateTime.now().toIso8601String();
 
-        await _supabase
-            .from('posts')
-            .update(updates)
-            .eq('id', postId);
+        await _supabase.from('posts').update(updates).eq('id', postId);
 
         // Recalculate engagement rate
         await _recalculateEngagementRate(postId);
       }
-
     } catch (e) {
       debugPrint('❌ Error updating post engagement: $e');
     }
@@ -243,7 +238,6 @@ class ContentService {
       await updatePostEngagement(postId, commentsIncrement: 1);
 
       return savedComment;
-
     } catch (e) {
       debugPrint('❌ Error adding comment: $e');
       rethrow;
@@ -265,8 +259,9 @@ class ContentService {
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      return response.map<CommentModel>((json) => CommentModel.fromJson(json)).toList();
-
+      return response
+          .map<CommentModel>((json) => CommentModel.fromJson(json))
+          .toList();
     } catch (e) {
       debugPrint('❌ Error fetching comments: $e');
       return [];
@@ -302,7 +297,10 @@ class ContentService {
       // Soft delete the post
       await _supabase
           .from('posts')
-          .update({'is_active': false, 'updated_at': DateTime.now().toIso8601String()})
+          .update({
+            'is_active': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', postId);
 
       // Update avatar post count
@@ -313,7 +311,6 @@ class ContentService {
 
       debugPrint('✅ Post deleted successfully: $postId');
       return true;
-
     } catch (e) {
       debugPrint('❌ Error deleting post: $e');
       return false;
@@ -321,13 +318,16 @@ class ContentService {
   }
 
   // Get trending hashtags
-  Future<List<Map<String, dynamic>>> getTrendingHashtags({int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getTrendingHashtags({
+    int limit = 20,
+  }) async {
     try {
-      final response = await _supabase
-          .rpc('get_trending_hashtags', params: {'limit_count': limit});
+      final response = await _supabase.rpc(
+        'get_trending_hashtags',
+        params: {'limit_count': limit},
+      );
 
       return List<Map<String, dynamic>>.from(response);
-
     } catch (e) {
       debugPrint('❌ Error fetching trending hashtags: $e');
       return [];
@@ -364,7 +364,9 @@ class ContentService {
           throw Exception('Video file too large (max ${maxVideoSizeMB}MB)');
         }
         if (!allowedVideoTypes.contains(extension)) {
-          throw Exception('Unsupported video format (allowed: ${allowedVideoTypes.join(', ')})');
+          throw Exception(
+            'Unsupported video format (allowed: ${allowedVideoTypes.join(', ')})',
+          );
         }
         await _validateVideoDuration(mediaFile);
       } else {
@@ -372,7 +374,9 @@ class ContentService {
           throw Exception('Image file too large (max ${maxImageSizeMB}MB)');
         }
         if (!allowedImageTypes.contains(extension)) {
-          throw Exception('Unsupported image format (allowed: ${allowedImageTypes.join(', ')})');
+          throw Exception(
+            'Unsupported image format (allowed: ${allowedImageTypes.join(', ')})',
+          );
         }
       }
     }
@@ -382,12 +386,14 @@ class ContentService {
     try {
       final controller = VideoPlayerController.file(videoFile);
       await controller.initialize();
-      
+
       final duration = controller.value.duration;
       await controller.dispose();
 
       if (duration > maxVideoDuration) {
-        throw Exception('Video too long (max ${maxVideoDuration.inMinutes} minutes)');
+        throw Exception(
+          'Video too long (max ${maxVideoDuration.inMinutes} minutes)',
+        );
       }
     } catch (e) {
       if (e.toString().contains('Video too long')) rethrow;
@@ -398,7 +404,8 @@ class ContentService {
   Future<String> _uploadImage(File imageFile, String avatarId) async {
     try {
       final bytes = await imageFile.readAsBytes();
-      final fileName = '${avatarId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName =
+          '${avatarId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = 'posts/images/$fileName';
 
       // Compress image if needed
@@ -409,19 +416,21 @@ class ContentService {
           .uploadBinary(filePath, compressedBytes);
 
       return _supabase.storage.from('content').getPublicUrl(filePath);
-
     } catch (e) {
       debugPrint('❌ Error uploading image: $e');
       rethrow;
     }
   }
 
-  Future<Map<String, String>> _uploadVideoWithThumbnail(File videoFile, String avatarId) async {
+  Future<Map<String, String>> _uploadVideoWithThumbnail(
+    File videoFile,
+    String avatarId,
+  ) async {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final videoFileName = '${avatarId}_${timestamp}.mp4';
+      final videoFileName = '${avatarId}_$timestamp.mp4';
       final thumbnailFileName = '${avatarId}_${timestamp}_thumb.jpg';
-      
+
       final videoPath = 'posts/videos/$videoFileName';
       final thumbnailPath = 'posts/thumbnails/$thumbnailFileName';
 
@@ -431,7 +440,9 @@ class ContentService {
           .from('content')
           .uploadBinary(videoPath, videoBytes);
 
-      final videoUrl = _supabase.storage.from('content').getPublicUrl(videoPath);
+      final videoUrl = _supabase.storage
+          .from('content')
+          .getPublicUrl(videoPath);
 
       // Generate and upload thumbnail
       final thumbnailBytes = await _generateVideoThumbnail(videoFile);
@@ -440,12 +451,13 @@ class ContentService {
             .from('content')
             .uploadBinary(thumbnailPath, thumbnailBytes);
 
-        final thumbnailUrl = _supabase.storage.from('content').getPublicUrl(thumbnailPath);
+        final thumbnailUrl = _supabase.storage
+            .from('content')
+            .getPublicUrl(thumbnailPath);
         return {'video': videoUrl, 'thumbnail': thumbnailUrl};
       }
 
       return {'video': videoUrl};
-
     } catch (e) {
       debugPrint('❌ Error uploading video: $e');
       rethrow;
@@ -459,12 +471,16 @@ class ContentService {
 
       // Resize if too large
       final resized = image.width > 1080 || image.height > 1080
-          ? img.copyResize(image, width: 1080, height: 1080, interpolation: img.Interpolation.linear)
+          ? img.copyResize(
+              image,
+              width: 1080,
+              height: 1080,
+              interpolation: img.Interpolation.linear,
+            )
           : image;
 
       // Compress as JPEG with 85% quality
       return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
-
     } catch (e) {
       debugPrint('⚠️ Image compression failed, using original: $e');
       return bytes;
@@ -485,24 +501,25 @@ class ContentService {
         return thumbnail;
       }
       return null;
-
     } catch (e) {
       debugPrint('⚠️ Could not generate video thumbnail: $e');
       return null;
     }
   }
 
-  Future<void> _updateAvatarPostCount(String avatarId, {required bool increment}) async {
+  Future<void> _updateAvatarPostCount(
+    String avatarId, {
+    required bool increment,
+  }) async {
     try {
       final change = increment ? 1 : -1;
       await _supabase
           .from('avatars')
           .update({
             'posts_count': 'posts_count + $change',
-            'updated_at': DateTime.now().toIso8601String()
+            'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', avatarId);
-
     } catch (e) {
       debugPrint('⚠️ Error updating avatar post count: $e');
     }
@@ -521,13 +538,17 @@ class ContentService {
       final comments = response['comments_count'] as int;
       final shares = response['shares_count'] as int;
 
-      final engagementRate = PostModel.calculateEngagementRate(likes, comments, shares, views);
+      final engagementRate = PostModel.calculateEngagementRate(
+        likes,
+        comments,
+        shares,
+        views,
+      );
 
       await _supabase
           .from('posts')
           .update({'engagement_rate': engagementRate})
           .eq('id', postId);
-
     } catch (e) {
       debugPrint('⚠️ Error recalculating engagement rate: $e');
     }

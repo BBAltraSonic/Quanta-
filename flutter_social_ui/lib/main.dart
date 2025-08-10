@@ -1,24 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/screens/auth_wrapper.dart';
-import 'package:flutter_social_ui/config/app_config.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_social_ui/services/performance_service.dart';
+import 'package:flutter_social_ui/services/theme_service.dart';
+import 'package:flutter_social_ui/services/accessibility_service.dart';
+import 'package:flutter_social_ui/services/offline_service.dart';
+import 'package:flutter_social_ui/services/video_service.dart';
+import 'package:flutter_social_ui/services/content_moderation_service.dart';
+import 'package:flutter_social_ui/services/user_safety_service.dart';
+import 'package:flutter_social_ui/services/testing_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Supabase if not in demo mode
-  if (!AppConfig.demoMode) {
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      anonKey: AppConfig.supabaseAnonKey,
-    );
-  }
-  
-  // Initialize auth service
-  await AuthServiceWrapper().initialize();
-  
+
+  // Initialize performance services
+  await PerformanceService.warmupApp();
+
+  // Initialize core services
+  await Future.wait([
+    AuthServiceWrapper().initialize(),
+    PerformanceService().initialize(),
+    ThemeService().initialize(),
+    AccessibilityService().initialize(),
+    OfflineService().initialize(),
+    VideoService().initialize(),
+    ContentModerationService().initialize(),
+    UserSafetyService().initialize(),
+    TestingService().initialize(),
+  ]);
+
   runApp(const MyApp());
 }
 
@@ -27,44 +38,38 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Quanta - AI Avatar Platform',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: kBackgroundColor,
-        primaryColor: kPrimaryColor,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: kBackgroundColor,
-          elevation: 0,
-          iconTheme: IconThemeData(color: kTextColor),
-          titleTextStyle: TextStyle(
-            color: kTextColor,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textTheme: const TextTheme(
-          displayLarge: kHeadingTextStyle,
-          bodyLarge: kBodyTextStyle,
-          bodyMedium: kBodyTextStyle,
-          bodySmall: kCaptionTextStyle,
-        ),
-        cardColor: kCardColor,
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          backgroundColor: kBackgroundColor,
-          selectedItemColor: kPrimaryColor,
-          unselectedItemColor: kLightTextColor,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-        ),
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          secondary: kPrimaryColor, // Use kPrimaryColor for accent
-          surface: kBackgroundColor,
-          brightness: Brightness.dark, // Explicitly set brightness to dark
-        ),
-      ),
-      home: const AuthWrapper(),
+    return ListenableBuilder(
+      listenable: ThemeService(),
+      builder: (context, child) {
+        final themeService = ThemeService();
+
+        return MaterialApp(
+          title: 'Quanta - AI Avatar Platform',
+          debugShowCheckedModeBanner: false,
+          onGenerateRoute: (settings) {
+            // Handle any route generation issues
+            return MaterialPageRoute(builder: (context) => const AuthWrapper());
+          },
+          theme: themeService.lightTheme,
+          darkTheme: themeService.darkTheme,
+          themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          builder: (context, child) {
+            // Apply accessibility settings
+            final accessibilityService = AccessibilityService();
+            final mediaQuery = MediaQuery.of(context);
+
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(
+                  accessibilityService.textScaleFactor,
+                ),
+              ),
+              child: child!,
+            );
+          },
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }

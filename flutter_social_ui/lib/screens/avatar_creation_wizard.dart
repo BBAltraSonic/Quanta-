@@ -8,7 +8,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 class AvatarCreationWizard extends StatefulWidget {
-  const AvatarCreationWizard({Key? key}) : super(key: key);
+  const AvatarCreationWizard({super.key});
 
   @override
   _AvatarCreationWizardState createState() => _AvatarCreationWizardState();
@@ -18,23 +18,23 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   final PageController _pageController = PageController();
   final AvatarService _avatarService = AvatarService();
   final AuthServiceWrapper _authService = AuthServiceWrapper();
-  
+
   int _currentStep = 0;
   bool _isCreating = false;
-  
+
   // Avatar data
   String _name = '';
   String _bio = '';
   AvatarNiche _selectedNiche = AvatarNiche.lifestyle;
-  List<PersonalityTrait> _selectedTraits = [];
+  final List<PersonalityTrait> _selectedTraits = [];
   File? _avatarImage;
   String? _backstory;
-  
+
   final List<String> _stepTitles = [
     'Basic Info',
     'Personality',
     'Appearance',
-    'Preview & Create'
+    'Preview & Create',
   ];
 
   @override
@@ -67,7 +67,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
               valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
             ),
           ),
-          
+
           // Step content
           Expanded(
             child: PageView(
@@ -81,7 +81,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
               ],
             ),
           ),
-          
+
           // Navigation buttons
           Container(
             padding: EdgeInsets.all(20),
@@ -100,7 +100,10 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                       ),
                       child: Text(
                         'Continue',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -119,7 +122,10 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                           ? CircularProgressIndicator(color: Colors.white)
                           : Text(
                               'Create Avatar',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                     ),
                   ),
@@ -147,9 +153,12 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             style: kBodyTextStyle.copyWith(color: kLightTextColor),
           ),
           SizedBox(height: 32),
-          
+
           // Name field
-          Text('Avatar Name *', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Avatar Name *',
+            style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 8),
           TextField(
             style: kBodyTextStyle,
@@ -164,11 +173,14 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             ),
             onChanged: (value) => setState(() => _name = value),
           ),
-          
+
           SizedBox(height: 24),
-          
+
           // Bio field
-          Text('Bio *', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Bio *',
+            style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 8),
           TextField(
             style: kBodyTextStyle,
@@ -184,11 +196,14 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             ),
             onChanged: (value) => setState(() => _bio = value),
           ),
-          
+
           SizedBox(height: 24),
-          
+
           // Niche selection
-          Text('Niche *', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Niche *',
+            style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -230,7 +245,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             style: kBodyTextStyle.copyWith(color: kLightTextColor),
           ),
           SizedBox(height: 32),
-          
+
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -258,23 +273,27 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
               );
             }).toList(),
           ),
-          
+
           SizedBox(height: 24),
           Text(
             'Selected: ${_selectedTraits.length}/5',
             style: kCaptionTextStyle.copyWith(color: kLightTextColor),
           ),
-          
+
           SizedBox(height: 32),
-          
+
           // Optional backstory
-          Text('Backstory (Optional)', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Backstory (Optional)',
+            style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 8),
           TextField(
             style: kBodyTextStyle,
             maxLines: 4,
             decoration: InputDecoration(
-              hintText: 'Add a backstory to make your avatar more interesting...',
+              hintText:
+                  'Add a backstory to make your avatar more interesting...',
               filled: true,
               fillColor: kCardColor,
               border: OutlineInputBorder(
@@ -305,7 +324,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             style: kBodyTextStyle.copyWith(color: kLightTextColor),
           ),
           SizedBox(height: 32),
-          
+
           // Image picker
           Center(
             child: GestureDetector(
@@ -321,10 +340,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                 child: _avatarImage != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(100),
-                        child: Image.file(
-                          _avatarImage!,
-                          fit: BoxFit.cover,
-                        ),
+                        child: Image.file(_avatarImage!, fit: BoxFit.cover),
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -337,16 +353,18 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                           SizedBox(height: 8),
                           Text(
                             'Tap to add photo',
-                            style: kBodyTextStyle.copyWith(color: kPrimaryColor),
+                            style: kBodyTextStyle.copyWith(
+                              color: kPrimaryColor,
+                            ),
                           ),
                         ],
                       ),
               ),
             ),
           ),
-          
+
           SizedBox(height: 24),
-          
+
           if (_avatarImage != null)
             Center(
               child: TextButton(
@@ -375,7 +393,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
             style: kBodyTextStyle.copyWith(color: kLightTextColor),
           ),
           SizedBox(height: 32),
-          
+
           // Avatar preview card
           Container(
             width: double.infinity,
@@ -401,16 +419,16 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                         )
                       : Icon(Icons.person, size: 60, color: kLightTextColor),
                 ),
-                
+
                 SizedBox(height: 16),
-                
+
                 // Name and bio
                 Text(_name, style: kHeadingTextStyle.copyWith(fontSize: 20)),
                 SizedBox(height: 8),
                 Text(_bio, style: kBodyTextStyle, textAlign: TextAlign.center),
-                
+
                 SizedBox(height: 16),
-                
+
                 // Niche
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -420,12 +438,15 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                   ),
                   child: Text(
                     _selectedNiche.displayName,
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                
+
                 SizedBox(height: 16),
-                
+
                 // Personality traits
                 Wrap(
                   spacing: 8,
@@ -437,10 +458,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                         color: kBackgroundColor,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        trait.displayName,
-                        style: kCaptionTextStyle,
-                      ),
+                      child: Text(trait.displayName, style: kCaptionTextStyle),
                     );
                   }).toList(),
                 ),
@@ -490,7 +508,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (pickedFile != null) {
       setState(() {
         _avatarImage = File(pickedFile.path);
@@ -500,15 +518,15 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
 
   Future<void> _createAvatar() async {
     if (!_canProceed()) return;
-    
+
     setState(() => _isCreating = true);
-    
+
     try {
       final currentUser = _authService.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
-      
+
       // Create avatar
       final avatar = await _avatarService.createAvatar(
         name: _name,
@@ -516,24 +534,22 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
         niche: _selectedNiche,
         personalityTraits: _selectedTraits,
         backstory: _backstory,
-        imageFile: _avatarImage,
+        avatarImage: _avatarImage,
       );
-      
-      if (avatar != null) {
-        // Navigate to main app
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => AppShell()),
-          (route) => false,
-        );
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Avatar "${_name}" created successfully! 🎉'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+
+      // Navigate to main app
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => AppShell()),
+        (route) => false,
+      );
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Avatar "$_name" created successfully! 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

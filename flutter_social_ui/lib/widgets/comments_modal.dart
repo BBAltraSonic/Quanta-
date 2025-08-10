@@ -153,7 +153,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                       Expanded(
                         child: Container(
                           decoration: BoxDecoration(
-                            color: color.surfaceVariant.withOpacity(0.6),
+                            color: color.surfaceContainerHighest.withOpacity(
+                              0.6,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: color.onSurface.withOpacity(0.06),
