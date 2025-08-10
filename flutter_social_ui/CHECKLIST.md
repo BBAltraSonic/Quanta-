@@ -20,7 +20,7 @@
 - [ ] 13. Remove demo feature flags and remote toggles
 - [ ] 14. Sanitize authentication and session flows
 - [ ] 15. Realtime features: remove local simulators
-- [ ] 16. Assets and pubspec cleanup
+- [x] 16. Assets and pubspec cleanup (COMPLETED)
 - [ ] 17. Logging, debug menus, and overlays
 
 ## Phase 4: Testing and Quality Assurance
@@ -38,10 +38,15 @@
 - **Current Phase**: Phase 2
 - **Estimated Completion**: TBD
 - **Issues Found**: 0
+- **Major Tasks Completed**: 4/23 (Tasks #1, #2, #4, #7, #16)
 - **Blockers**: None
 
 ## Links to Work
-(Will be updated as PRs and commits are made)
+- [Commits on chore/remove-mocks-prod-only branch]
+- Task #1, #2: Specification and checklist created
+- Task #4: Complete inventory documented in INVENTORY.md
+- Task #7: All demo services and wrappers eliminated
+- Task #16: Placeholder assets removed
 
 ## Notes
 - Each completed task should be marked with [x] and include a link to the relevant PR/commit
