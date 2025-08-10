@@ -16,11 +16,7 @@ class InteractionService {
   final AuthService _authService = AuthService();
   final SupabaseClient _supabase = Supabase.instance.client;
   
-  // In-memory cache for demo mode
-  final Map<String, Set<String>> _likedPosts = {};
-  final Map<String, Set<String>> _savedPosts = {};
-  final Map<String, List<Comment>> _postComments = {};
-  final Map<String, Set<String>> _sharedPosts = {};
+
 
   /// Like or unlike a post
   Future<bool> toggleLike(String postId) async {
@@ -28,11 +24,7 @@ class InteractionService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      if (false) {
-        return _toggleLikeDemo(postId, userId);
-      } else {
-        return _toggleLikeSupabase(postId, userId);
-      }
+      return _toggleLikeSupabase(postId, userId);
     } catch (e) {
       debugPrint('Error toggling like: $e');
       rethrow;
@@ -45,11 +37,7 @@ class InteractionService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      if (false) {
-        return _toggleSaveDemo(postId, userId);
-      } else {
-        return _toggleSaveSupabase(postId, userId);
-      }
+      return _toggleSaveSupabase(postId, userId);
     } catch (e) {
       debugPrint('Error toggling save: $e');
       rethrow;
@@ -62,11 +50,7 @@ class InteractionService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      if (false) {
-        _sharePostDemo(postId, userId, message);
-      } else {
-        await _sharePostSupabase(postId, userId, message);
-      }
+      await _sharePostSupabase(postId, userId, message);
     } catch (e) {
       debugPrint('Error sharing post: $e');
       rethrow;
@@ -79,11 +63,7 @@ class InteractionService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      if (false) {
-        return _addCommentDemo(postId, text, userId, parentCommentId);
-      } else {
-        return _addCommentSupabase(postId, text, userId, parentCommentId);
-      }
+      return _addCommentSupabase(postId, text, userId, parentCommentId);
     } catch (e) {
       debugPrint('Error adding comment: $e');
       rethrow;
@@ -93,11 +73,7 @@ class InteractionService {
   /// Get comments for a post
   Future<List<Comment>> getComments(String postId, {int limit = 20, int offset = 0}) async {
     try {
-      if (false) {
-        return _getCommentsDemo(postId, limit, offset);
-      } else {
-        return _getCommentsSupabase(postId, limit, offset);
-      }
+      return _getCommentsSupabase(postId, limit, offset);
     } catch (e) {
       debugPrint('Error getting comments: $e');
       rethrow;
@@ -138,68 +114,7 @@ class InteractionService {
     }
   }
 
-  // Demo mode implementations
-  bool _toggleLikeDemo(String postId, String userId) {
-    _likedPosts[postId] ??= <String>{};
-    final hasLiked = _likedPosts[postId]!.contains(userId);
-    
-    if (hasLiked) {
-      _likedPosts[postId]!.remove(userId);
-      return false;
-    } else {
-      _likedPosts[postId]!.add(userId);
-      return true;
-    }
-  }
 
-  bool _toggleSaveDemo(String postId, String userId) {
-    _savedPosts[postId] ??= <String>{};
-    final hasSaved = _savedPosts[postId]!.contains(userId);
-    
-    if (hasSaved) {
-      _savedPosts[postId]!.remove(userId);
-      return false;
-    } else {
-      _savedPosts[postId]!.add(userId);
-      return true;
-    }
-  }
-
-  void _sharePostDemo(String postId, String userId, String? message) {
-    _sharedPosts[postId] ??= <String>{};
-    _sharedPosts[postId]!.add(userId);
-    debugPrint('Demo: Post $postId shared by $userId with message: $message');
-  }
-
-  Comment _addCommentDemo(String postId, String text, String userId, String? parentCommentId) {
-    _postComments[postId] ??= <Comment>[];
-    
-    final comment = Comment(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      postId: postId,
-      userId: userId,
-      userName: 'Demo User',
-      userAvatar: 'assets/images/p.jpg',
-      text: text,
-      createdAt: DateTime.now(),
-      likes: 0,
-      hasLiked: false,
-      repliesCount: 0,
-      parentCommentId: parentCommentId,
-    );
-    
-    _postComments[postId]!.insert(0, comment);
-    return comment;
-  }
-
-  List<Comment> _getCommentsDemo(String postId, int limit, int offset) {
-    final comments = _postComments[postId] ?? <Comment>[];
-    final startIndex = offset;
-    final endIndex = (startIndex + limit).clamp(0, comments.length);
-    
-    if (startIndex >= comments.length) return <Comment>[];
-    return comments.sublist(startIndex, endIndex);
-  }
 
   // Real Supabase implementations
   Future<bool> _toggleLikeSupabase(String postId, String userId) async {
@@ -351,22 +266,13 @@ class InteractionService {
   /// Get interaction statistics for a post
   Future<Map<String, dynamic>> getPostStats(String postId) async {
     try {
-      if (false) {
-        return {
-          'likes': _likedPosts[postId]?.length ?? 0,
-          'saves': _savedPosts[postId]?.length ?? 0,
-          'shares': _sharedPosts[postId]?.length ?? 0,
-          'comments': _postComments[postId]?.length ?? 0,
-        };
-      } else {
-        // TODO: Implement Supabase stats fetching
-        return {
-          'likes': 0,
-          'saves': 0,
-          'shares': 0,
-          'comments': 0,
-        };
-      }
+      // TODO: Implement Supabase stats fetching
+      return {
+        'likes': 0,
+        'saves': 0,
+        'shares': 0,
+        'comments': 0,
+      };
     } catch (e) {
       debugPrint('Error getting post stats: $e');
       return {
@@ -378,11 +284,5 @@ class InteractionService {
     }
   }
 
-  /// Clear cache (useful for demo mode)
-  void clearCache() {
-    _likedPosts.clear();
-    _savedPosts.clear();
-    _postComments.clear();
-    _sharedPosts.clear();
-  }
+
 }

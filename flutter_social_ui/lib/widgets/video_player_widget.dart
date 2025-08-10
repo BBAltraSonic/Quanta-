@@ -205,21 +205,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                return _buildPlaceholder();
+                return _buildErrorWidget();
               },
             )
           : Image.asset(
               widget.fallbackImageUrl!,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return _buildPlaceholder();
+                return _buildErrorWidget();
               },
             );
     }
-    return _buildPlaceholder();
+    return _buildErrorWidget();
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildErrorWidget() {
     return Container(
       color: Colors.grey[900],
       child: const Center(

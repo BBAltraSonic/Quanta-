@@ -10,6 +10,7 @@ class AuthService {
 
   late final SupabaseClient _supabase;
   UserModel? _currentUser;
+  bool _isInitialized = false;
   
   // Getters
   SupabaseClient get supabase => _supabase;
@@ -19,6 +20,12 @@ class AuthService {
   
   // Initialize Supabase
   Future<void> initialize() async {
+    // Prevent multiple initializations
+    if (_isInitialized) {
+      print('🔍 DEBUG: AuthService already initialized, skipping...');
+      return;
+    }
+    
     try {
       Environment.validateConfiguration();
       
@@ -41,6 +48,7 @@ class AuthService {
       }
       
       _supabase = Supabase.instance.client;
+      _isInitialized = true;
       
       // Check for existing session
       final session = _supabase.auth.currentSession;

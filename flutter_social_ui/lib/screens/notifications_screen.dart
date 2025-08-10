@@ -26,94 +26,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   TabKind _tab = TabKind.notifications; // Default to notifications tab
 
-  // Mock data for Notifications
-  final List<_ChatItem> _notificationList = [
-    _ChatItem(
-      'Jason',
-      'assets/images/We.jpg',
-      'User ${1} liked your post • ${15}m',
-      '9:41 PM',
-      isOnline: false,
-      unread: true,
-    ),
-    _ChatItem(
-      'John',
-      'assets/images/p.jpg',
-      'User ${2} commented on your photo • ${20}m',
-      '5:07 PM',
-      isOnline: false,
-    ),
-    _ChatItem(
-      'Matt L',
-      'assets/images/We.jpg',
-      'User ${3} started following you • ${30}m',
-      '2:23 PM',
-      isOnline: false,
-    ),
-    _ChatItem(
-      'Nicolas',
-      'assets/images/p.jpg',
-      'User ${4} mentioned you in a comment • ${45}m',
-      '10:02 AM',
-      isOnline: false,
-      unread: true,
-    ),
-    _ChatItem(
-      'Katie',
-      'assets/images/We.jpg',
-      'User ${5} sent you a message • ${60}m',
-      '7:46 AM',
-      isOnline: false,
-    ),
-  ];
+  List<_ChatItem> _notificationList = [];
 
-  // Mock data for Chats
-  final List<_ChatItem> _chatList = [
-    _ChatItem(
-      'Jason',
-      'assets/images/We.jpg',
-      'Hey! Are you free to call tonight?',
-      '9:41 PM',
-      isOnline: true,
-      unread: true,
-    ),
-    _ChatItem(
-      'John',
-      'assets/images/p.jpg',
-      'Did you see this? 😅',
-      '5:07 PM',
-      isOnline: true,
-    ),
-    _ChatItem(
-      'Matt L',
-      'assets/images/We.jpg',
-      'Looks nice there! Wish I was in Ha...',
-      '2:23 PM',
-    ),
-    _ChatItem(
-      'Nicolas',
-      'assets/images/p.jpg',
-      'Hey bro! How are you?',
-      '10:02 AM',
-      unread: true,
-    ),
-    _ChatItem('Katie', 'assets/images/We.jpg', 'Sent an image', '7:46 AM'),
-    _ChatItem(
-      'Flutter Devs',
-      'assets/images/We.jpg',
-      'Ben: push your branch when ready',
-      '8:30 PM',
-      isGroup: true,
-    ),
-    _ChatItem(
-      'Weekend Hikers',
-      'assets/images/p.jpg',
-      'Sam: Meet 7 AM at the gate',
-      'Yesterday',
-      isGroup: true,
-      unread: true,
-    ),
-  ];
+  List<_ChatItem> _chatList = [];
 
   List<_ChatItem> get _items =>
       _tab == TabKind.notifications ? _notificationList : _chatList;

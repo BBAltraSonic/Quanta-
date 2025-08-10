@@ -39,7 +39,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       _loadInitialPosts();
     } catch (e) {
       debugPrint('Error initializing services: $e');
-      _loadDemoData();
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
@@ -64,90 +67,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _isLoading = false;
         });
       } else {
-        // If no real posts, use demo data
-        _loadDemoData();
+        // No posts available
+        setState(() {
+          _posts = [];
+          _isLoading = false;
+          _hasError = false;
+        });
       }
     } catch (e) {
       debugPrint('Error loading posts: $e');
-      // Fallback to demo data on error
-      _loadDemoData();
+      setState(() {
+        _posts = [];
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
-  void _loadDemoData() {
-    // Create demo posts for when backend is not available
-    final demoAvatars = _createDemoAvatars();
-    final demoPosts = _createDemoPosts(demoAvatars);
 
-    setState(() {
-      _posts = demoPosts;
-      _avatarCache = {for (var avatar in demoAvatars) avatar.id: avatar};
-      _isLoading = false;
-      _hasError = false;
-    });
-  }
-
-  List<AvatarModel> _createDemoAvatars() {
-    return [
-      AvatarModel.create(
-        ownerUserId: 'demo-user-1',
-        name: 'Chris Glasser',
-        bio: 'Travel enthusiast and adventure seeker',
-        niche: AvatarNiche.travel,
-        personalityTraits: [
-          PersonalityTrait.creative,
-          PersonalityTrait.energetic,
-        ],
-        avatarImageUrl: 'assets/images/p.jpg',
-      ),
-      AvatarModel.create(
-        ownerUserId: 'demo-user-2',
-        name: 'Ocean Explorer',
-        bio: 'Nature lover and ocean conservationist',
-        niche: AvatarNiche.travel,
-        personalityTraits: [PersonalityTrait.calm, PersonalityTrait.inspiring],
-        avatarImageUrl: 'assets/images/p.jpg',
-      ),
-      AvatarModel.create(
-        ownerUserId: 'demo-user-3',
-        name: 'History Hunter',
-        bio: 'Curious about the past and ancient civilizations',
-        niche: AvatarNiche.education,
-        personalityTraits: [
-          PersonalityTrait.analytical,
-          PersonalityTrait.friendly,
-        ],
-        avatarImageUrl: 'assets/images/p.jpg',
-      ),
-    ];
-  }
-
-  List<PostModel> _createDemoPosts(List<AvatarModel> avatars) {
-    return [
-      PostModel.create(
-        avatarId: avatars[0].id,
-        type: PostType.image,
-        imageUrl: 'assets/images/p.jpg',
-        caption:
-            'Drone hyperlapse of the Dubai skyline during golden hour. #dubai #hyperlapse',
-        hashtags: ['#dubai', '#hyperlapse'],
-      ).copyWith(likesCount: 12200, commentsCount: 137, viewsCount: 45000),
-      PostModel.create(
-        avatarId: avatars[1].id,
-        type: PostType.image,
-        imageUrl: 'assets/images/p.jpg',
-        caption: 'Beautiful sunset over the ocean. #travel #beach',
-        hashtags: ['#travel', '#beach'],
-      ).copyWith(likesCount: 5100, commentsCount: 50, viewsCount: 18000),
-      PostModel.create(
-        avatarId: avatars[2].id,
-        type: PostType.image,
-        imageUrl: 'assets/images/p.jpg',
-        caption: 'Exploring ancient ruins. #history #adventure',
-        hashtags: ['#history', '#adventure'],
-      ).copyWith(likesCount: 8900, commentsCount: 90, viewsCount: 32000),
-    ];
-  }
 
   Future<void> _cacheAvatarsForPosts(List<PostModel> posts) async {
     final avatarIds = posts.map((p) => p.avatarId).toSet();

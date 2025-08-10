@@ -4,14 +4,13 @@ class AppConfig {
   static const String supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5leWZxaWF1eXhmdXJmaGR0cnVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNzQzNzgsImV4cCI6MjA2OTk1MDM3OH0.gKc0NEJvKwipztJyDLcGB2ScJwkh3de8-5BRKk9V6qY';
 
-  // AI Service Configuration
-  static const String openRouterApiKey = 'your-openrouter-key';
-  static const String huggingFaceApiKey = 'your-huggingface-key';
+  // AI Service Configuration - Use Environment variables instead
+  // These are kept for backward compatibility but should use Environment class
 
   // App Configuration
   static const String appName = 'Quanta';
   static const String appVersion = '1.0.0';
-  static const bool isDevelopment = true;
+  static const bool isDevelopment = false;
 
   // Feature Flags
   static const bool enableAI = true;
@@ -21,16 +20,21 @@ class AppConfig {
 
   // Validation
   static bool get isConfigured {
-    return supabaseUrl != 'https://your-project.supabase.co' &&
-        supabaseAnonKey != 'your-anon-key-here';
+    return supabaseUrl.isNotEmpty && 
+           supabaseAnonKey.isNotEmpty &&
+           supabaseUrl.startsWith('https://') &&
+           supabaseAnonKey.length > 10;
   }
 
   static String get configurationError {
-    if (supabaseUrl == 'https://your-project.supabase.co') {
-      return 'Supabase URL not configured';
+    if (supabaseUrl.isEmpty) {
+      return 'Supabase URL not configured in environment variables';
     }
-    if (supabaseAnonKey == 'your-anon-key-here') {
-      return 'Supabase anonymous key not configured';
+    if (supabaseAnonKey.isEmpty) {
+      return 'Supabase anonymous key not configured in environment variables';
+    }
+    if (!supabaseUrl.startsWith('https://')) {
+      return 'Supabase URL must be a valid HTTPS URL';
     }
     return '';
   }

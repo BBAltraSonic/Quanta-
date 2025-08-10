@@ -73,8 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // Load existing messages
         await _loadChatHistory();
       } else {
-        // Use demo mode if avatar not found
-        _loadDemoMessages();
+        throw Exception('Avatar not found. Please ensure the avatar exists in the database.');
       }
 
       setState(() {
@@ -82,10 +81,9 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     } catch (e) {
       debugPrint('Error initializing chat: $e');
-      _loadDemoMessages();
       setState(() {
         _isLoading = false;
-        _hasError = false; // Don't show error for demo mode
+        _hasError = true;
       });
     }
   }
@@ -130,30 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _loadDemoMessages() {
-    // Demo messages when backend is not available
-    final demoMessages = [
-      ChatMessage(
-        id: '1',
-        text: 'Hey there! I\'m ${widget.name}, nice to meet you! 😊',
-        isMe: false,
-        time: DateTime.now().subtract(Duration(hours: 2)),
-        avatarUrl: widget.avatar,
-      ),
-      ChatMessage(
-        id: '2',
-        text: 'What would you like to chat about today?',
-        isMe: false,
-        time: DateTime.now().subtract(Duration(hours: 1)),
-        avatarUrl: widget.avatar,
-      ),
-    ];
 
-    setState(() {
-      _messages = demoMessages;
-      _isLoading = false;
-    });
-  }
 
   Future<void> _handleSend() async {
     if (_textController.text.trim().isEmpty) return;
@@ -199,15 +174,12 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         });
       } else {
-        // Demo mode - generate simple response
-        await Future.delayed(Duration(seconds: 1));
-        final demoResponse = _generateDemoResponse(messageText);
-
+        // No chat service available - show error
         setState(() {
           _messages.add(
             ChatMessage(
-              id: 'demo_${DateTime.now().millisecondsSinceEpoch}',
-              text: demoResponse,
+              id: 'error_${DateTime.now().millisecondsSinceEpoch}',
+              text: 'Chat service is not available. Please ensure the service is properly configured.',
               isMe: false,
               time: DateTime.now(),
               avatarUrl: widget.avatar,
@@ -238,20 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  String _generateDemoResponse(String userMessage) {
-    final responses = [
-      'That\'s interesting! Tell me more about that.',
-      'I understand what you mean. What do you think about it?',
-      'Thanks for sharing that with me! 😊',
-      'That\'s a great point! I hadn\'t thought of it that way.',
-      'I\'d love to hear your thoughts on this topic.',
-      'What\'s your favorite part about that?',
-      'That sounds really cool! How did you get into that?',
-    ];
 
-    responses.shuffle();
-    return responses.first;
-  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -96,7 +96,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       _loadNotifications();
     } catch (e) {
       debugPrint('Error initializing services: $e');
-      _loadNotifications(); // Still load demo notifications
+      _loadNotifications();
     }
   }
 
@@ -361,8 +361,17 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
     try {
       // In production, this would fetch from a notifications service
-      // For now, we'll generate some demo notifications based on user activity
-      await _loadDemoNotifications();
+      // Notifications service not yet implemented
+      setState(() {
+        _isLoading = false;
+        _allNotifications = [];
+        _unreadNotifications = [];
+      });
+      
+      throw Exception(
+        'Notifications service is not yet fully implemented. '
+        'Please ensure Supabase database is properly configured with notifications table.'
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading notifications: $e')),
@@ -372,76 +381,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     }
   }
 
-  Future<void> _loadDemoNotifications() async {
-    // Generate demo notifications based on recent activity
-    final demoNotifications = <NotificationItem>[
-      NotificationItem(
-        id: '1',
-        type: NotificationType.like,
-        title: 'New like on your post',
-        message:
-            'Your avatar "Tech Guru" received a like on their latest post about AI trends.',
-        timestamp: DateTime.now().subtract(Duration(minutes: 15)),
-        isRead: false,
-      ),
-      NotificationItem(
-        id: '2',
-        type: NotificationType.avatarReply,
-        title: 'Avatar auto-replied',
-        message:
-            'Your avatar "Fitness Coach" automatically replied to a comment on your workout video.',
-        timestamp: DateTime.now().subtract(Duration(hours: 1)),
-        isRead: false,
-      ),
-      NotificationItem(
-        id: '3',
-        type: NotificationType.comment,
-        title: 'New comment',
-        message:
-            'Someone commented: "This is amazing! How did you create this avatar?"',
-        timestamp: DateTime.now().subtract(Duration(hours: 2)),
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '4',
-        type: NotificationType.chatMessage,
-        title: 'New chat message',
-        message: 'A user started chatting with your avatar "Creative Artist".',
-        timestamp: DateTime.now().subtract(Duration(hours: 3)),
-        isRead: false,
-      ),
-      NotificationItem(
-        id: '5',
-        type: NotificationType.follow,
-        title: 'New follower',
-        message: 'Your avatar "Travel Explorer" gained a new follower!',
-        timestamp: DateTime.now().subtract(Duration(days: 1)),
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '6',
-        type: NotificationType.postFeatured,
-        title: 'Post featured',
-        message: 'Your post was featured in the trending section! 🎉',
-        timestamp: DateTime.now().subtract(Duration(days: 1)),
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '7',
-        type: NotificationType.systemUpdate,
-        title: 'Welcome to Quanta!',
-        message:
-            'Your AI avatar platform is ready. Start creating amazing content!',
-        timestamp: DateTime.now().subtract(Duration(days: 2)),
-        isRead: true,
-      ),
-    ];
 
-    setState(() {
-      _allNotifications = demoNotifications;
-      _unreadNotifications = demoNotifications.where((n) => !n.isRead).toList();
-    });
-  }
 
   Future<void> _refreshNotifications() async {
     setState(() => _isRefreshing = true);

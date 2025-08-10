@@ -47,9 +47,7 @@ class ErrorHandlingService {
       return AppError(
         type: ErrorType.network,
         message: error.toString(),
-        userFriendlyMessage: false 
-          ? 'Demo mode is active. No real network connection needed.'
-          : 'Network connection issue. Please check your internet connection and try again.',
+        userFriendlyMessage: 'Network connection issue. Please check your internet connection and try again.',
         originalError: error,
       );
     }
@@ -62,9 +60,7 @@ class ErrorHandlingService {
       return AppError(
         type: ErrorType.authentication,
         message: error.toString(),
-        userFriendlyMessage: false
-          ? 'Demo authentication failed. This shouldn\'t happen - please restart the app.'
-          : 'Authentication failed. Please check your credentials and try again.',
+        userFriendlyMessage: 'Authentication failed. Please check your credentials and try again.',
         originalError: error,
       );
     }
@@ -77,9 +73,7 @@ class ErrorHandlingService {
       return AppError(
         type: ErrorType.configuration,
         message: error.toString(),
-        userFriendlyMessage: false
-          ? 'Demo mode configuration issue. Please restart the app.'
-          : 'App configuration issue. Please contact support or check your environment settings.',
+        userFriendlyMessage: 'App configuration issue. Please contact support or check your environment settings.',
         technicalDetails: AppConfig.configurationError,
         originalError: error,
       );
@@ -113,9 +107,7 @@ class ErrorHandlingService {
     return AppError(
       type: ErrorType.unknown,
       message: error.toString(),
-      userFriendlyMessage: false
-        ? 'An unexpected error occurred in demo mode. Please restart the app.'
-        : 'An unexpected error occurred. Please try again or contact support if the issue persists.',
+      userFriendlyMessage: 'An unexpected error occurred. Please try again or contact support if the issue persists.',
       originalError: error,
     );
   }

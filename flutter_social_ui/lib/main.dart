@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/screens/auth_wrapper.dart';
 import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/services/performance_service.dart';
@@ -9,7 +8,7 @@ import 'package:flutter_social_ui/services/offline_service.dart';
 import 'package:flutter_social_ui/services/video_service.dart';
 import 'package:flutter_social_ui/services/content_moderation_service.dart';
 import 'package:flutter_social_ui/services/user_safety_service.dart';
-import 'package:flutter_social_ui/services/testing_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +26,7 @@ void main() async {
     VideoService().initialize(),
     ContentModerationService().initialize(),
     UserSafetyService().initialize(),
-    TestingService().initialize(),
+
   ]);
 
   runApp(const MyApp());

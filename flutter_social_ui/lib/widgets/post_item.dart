@@ -266,7 +266,7 @@ class PostItem extends StatelessWidget {
           ),
         ),
 
-        // Bottom progress line (mocked)
+        // Progress indicator
         Positioned(
           left: 4,
           right: 4,

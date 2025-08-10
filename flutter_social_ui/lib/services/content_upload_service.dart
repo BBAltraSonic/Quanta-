@@ -25,25 +25,14 @@ class ContentUploadService {
     List<String>? hashtags,
   }) async {
     try {
-      if (false) {
-        return _uploadContentDemo(
-          avatarId: avatarId,
-          caption: caption,
-          mediaFile: mediaFile,
-          externalMediaUrl: externalMediaUrl,
-          type: type,
-          hashtags: hashtags,
-        );
-      } else {
-        return _uploadContentSupabase(
-          avatarId: avatarId,
-          caption: caption,
-          mediaFile: mediaFile,
-          externalMediaUrl: externalMediaUrl,
-          type: type,
-          hashtags: hashtags,
-        );
-      }
+      return _uploadContentSupabase(
+        avatarId: avatarId,
+        caption: caption,
+        mediaFile: mediaFile,
+        externalMediaUrl: externalMediaUrl,
+        type: type,
+        hashtags: hashtags,
+      );
     } catch (e) {
       debugPrint('Error uploading content: $e');
       rethrow;
@@ -53,11 +42,7 @@ class ContentUploadService {
   /// Upload media file and get URL
   Future<String> uploadMediaFile(File file, PostType type) async {
     try {
-      if (false) {
-        return _uploadMediaFileDemo(file, type);
-      } else {
-        return _uploadMediaFileSupabase(file, type);
-      }
+      return _uploadMediaFileSupabase(file, type);
     } catch (e) {
       debugPrint('Error uploading media file: $e');
       rethrow;
@@ -74,25 +59,14 @@ class ContentUploadService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      if (false) {
-        return _importExternalContentDemo(
-          avatarId: avatarId,
-          caption: caption,
-          sourceUrl: sourceUrl,
-          sourcePlatform: sourcePlatform,
-          type: type,
-          metadata: metadata,
-        );
-      } else {
-        return _importExternalContentSupabase(
-          avatarId: avatarId,
-          caption: caption,
-          sourceUrl: sourceUrl,
-          sourcePlatform: sourcePlatform,
-          type: type,
-          metadata: metadata,
-        );
-      }
+      return _importExternalContentSupabase(
+        avatarId: avatarId,
+        caption: caption,
+        sourceUrl: sourceUrl,
+        sourcePlatform: sourcePlatform,
+        type: type,
+        metadata: metadata,
+      );
     } catch (e) {
       debugPrint('Error importing external content: $e');
       rethrow;
@@ -229,94 +203,7 @@ class ContentUploadService {
     );
   }
 
-  // Demo mode implementations
-  Future<PostModel> _uploadContentDemo({
-    required String avatarId,
-    required String caption,
-    File? mediaFile,
-    String? externalMediaUrl,
-    PostType type = PostType.image,
-    List<String>? hashtags,
-  }) async {
-    // Simulate upload delay
-    await Future.delayed(Duration(seconds: 2));
-    
-    String mediaUrl;
-    if (mediaFile != null) {
-      mediaUrl = await _uploadMediaFileDemo(mediaFile, type);
-    } else if (externalMediaUrl != null) {
-      mediaUrl = externalMediaUrl;
-    } else {
-      mediaUrl = 'assets/images/p.jpg'; // Fallback
-    }
-    
-    final now = DateTime.now();
-    final post = PostModel(
-      id: 'post_${now.millisecondsSinceEpoch}',
-      avatarId: avatarId,
-      caption: caption,
-      type: type,
-      imageUrl: type == PostType.image ? mediaUrl : null,
-      videoUrl: type == PostType.video ? mediaUrl : null,
-      hashtags: hashtags ?? extractHashtags(caption),
-      likesCount: 0,
-      commentsCount: 0,
-      sharesCount: 0,
-      viewsCount: 0,
-      createdAt: now,
-      updatedAt: now,
-    );
-    
-    return post;
-  }
-
-  Future<String> _uploadMediaFileDemo(File file, PostType type) async {
-    // Simulate file upload
-    await Future.delayed(Duration(milliseconds: 1500));
-    
-    // In demo mode, return a placeholder URL
-    return type == PostType.video 
-        ? 'https://example.com/demo_video.mp4'
-        : 'https://example.com/demo_image.jpg';
-  }
-
-  Future<PostModel> _importExternalContentDemo({
-    required String avatarId,
-    required String caption,
-    required String sourceUrl,
-    required String sourcePlatform,
-    PostType type = PostType.image,
-    Map<String, dynamic>? metadata,
-  }) async {
-    // Simulate import delay
-    await Future.delayed(Duration(seconds: 3));
-    
-    final now = DateTime.now();
-    final post = PostModel(
-      id: 'imported_${now.millisecondsSinceEpoch}',
-      avatarId: avatarId,
-      caption: '$caption\n\n📡 Imported from $sourcePlatform',
-      type: type,
-      imageUrl: type == PostType.image ? sourceUrl : null,
-      videoUrl: type == PostType.video ? sourceUrl : null,
-      hashtags: extractHashtags(caption)..add('#Imported'),
-      likesCount: 0,
-      commentsCount: 0,
-      sharesCount: 0,
-      viewsCount: 0,
-      createdAt: now,
-      updatedAt: now,
-      metadata: {
-        'source': sourcePlatform,
-        'originalUrl': sourceUrl,
-        ...?metadata,
-      },
-    );
-    
-    return post;
-  }
-
-  // Supabase implementations (placeholders)
+  // Supabase implementations
   Future<PostModel> _uploadContentSupabase({
     required String avatarId,
     required String caption,
@@ -325,13 +212,17 @@ class ContentUploadService {
     PostType type = PostType.image,
     List<String>? hashtags,
   }) async {
-    // TODO: Implement Supabase content upload
-    throw UnimplementedError('Supabase content upload not implemented yet');
+    throw Exception(
+      'Content upload service is not yet fully implemented. '
+      'Please ensure Supabase storage and database are properly configured.'
+    );
   }
 
   Future<String> _uploadMediaFileSupabase(File file, PostType type) async {
-    // TODO: Implement Supabase file upload
-    throw UnimplementedError('Supabase file upload not implemented yet');
+    throw Exception(
+      'Media file upload service is not yet fully implemented. '
+      'Please ensure Supabase storage is properly configured.'
+    );
   }
 
   Future<PostModel> _importExternalContentSupabase({
@@ -342,8 +233,10 @@ class ContentUploadService {
     PostType type = PostType.image,
     Map<String, dynamic>? metadata,
   }) async {
-    // TODO: Implement Supabase external content import
-    throw UnimplementedError('Supabase external content import not implemented yet');
+    throw Exception(
+      'External content import service is not yet fully implemented. '
+      'Please ensure external platform integrations are properly configured.'
+    );
   }
 }
 

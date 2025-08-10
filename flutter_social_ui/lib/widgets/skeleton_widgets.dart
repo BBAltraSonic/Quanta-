@@ -120,7 +120,7 @@ class SkeletonPostCard extends StatelessWidget {
           SkeletonWidget(width: 200, height: 14),
           SizedBox(height: 16),
 
-          // Media placeholder
+          // Media loading indicator
           SkeletonWidget(
             width: double.infinity,
             height: 200,

@@ -13,15 +13,26 @@ class SimpleSupabaseService {
 
   SupabaseClient get _supabase => Supabase.instance.client;
 
-  // Initialize Supabase
+  // Initialize Supabase (only if not already initialized)
   static Future<void> initialize() async {
     try {
+      // Check if Supabase is already initialized
+      if (Supabase.instance.client != null) {
+        debugPrint('✅ Supabase already initialized, skipping...');
+        return;
+      }
+      
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
         anonKey: AppConfig.supabaseAnonKey,
       );
       debugPrint('✅ Supabase initialized successfully');
     } catch (e) {
+      // If already initialized, that's fine
+      if (e.toString().contains('already been initialized')) {
+        debugPrint('✅ Supabase already initialized, continuing...');
+        return;
+      }
       debugPrint('❌ Supabase initialization failed: $e');
       rethrow;
     }

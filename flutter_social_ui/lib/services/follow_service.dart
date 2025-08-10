@@ -18,10 +18,7 @@ class FollowService {
   // Supabase client
   SupabaseClient get _supabase => Supabase.instance.client;
   
-  // In-memory cache for demo mode
-  final Map<String, Set<String>> _userFollowingAvatars = {}; // userId -> Set<avatarId>
-  final Map<String, Set<String>> _avatarFollowers = {}; // avatarId -> Set<userId>
-  final Map<String, List<AvatarModel>> _recommendedAvatars = {};
+
 
   /// Follow or unfollow an avatar
   Future<bool> toggleFollow(String avatarId) async {
@@ -29,11 +26,7 @@ class FollowService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      if (false) {
-        return _toggleFollowDemo(avatarId, userId);
-      } else {
-        return _toggleFollowSupabase(avatarId, userId);
-      }
+      return _toggleFollowSupabase(avatarId, userId);
     } catch (e) {
       debugPrint('Error toggling follow: $e');
       rethrow;
@@ -46,11 +39,7 @@ class FollowService {
     if (userId == null) return false;
 
     try {
-      if (false) {
-        return _userFollowingAvatars[userId]?.contains(avatarId) ?? false;
-      } else {
-        return _isFollowingSupabase(avatarId, userId);
-      }
+      return _isFollowingSupabase(avatarId, userId);
     } catch (e) {
       debugPrint('Error checking follow status: $e');
       return false;
@@ -63,11 +52,7 @@ class FollowService {
     if (userId == null) return [];
 
     try {
-      if (false) {
-        return _getFollowingAvatarsDemo(userId, limit, offset);
-      } else {
-        return _getFollowingAvatarsSupabase(userId, limit, offset);
-      }
+      return _getFollowingAvatarsSupabase(userId, limit, offset);
     } catch (e) {
       debugPrint('Error getting following avatars: $e');
       return [];
@@ -77,11 +62,7 @@ class FollowService {
   /// Get list of users following an avatar
   Future<List<UserModel>> getAvatarFollowers(String avatarId, {int limit = 20, int offset = 0}) async {
     try {
-      if (false) {
-        return _getAvatarFollowersDemo(avatarId, limit, offset);
-      } else {
-        return _getAvatarFollowersSupabase(avatarId, limit, offset);
-      }
+      return _getAvatarFollowersSupabase(avatarId, limit, offset);
     } catch (e) {
       debugPrint('Error getting avatar followers: $e');
       return [];
@@ -91,11 +72,7 @@ class FollowService {
   /// Get follower count for an avatar
   Future<int> getFollowerCount(String avatarId) async {
     try {
-      if (false) {
-        return _avatarFollowers[avatarId]?.length ?? 0;
-      } else {
-        return _getFollowerCountSupabase(avatarId);
-      }
+      return _getFollowerCountSupabase(avatarId);
     } catch (e) {
       debugPrint('Error getting follower count: $e');
       return 0;
@@ -125,11 +102,7 @@ class FollowService {
     if (userId == null) return [];
 
     try {
-      if (false) {
-        return _getRecommendedAvatarsDemo(userId, limit);
-      } else {
-        return _getRecommendedAvatarsSupabase(userId, limit);
-      }
+      return _getRecommendedAvatarsSupabase(userId, limit);
     } catch (e) {
       debugPrint('Error getting recommended avatars: $e');
       return [];
@@ -139,11 +112,7 @@ class FollowService {
   /// Get trending avatars
   Future<List<AvatarModel>> getTrendingAvatars({int limit = 10}) async {
     try {
-      if (false) {
-        return _getTrendingAvatarsDemo(limit);
-      } else {
-        return _getTrendingAvatarsSupabase(limit);
-      }
+      return _getTrendingAvatarsSupabase(limit);
     } catch (e) {
       debugPrint('Error getting trending avatars: $e');
       return [];
@@ -156,119 +125,14 @@ class FollowService {
     if (userId == null) return [];
 
     try {
-      if (false) {
-        return _getMutualFollowsDemo(userId, otherUserId, limit);
-      } else {
-        return _getMutualFollowsSupabase(userId, otherUserId, limit);
-      }
+      return _getMutualFollowsSupabase(userId, otherUserId, limit);
     } catch (e) {
       debugPrint('Error getting mutual follows: $e');
       return [];
     }
   }
 
-  // Demo mode implementations
-  bool _toggleFollowDemo(String avatarId, String userId) {
-    _userFollowingAvatars[userId] ??= <String>{};
-    _avatarFollowers[avatarId] ??= <String>{};
-    
-    final isFollowing = _userFollowingAvatars[userId]!.contains(avatarId);
-    
-    if (isFollowing) {
-      _userFollowingAvatars[userId]!.remove(avatarId);
-      _avatarFollowers[avatarId]!.remove(userId);
-      return false;
-    } else {
-      _userFollowingAvatars[userId]!.add(avatarId);
-      _avatarFollowers[avatarId]!.add(userId);
-      return true;
-    }
-  }
 
-  Future<List<AvatarModel>> _getFollowingAvatarsDemo(String userId, int limit, int offset) async {
-    final followingIds = _userFollowingAvatars[userId] ?? <String>{};
-    final avatarsList = followingIds.toList();
-    
-    final startIndex = offset;
-    final endIndex = (startIndex + limit).clamp(0, avatarsList.length);
-    
-    if (startIndex >= avatarsList.length) return [];
-    
-    final limitedIds = avatarsList.sublist(startIndex, endIndex);
-    final avatars = <AvatarModel>[];
-    
-    for (final avatarId in limitedIds) {
-      try {
-        final avatar = await _avatarService.getAvatarById(avatarId);
-        if (avatar != null) avatars.add(avatar);
-      } catch (e) {
-        debugPrint('Error loading avatar $avatarId: $e');
-      }
-    }
-    
-    return avatars;
-  }
-
-  Future<List<UserModel>> _getAvatarFollowersDemo(String avatarId, int limit, int offset) async {
-    final followerIds = _avatarFollowers[avatarId] ?? <String>{};
-    final followersList = followerIds.toList();
-    
-    final startIndex = offset;
-    final endIndex = (startIndex + limit).clamp(0, followersList.length);
-    
-    if (startIndex >= followersList.length) return [];
-    
-    // For demo, create mock users
-    return followersList.sublist(startIndex, endIndex).map<UserModel>((userId) {
-      return UserModel.create(
-        email: 'user$userId@demo.com',
-        username: 'user_${userId.substring(0, 8)}',
-        displayName: 'Demo User ${userId.substring(0, 4)}',
-      );
-    }).toList();
-  }
-
-  Future<List<AvatarModel>> _getRecommendedAvatarsDemo(String userId, int limit) async {
-    // For demo, return some sample avatars that user isn't following
-    final allAvatars = await _avatarService.getAllAvatars();
-    final following = _userFollowingAvatars[userId] ?? <String>{};
-    
-    final recommended = allAvatars.where((avatar) => !following.contains(avatar.id)).take(limit).toList();
-    return recommended;
-  }
-
-  Future<List<AvatarModel>> _getTrendingAvatarsDemo(int limit) async {
-    // For demo, return avatars sorted by follower count
-    final allAvatars = await _avatarService.getAllAvatars();
-    
-    // Sort by follower count (demo)
-    allAvatars.sort((a, b) {
-      final aFollowers = _avatarFollowers[a.id]?.length ?? 0;
-      final bFollowers = _avatarFollowers[b.id]?.length ?? 0;
-      return bFollowers.compareTo(aFollowers);
-    });
-    
-    return allAvatars.take(limit).toList();
-  }
-
-  Future<List<AvatarModel>> _getMutualFollowsDemo(String userId, String otherUserId, int limit) async {
-    final userFollowing = _userFollowingAvatars[userId] ?? <String>{};
-    final otherFollowing = _userFollowingAvatars[otherUserId] ?? <String>{};
-    
-    final mutual = userFollowing.intersection(otherFollowing).take(limit);
-    final avatars = <AvatarModel>[];
-    
-    for (final avatarId in mutual) {
-      try {
-        final avatar = await _avatarService.getAvatarById(avatarId);
-        if (avatar != null) avatars.add(avatar);
-      } catch (e) {
-        debugPrint('Error loading mutual follow avatar $avatarId: $e');
-      }
-    }
-    
-    return avatars;
-  }
 
   // Supabase implementations (placeholders)
   Future<bool> _toggleFollowSupabase(String avatarId, String userId) async {
@@ -478,20 +342,5 @@ class FollowService {
     }
   }
 
-  /// Initialize with some demo data for testing
-  void initializeDemoData() {
-    // Pre-populate some follow relationships for demo
-    const demoUserId = 'demo-user-1';
-    _userFollowingAvatars[demoUserId] = {'avatar-1', 'avatar-2'};
-    _avatarFollowers['avatar-1'] = {demoUserId, 'demo-user-2', 'demo-user-3'};
-    _avatarFollowers['avatar-2'] = {demoUserId, 'demo-user-4'};
-    _avatarFollowers['avatar-3'] = {'demo-user-2', 'demo-user-3', 'demo-user-4', 'demo-user-5'};
-  }
 
-  /// Clear all cache
-  void clearCache() {
-    _userFollowingAvatars.clear();
-    _avatarFollowers.clear();
-    _recommendedAvatars.clear();
-  }
 }

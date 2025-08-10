@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
@@ -34,8 +35,8 @@ class ProfileService {
         throw Exception('Failed to load profile: ${response.statusCode}');
       }
     } catch (e) {
-      // Return demo data for development
-      return _getDemoProfileData(userId);
+      debugPrint('Error loading profile data: $e');
+      rethrow;
     }
   }
 
@@ -117,8 +118,8 @@ class ProfileService {
         throw Exception('Failed to load avatars: ${response.statusCode}');
       }
     } catch (e) {
-      // Return demo avatars for development
-      return _getDemoAvatars(userId);
+      debugPrint('Error loading user avatars: $e');
+      return [];
     }
   }
 
@@ -175,70 +176,5 @@ class ProfileService {
     }
   }
 
-  // Demo data for development
-  Map<String, dynamic> _getDemoProfileData(String userId) {
-    return {
-      'user': UserModel.create(
-        email: 'demo@example.com',
-        username: 'demo_user',
-        displayName: 'Demo User',
-        profileImageUrl: 'assets/images/p.jpg',
-      ),
-      'avatars': _getDemoAvatars(userId),
-      'stats': {
-        'total_posts': 24,
-        'total_likes': 1245,
-        'total_followers': 856,
-        'total_views': 12489,
-      },
-      'preferences': {
-        'notifications_enabled': true,
-        'push_notifications': true,
-        'email_notifications': false,
-        'dark_mode': true,
-        'auto_play_videos': true,
-        'data_saver': false,
-        'privacy_level': 'public',
-      },
-    };
-  }
 
-  List<AvatarModel> _getDemoAvatars(String userId) {
-    return [
-      AvatarModel.create(
-        ownerUserId: userId,
-        name: 'Lana Smith',
-        bio: 'Photographer | Traveler | Coffee lover',
-        niche: AvatarNiche.lifestyle,
-        personalityTraits: [
-          PersonalityTrait.friendly,
-          PersonalityTrait.creative,
-          PersonalityTrait.inspiring
-        ],
-        avatarImageUrl: 'assets/images/p.jpg',
-      ).copyWith(
-        followersCount: 8000,
-        likesCount: 12450,
-        postsCount: 50,
-        engagementRate: 4.2,
-      ),
-      AvatarModel.create(
-        ownerUserId: userId,
-        name: 'Alex Chen',
-        bio: 'Tech enthusiast | Gadget reviewer | Future lover',
-        niche: AvatarNiche.tech,
-        personalityTraits: [
-          PersonalityTrait.analytical,
-          PersonalityTrait.professional,
-          PersonalityTrait.energetic
-        ],
-        avatarImageUrl: 'assets/images/We.jpg',
-      ).copyWith(
-        followersCount: 5200,
-        likesCount: 8900,
-        postsCount: 32,
-        engagementRate: 3.8,
-      ),
-    ];
-  }
 }

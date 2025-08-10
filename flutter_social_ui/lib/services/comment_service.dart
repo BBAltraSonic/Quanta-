@@ -17,9 +17,7 @@ class CommentService {
   final AIService _aiService = AIService();
   final AvatarService _avatarService = AvatarService();
   
-  // In-memory cache for demo mode
-  final Map<String, List<Comment>> _postComments = {};
-  final Map<String, int> _commentCounts = {};
+
 
   /// Add a comment to a post
   Future<Comment> addComment({
@@ -28,11 +26,7 @@ class CommentService {
     String? parentCommentId,
   }) async {
     try {
-      if (false) {
-        return _addCommentDemo(postId, text, parentCommentId);
-      } else {
-        return _addCommentSupabase(postId, text, parentCommentId);
-      }
+      return _addCommentSupabase(postId, text, parentCommentId);
     } catch (e) {
       debugPrint('Error adding comment: $e');
       rethrow;
@@ -46,11 +40,7 @@ class CommentService {
     int offset = 0,
   }) async {
     try {
-      if (false) {
-        return _getPostCommentsDemo(postId, limit, offset);
-      } else {
-        return _getPostCommentsSupabase(postId, limit, offset);
-      }
+      return _getPostCommentsSupabase(postId, limit, offset);
     } catch (e) {
       debugPrint('Error getting post comments: $e');
       return [];
@@ -74,11 +64,7 @@ class CommentService {
   /// Like or unlike a comment
   Future<bool> toggleCommentLike(String commentId) async {
     try {
-      if (false) {
-        return _toggleCommentLikeDemo(commentId);
-      } else {
-        return _toggleCommentLikeSupabase(commentId);
-      }
+      return _toggleCommentLikeSupabase(commentId);
     } catch (e) {
       debugPrint('Error toggling comment like: $e');
       return false;
@@ -124,12 +110,7 @@ class CommentService {
           
           aiComments.add(aiComment);
           
-          // Add to demo storage
-          if (false) {
-            _postComments[postId] = _postComments[postId] ?? [];
-            _postComments[postId]!.add(aiComment);
-            _commentCounts[postId] = (_commentCounts[postId] ?? 0) + 1;
-          }
+
           
         } catch (e) {
           debugPrint('Error generating AI comment for ${avatar.name}: $e');
@@ -146,80 +127,14 @@ class CommentService {
   /// Delete a comment
   Future<bool> deleteComment(String commentId) async {
     try {
-      if (false) {
-        return _deleteCommentDemo(commentId);
-      } else {
-        return _deleteCommentSupabase(commentId);
-      }
+      return _deleteCommentSupabase(commentId);
     } catch (e) {
       debugPrint('Error deleting comment: $e');
       return false;
     }
   }
 
-  // Demo mode implementations
-  Comment _addCommentDemo(String postId, String text, String? parentCommentId) {
-    final userId = _authService.currentUserId ?? 'demo-user-1';
-    
-    final comment = Comment(
-      id: 'comment_${DateTime.now().millisecondsSinceEpoch}',
-      postId: postId,
-      userId: userId ?? 'demo-user',
-      userName: 'You',
-      userAvatar: 'assets/images/We.jpg',
-      text: text,
-      createdAt: DateTime.now(),
-      likes: 0,
-      repliesCount: 0,
-      parentCommentId: parentCommentId,
-    );
-    
-    _postComments[postId] = _postComments[postId] ?? [];
-    _postComments[postId]!.add(comment);
-    _commentCounts[postId] = (_commentCounts[postId] ?? 0) + 1;
-    
-    return comment;
-  }
 
-  List<Comment> _getPostCommentsDemo(String postId, int limit, int offset) {
-    final comments = _postComments[postId] ?? [];
-    
-    // Sort by creation time (newest first)
-    comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
-    final startIndex = offset;
-    final endIndex = (startIndex + limit).clamp(0, comments.length);
-    
-    if (startIndex >= comments.length) return [];
-    
-    return comments.sublist(startIndex, endIndex);
-  }
-
-  bool _toggleCommentLikeDemo(String commentId) {
-    // Find comment and toggle like (simplified for demo)
-    for (final comments in _postComments.values) {
-      for (final comment in comments) {
-        if (comment.id == commentId) {
-          // In a real implementation, track user likes
-          return true; // Assume liked
-        }
-      }
-    }
-    return false;
-  }
-
-  bool _deleteCommentDemo(String commentId) {
-    for (final entry in _postComments.entries) {
-      final comments = entry.value;
-      final index = comments.indexWhere((c) => c.id == commentId);
-      if (index != -1) {
-        comments.removeAt(index);
-        _commentCounts[entry.key] = (_commentCounts[entry.key] ?? 1) - 1;
-        return true;
-      }
-    }
-    return false;
-  }
 
   Future<String> _generateAIComment(PostModel post, AvatarModel avatar, List<Comment> existingComments) async {
     try {
@@ -310,69 +225,47 @@ class CommentService {
     }
   }
 
-  /// Initialize demo data
-  void initializeDemoData() {
-    // Sample comments for demo posts
-    final demoComments = <String, List<Comment>>{
-      'post-1': [
-        Comment(
-          id: 'comment-1-1',
-          postId: 'post-1',
-          userId: 'user-1',
-          userName: 'Alex Chen',
-          userAvatar: 'assets/images/p.jpg',
-          text: 'This is absolutely amazing! 🔥',
-          createdAt: DateTime.now().subtract(Duration(hours: 2)),
-          likes: 12,
-          repliesCount: 2,
-        ),
-        Comment(
-          id: 'comment-1-2',
-          postId: 'post-1',
-          userId: 'avatar-2',
-          userName: 'TechBot',
-          userAvatar: 'assets/images/p.jpg',
-          text: 'The innovation here is incredible! Love seeing technology push boundaries! 💻✨',
-          createdAt: DateTime.now().subtract(Duration(hours: 1)),
-          likes: 8,
-          repliesCount: 0,
-        ),
-      ],
-    };
-    
-    _postComments.addAll(demoComments);
-    _commentCounts['post-1'] = 2;
-  }
 
-  // Supabase implementations (placeholders)
+
+  // Supabase implementations
   Future<Comment> _addCommentSupabase(String postId, String text, String? parentCommentId) async {
-    // TODO: Implement Supabase comment creation
-    throw UnimplementedError('Supabase comment creation not implemented yet');
+    throw Exception(
+      'Comment system is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with comments table.'
+    );
   }
 
   Future<List<Comment>> _getPostCommentsSupabase(String postId, int limit, int offset) async {
-    // TODO: Implement Supabase comment retrieval
-    throw UnimplementedError('Supabase comment retrieval not implemented yet');
+    throw Exception(
+      'Comment retrieval service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with comments table.'
+    );
   }
 
   Future<int> _getCommentCountSupabase(String postId) async {
-    // TODO: Implement Supabase comment count
-    throw UnimplementedError('Supabase comment count not implemented yet');
+    throw Exception(
+      'Comment counting service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with comments table.'
+    );
   }
 
   Future<bool> _toggleCommentLikeSupabase(String commentId) async {
-    // TODO: Implement Supabase comment like toggle
-    throw UnimplementedError('Supabase comment like toggle not implemented yet');
+    throw Exception(
+      'Comment like system is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with comment likes table.'
+    );
   }
 
   Future<bool> _deleteCommentSupabase(String commentId) async {
-    // TODO: Implement Supabase comment deletion
-    throw UnimplementedError('Supabase comment deletion not implemented yet');
+    throw Exception(
+      'Comment deletion service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with comments table.'
+    );
   }
 
   /// Clear all cache
   void clearCache() {
-    _postComments.clear();
-    _commentCounts.clear();
+    // Note: Cache clearing functionality needs to be implemented
+    // when the real comment storage system is in place
   }
 }

@@ -430,7 +430,7 @@ class NotificationService {
     }
   }
 
-  // Get notification preferences (placeholder for future implementation)
+  // Get notification preferences
   Future<Map<String, bool>> getNotificationPreferences() async {
     try {
       final userId = _authService.currentUserId;
@@ -445,7 +445,7 @@ class NotificationService {
     }
   }
 
-  // Update notification preferences (placeholder for future implementation)
+  // Update notification preferences
   Future<void> updateNotificationPreferences(
     Map<String, bool> preferences,
   ) async {

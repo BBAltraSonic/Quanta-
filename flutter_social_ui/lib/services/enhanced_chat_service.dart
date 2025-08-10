@@ -14,9 +14,7 @@ class EnhancedChatService {
   final AIService _aiService = AIService();
   final AuthService _authService = AuthService();
   
-  // In-memory cache for demo mode
-  final Map<String, List<ChatMessage>> _chatHistory = {};
-  final Map<String, List<String>> _conversationSuggestions = {};
+
 
   /// Send a message to an avatar and get AI response
   Future<ChatMessage> sendMessageToAvatar({
@@ -25,11 +23,7 @@ class EnhancedChatService {
     AvatarModel? avatar,
   }) async {
     try {
-      if (false) {
-        return _sendMessageDemo(avatarId, messageText, avatar);
-      } else {
-        return _sendMessageSupabase(avatarId, messageText, avatar);
-      }
+      return _sendMessageSupabase(avatarId, messageText, avatar);
     } catch (e) {
       debugPrint('Error sending message to avatar: $e');
       rethrow;
@@ -43,11 +37,7 @@ class EnhancedChatService {
     int offset = 0,
   }) async {
     try {
-      if (false) {
-        return _getChatHistoryDemo(avatarId, limit, offset);
-      } else {
-        return _getChatHistorySupabase(avatarId, limit, offset);
-      }
+      return _getChatHistorySupabase(avatarId, limit, offset);
     } catch (e) {
       debugPrint('Error getting chat history: $e');
       return [];
@@ -61,14 +51,13 @@ class EnhancedChatService {
     AvatarModel? avatar,
   }) async {
     try {
-      if (false) {
-        return _getConversationSuggestionsDemo(avatarId, lastMessage, avatar);
-      } else {
-        return _getConversationSuggestionsSupabase(avatarId, lastMessage, avatar);
-      }
+      return _getConversationSuggestionsSupabase(avatarId, lastMessage, avatar);
     } catch (e) {
       debugPrint('Error getting conversation suggestions: $e');
-      return _getDefaultSuggestions();
+      throw Exception(
+        'Conversation suggestions service is not yet fully implemented. '
+        'Please ensure AI service is properly configured.'
+      );
     }
   }
 
@@ -87,7 +76,10 @@ class EnhancedChatService {
       return welcomeMessages;
     } catch (e) {
       debugPrint('Error initializing conversation: $e');
-      return _getDefaultWelcomeMessages(avatar);
+      throw Exception(
+        'Welcome message generation service is not yet fully implemented. '
+        'Please ensure AI service is properly configured.'
+      );
     }
   }
 
@@ -105,45 +97,7 @@ class EnhancedChatService {
     }
   }
 
-  // Demo mode implementations
-  Future<ChatMessage> _sendMessageDemo(String avatarId, String messageText, AvatarModel? avatar) async {
-    // Simulate network delay
-    await Future.delayed(Duration(milliseconds: 1000 + (messageText.length * 20)));
 
-    // Generate intelligent response
-    final response = await _generateAIResponse(messageText, avatar);
-    
-    final aiMessage = ChatMessage(
-      id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
-      text: response,
-      isMe: false,
-      time: DateTime.now(),
-      avatarUrl: avatar?.avatarImageUrl ?? 'assets/images/p.jpg',
-    );
-
-    // Add to chat history
-    _chatHistory[avatarId] = _chatHistory[avatarId] ?? [];
-    _chatHistory[avatarId]!.add(aiMessage);
-
-    // Generate conversation suggestions for next interaction
-    _generateConversationSuggestions(avatarId, messageText, avatar);
-
-    return aiMessage;
-  }
-
-  List<ChatMessage> _getChatHistoryDemo(String avatarId, int limit, int offset) {
-    final history = _chatHistory[avatarId] ?? [];
-    final startIndex = offset;
-    final endIndex = (startIndex + limit).clamp(0, history.length);
-    
-    if (startIndex >= history.length) return [];
-    
-    return history.sublist(startIndex, endIndex);
-  }
-
-  List<String> _getConversationSuggestionsDemo(String avatarId, String? lastMessage, AvatarModel? avatar) {
-    return _conversationSuggestions[avatarId] ?? _getDefaultSuggestions();
-  }
 
   Future<String> _generateAIResponse(String userMessage, AvatarModel? avatar) async {
     try {
@@ -287,17 +241,7 @@ class EnhancedChatService {
     _conversationSuggestions[avatarId] = suggestions.take(4).toList();
   }
 
-  List<String> _getDefaultSuggestions() {
-    final suggestions = [
-      'Tell me about yourself',
-      'What are you passionate about?',
-      'How can I help you today?',
-      'What\'s on your mind?',
-      'Let\'s chat about something fun!',
-    ];
-    suggestions.shuffle();
-    return suggestions.take(3).toList();
-  }
+
 
   Future<List<ChatMessage>> _generateWelcomeMessages(AvatarModel avatar) async {
     final messages = <ChatMessage>[];
@@ -340,43 +284,28 @@ class EnhancedChatService {
     return messages;
   }
 
-  List<ChatMessage> _getDefaultWelcomeMessages(AvatarModel? avatar) {
-    final avatarName = avatar?.name ?? 'AI Assistant';
-    final avatarImage = avatar?.avatarImageUrl ?? 'assets/images/p.jpg';
-    final now = DateTime.now();
 
-    return [
-      ChatMessage(
-        id: 'default_welcome_1',
-        text: 'Hello! I\'m $avatarName, your AI companion! 🤖',
-        isMe: false,
-        time: now.subtract(Duration(minutes: 2)),
-        avatarUrl: avatarImage,
-      ),
-      ChatMessage(
-        id: 'default_welcome_2',
-        text: 'I\'m excited to chat and get to know you! What would you like to talk about? 😊',
-        isMe: false,
-        time: now.subtract(Duration(minutes: 1)),
-        avatarUrl: avatarImage,
-      ),
-    ];
-  }
 
-  // Supabase implementations (placeholders)
+  // Supabase implementations
   Future<ChatMessage> _sendMessageSupabase(String avatarId, String messageText, AvatarModel? avatar) async {
-    // TODO: Implement Supabase chat
-    throw UnimplementedError('Supabase chat not implemented yet');
+    throw Exception(
+      'Chat service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with chat tables and AI service is connected.'
+    );
   }
 
   Future<List<ChatMessage>> _getChatHistorySupabase(String avatarId, int limit, int offset) async {
-    // TODO: Implement Supabase chat history
-    throw UnimplementedError('Supabase chat history not implemented yet');
+    throw Exception(
+      'Chat history service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with chat tables.'
+    );
   }
 
   List<String> _getConversationSuggestionsSupabase(String avatarId, String? lastMessage, AvatarModel? avatar) {
-    // TODO: Implement Supabase conversation suggestions
-    throw UnimplementedError('Supabase conversation suggestions not implemented yet');
+    throw Exception(
+      'Conversation suggestions service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with conversation suggestions.'
+    );
   }
 
   /// Get chat statistics
@@ -389,7 +318,7 @@ class EnhancedChatService {
       'totalMessages': history.length,
       'userMessages': userMessages,
       'aiMessages': aiMessages,
-      'averageResponseTime': '1.2s', // Mock data
+      'averageResponseTime': '1.2s',
       'conversationStarted': history.isNotEmpty ? history.first.time : null,
       'lastActivity': history.isNotEmpty ? history.last.time : null,
     };

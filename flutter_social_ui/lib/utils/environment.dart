@@ -13,12 +13,10 @@ class Environment {
   // AI Service Configuration
   static const String openRouterApiKey = String.fromEnvironment(
     'OPENROUTER_API_KEY',
-    defaultValue: 'your-openrouter-key-here',
   );
   
   static const String huggingFaceApiKey = String.fromEnvironment(
     'HUGGINGFACE_API_KEY',
-    defaultValue: 'your-huggingface-key-here',
   );
   
   // App Configuration
@@ -26,7 +24,6 @@ class Environment {
   static const String appVersion = '1.0.0';
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://api.example.com',
   );
   
   // Feature Flags
@@ -46,14 +43,31 @@ class Environment {
   
   // Validation
   static bool get isConfigured {
-    return supabaseUrl != 'https://your-project.supabase.co' &&
-           supabaseAnonKey != 'your-anon-key-here';
+    return supabaseUrl.isNotEmpty && 
+           supabaseAnonKey.isNotEmpty &&
+           supabaseUrl.startsWith('https://') &&
+           supabaseAnonKey.length > 10; // Basic validation
   }
   
   static void validateConfiguration() {
-    if (!isConfigured) {
+    if (supabaseUrl.isEmpty) {
       throw Exception(
-        'Environment not configured properly. Please set SUPABASE_URL and SUPABASE_ANON_KEY.',
+        'SUPABASE_URL environment variable is required but not set.',
+      );
+    }
+    if (supabaseAnonKey.isEmpty) {
+      throw Exception(
+        'SUPABASE_ANON_KEY environment variable is required but not set.',
+      );
+    }
+    if (!supabaseUrl.startsWith('https://')) {
+      throw Exception(
+        'SUPABASE_URL must be a valid HTTPS URL.',
+      );
+    }
+    if (openRouterApiKey.isEmpty && huggingFaceApiKey.isEmpty) {
+      throw Exception(
+        'At least one AI service API key (OPENROUTER_API_KEY or HUGGINGFACE_API_KEY) must be configured.',
       );
     }
   }

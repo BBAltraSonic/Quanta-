@@ -6,7 +6,7 @@ Future<void> openCommentsModal(
   BuildContext context, {
   List<Comment>? initial,
 }) async {
-  final comments = List<Comment>.from(initial ?? generateMockComments());
+  final comments = List<Comment>.from(initial ?? <Comment>[]);
 
   await showModalBottomSheet(
     context: context,
