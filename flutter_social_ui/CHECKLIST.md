@@ -4,7 +4,7 @@
 - [x] 1. Confirm and finalize the specification (SPEC.md created)
 - [x] 2. Create and commit living checklist (CHECKLIST.md)
 - [ ] 3. Baseline branch and CI prep
-- [ ] 4. Codebase inventory of mock, fake, and demo artifacts
+- [x] 4. Codebase inventory of mock, fake, and demo artifacts (INVENTORY.md created)
 - [ ] 5. Map data flow and dependency injection bindings
 - [ ] 6. Lock production configuration defaults and flavors
 
