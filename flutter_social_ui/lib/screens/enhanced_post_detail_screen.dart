@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../widgets/overlay_icon.dart';
 import '../screens/chat_screen.dart';
 import '../screens/enhanced_comments_screen.dart';
@@ -60,6 +61,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   
   // UI state
   bool _showControls = true;
+  bool _isMuted = false;
   late AnimationController _controlsAnimationController;
   late Animation<double> _controlsAnimation;
 
@@ -104,10 +106,12 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   
   void _setupVideoAnalytics() {
     _videoService.onAnalyticsEvent = (url, event, data) {
-      final post = _posts.firstWhere(
-        (p) => p.videoUrl == url,
-        orElse: () => _posts.isNotEmpty ? _posts.first : null,
-      );
+      PostModel? post;
+      try {
+        post = _posts.firstWhere((p) => p.videoUrl == url);
+      } catch (e) {
+        post = _posts.isNotEmpty ? _posts.first : null;
+      }
       
       if (post != null) {
         _trackAnalyticsEvent(post.id, event, data);
@@ -638,7 +642,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Block User'),
-        content: Text('Are you sure you want to block ${avatar.name}? You won\\'t see their posts anymore.'),
+        content: Text('Are you sure you want to block ${avatar.name}? You won\'t see their posts anymore.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

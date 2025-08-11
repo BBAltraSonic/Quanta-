@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:video_player/video_player.dart';
 import '../constants.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';

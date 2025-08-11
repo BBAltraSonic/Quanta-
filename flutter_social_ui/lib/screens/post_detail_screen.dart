@@ -52,8 +52,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   List<PostModel> _posts = [];
   Map<String, AvatarModel> _avatarCache = {};
-  Map<String, bool> _likedStatus = {};
-  Map<String, bool> _followingStatus = {};
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -94,6 +92,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       
       _trackAnalyticsEvent(post.id, event, data);
     };
+  }
+  
+  void _trackAnalyticsEvent(String postId, String event, Map<String, dynamic> data) {
+    // Track analytics events
+    debugPrint('Analytics: $event for post $postId with data: $data');
+    
+    // In a real app, you would send this to your analytics service
+    // For now, we'll just log it
+    try {
+      // Example: Analytics.track(event, {
+      //   'post_id': postId,
+      //   'timestamp': DateTime.now().toIso8601String(),
+      //   ...data,
+      // });
+    } catch (e) {
+      debugPrint('Failed to track analytics event: $e');
+    }
   }
 
   @override
