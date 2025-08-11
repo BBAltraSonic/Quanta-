@@ -288,32 +288,100 @@ class _VideoFeedItemState extends State<VideoFeedItem>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final videoUrl = widget.post.videoUrl;
-    
-    if (videoUrl == null || videoUrl.isEmpty) {
-      return Container(
-        color: Colors.black,
-        child: const Center(
-          child: Text(
-            'Video not available',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
-    }
+  Widget _buildMediaContent() {
+    final hasVideo = widget.post.videoUrl != null && widget.post.videoUrl!.isNotEmpty;
+    final hasImage = widget.post.imageUrl != null && widget.post.imageUrl!.isNotEmpty;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Video Player
-        FeedsVideoPlayer(
-          videoUrl: videoUrl,
+    if (hasVideo) {
+      // Video content
+      return GestureDetector(
+        onDoubleTap: _handleDoubleTap,
+        child: FeedsVideoPlayer(
+          videoUrl: widget.post.videoUrl!,
           isActive: widget.isActive,
           onDoubleTap: _handleDoubleTap,
           onPlayStateChanged: widget.onPlayStateChanged,
         ),
+      );
+    } else if (hasImage) {
+      // Image content
+      return GestureDetector(
+        onDoubleTap: _handleDoubleTap,
+        child: Container(
+          color: Colors.black,
+          child: Image.network(
+            widget.post.imageUrl!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey[900],
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported,
+                        color: Colors.grey,
+                        size: 64,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return Container(
+                color: Colors.grey[900],
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      // No media content - show placeholder
+      return Container(
+        color: Colors.grey[900],
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.photo_library,
+                color: Colors.grey,
+                size: 64,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No media available',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Media Content (Video or Image)
+        _buildMediaContent(),
 
         // Right side actions
         Positioned(

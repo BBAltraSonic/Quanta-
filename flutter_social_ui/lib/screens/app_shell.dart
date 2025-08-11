@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_social_ui/screens/simple_feeds_screen.dart';
+import 'package:flutter_social_ui/screens/feeds_screen.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/screens/create_post_screen.dart';
 import 'package:flutter_social_ui/screens/profile_screen.dart';
@@ -21,7 +21,7 @@ class _AppShellState extends State<AppShell> {
   // New order (keeping Feeds screen as the main/home tab):
   // [Feeds (Home), Search (left of center), Create (center), Notifications (right of center), Profile]
   static final List<Widget> _widgetOptions = <Widget>[
-    const SimpleFeedsScreen(), // Home / Feeds screen with real posts
+    const FeedsScreen(), // Home / TikTok-style video feed
     const SearchScreenNew(), // Left of center
     const CreatePostScreen(), // Center FAB highlight
     const NotificationsScreenNew(), // Right of center

@@ -21,11 +21,11 @@ class FeedsService {
     bool orderByTrending = true,
   }) async {
     try {
+      // Get all posts (not just videos) since we have mixed content
       PostgrestFilterBuilder<PostgrestList> query = _supabase
           .from('posts')
           .select('*')
-          .eq('is_active', true)
-          .not('video_url', 'is', null);
+          .eq('is_active', true);
 
       PostgrestTransformBuilder<PostgrestList> orderedQuery;
       if (orderByTrending) {

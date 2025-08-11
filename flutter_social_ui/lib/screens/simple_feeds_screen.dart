@@ -14,7 +14,7 @@ class SimpleFeedsScreen extends StatefulWidget {
 class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
   final SimpleSupabaseService _supabaseService = SimpleSupabaseService();
   
-  List<Map<String, dynamic>> _posts = [];
+  List<PostModel> _posts = [];
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -34,7 +34,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
       });
 
       // Get posts directly from Supabase
-      final posts = await _supabaseService.getPosts();
+      final posts = await _supabaseService.getFeedPosts();
       
       setState(() {
         _posts = posts;
@@ -171,7 +171,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                       radius: 20,
                       backgroundColor: kPrimaryColor,
                       child: Text(
-                        (post['author_name'] ?? 'User')[0].toUpperCase(),
+                        (post.avatarId ?? 'User')[0].toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -184,7 +184,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            post['author_name'] ?? 'Unknown User',
+                            'Avatar ${post.avatarId}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -192,7 +192,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                             ),
                           ),
                           Text(
-                            '${post['created_at'] ?? ''}',
+                            post.createdAt.toString().split('.')[0],
                             style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
@@ -206,11 +206,11 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                 const SizedBox(height: 12),
                 
                 // Post content
-                if (post['caption'] != null && post['caption'].toString().isNotEmpty)
+                if (post.caption.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
-                      post['caption'],
+                      post.caption,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -219,7 +219,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                   ),
                 
                 // Media placeholder
-                if (post['image_url'] != null || post['video_url'] != null)
+                if (post.imageUrl != null || post.videoUrl != null)
                   Container(
                     height: 200,
                     width: double.infinity,
@@ -248,7 +248,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${post['likes_count'] ?? 0}',
+                      '${post.likesCount}',
                       style: const TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(width: 16),
@@ -259,7 +259,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${post['comments_count'] ?? 0}',
+                      '${post.commentsCount}',
                       style: const TextStyle(color: Colors.grey),
                     ),
                   ],
