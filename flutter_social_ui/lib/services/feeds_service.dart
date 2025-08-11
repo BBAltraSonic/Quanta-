@@ -225,7 +225,7 @@ class FeedsService {
   Future<List<Comment>> getComments(String postId, {int limit = 20, int offset = 0}) async {
     try {
       final response = await _supabase
-          .from('comments')
+          .from('post_comments')
           .select('*')
           .eq('post_id', postId)
           .order('created_at', ascending: false)
@@ -246,7 +246,7 @@ class FeedsService {
     }
 
     try {
-      final response = await _supabase.from('comments').insert({
+      final response = await _supabase.from('post_comments').insert({
         'post_id': postId,
         'user_id': userId,
         'text': text,
@@ -270,7 +270,7 @@ class FeedsService {
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'comments',
+          table: 'post_comments',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'post_id',
