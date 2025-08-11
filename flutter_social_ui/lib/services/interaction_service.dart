@@ -4,7 +4,6 @@ import '../models/post_model.dart';
 import '../models/comment.dart';
 import '../config/app_config.dart';
 import 'auth_service.dart';
-import 'simple_supabase_service.dart';
 import 'error_handling_service.dart';
 
 /// Service for handling social interactions like likes, comments, shares, and saves
@@ -92,7 +91,7 @@ class InteractionService {
 
     try {
       if (false) {
-        return _likedPosts[postId]?.contains(userId) ?? false;
+        return false; // _likedPosts is a Set, not a Map
       } else {
         return _hasLikedSupabase(postId, userId);
       }
@@ -109,7 +108,7 @@ class InteractionService {
 
     try {
       if (false) {
-        return _savedPosts[postId]?.contains(userId) ?? false;
+        return false; // _savedPosts is a Set, not a Map
       } else {
         return _hasSavedSupabase(postId, userId);
       }

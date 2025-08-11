@@ -6,7 +6,8 @@ import '../constants.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../services/enhanced_video_service.dart';
-import '../widgets/enhanced_comments_modal.dart';
+import '../widgets/comments_modal.dart';
+
 
 /// Enhanced post item widget with full functionality
 class EnhancedPostItem extends StatefulWidget {
@@ -532,7 +533,7 @@ class _EnhancedPostItemState extends State<EnhancedPostItem>
                     ),
                     GestureDetector(
               onTap: widget.onComment ?? () {
-                openEnhancedCommentsModal(
+                openCommentsModal(
                   context,
                   postId: widget.post.id,
                 );

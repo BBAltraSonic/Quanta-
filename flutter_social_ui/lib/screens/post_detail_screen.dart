@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:flutter_social_ui/widgets/post_item.dart';
 import 'package:flutter_social_ui/widgets/overlay_icon.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/screens/enhanced_comments_screen.dart';
+import 'package:flutter_social_ui/widgets/comments_modal.dart';
 import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/services/enhanced_video_service.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/config/db_config.dart';
-import '../widgets/enhanced_post_item.dart';
+
 
 
 class PostDetailScreen extends StatefulWidget {
@@ -365,10 +363,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   void _onPostComment(PostModel post) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => EnhancedCommentsScreen(postId: post.id),
-      ),
+    openCommentsModal(
+      context, 
+      postId: post.id,
+      onCommentCountChanged: (int newCount) {
+        // Update the post's comment count in real time
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          setState(() {
+            _posts[index] = _posts[index].copyWith(
+              commentsCount: newCount,
+            );
+          });
+        }
+      },
     );
   }
 

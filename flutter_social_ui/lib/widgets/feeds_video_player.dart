@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import '../services/video_service.dart';
+import '../services/enhanced_video_service.dart';
 
 class FeedsVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -30,7 +30,7 @@ class FeedsVideoPlayer extends StatefulWidget {
 
 class _FeedsVideoPlayerState extends State<FeedsVideoPlayer>
     with SingleTickerProviderStateMixin {
-  final VideoService _videoService = VideoService();
+  final EnhancedVideoService _videoService = EnhancedVideoService();
   VideoPlayerController? _controller;
   bool _isLoading = true;
   bool _hasError = false;

@@ -106,7 +106,14 @@ class _VideoFeedItemState extends State<VideoFeedItem>
   void _openComments() {
     widget.onComment?.call();
     // Open dark draggable bottom sheet to match design
-    openCommentsModal(context);
+    openCommentsModal(
+      context, 
+      postId: widget.post.id,
+      onCommentCountChanged: (int newCount) {
+        // The parent should handle updating the post model
+        // This is handled by the feeds screen or post detail screen
+      },
+    );
   }
 
   String _formatCount(int count) {

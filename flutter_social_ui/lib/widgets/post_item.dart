@@ -3,7 +3,7 @@ import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:flutter_social_ui/widgets/video_player_widget.dart';
-import 'comments_modal.dart';
+
 
 class PostItem extends StatelessWidget {
   final String imageUrl;
@@ -259,11 +259,7 @@ class PostItem extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap:
-                          onComment ??
-                          () {
-                            openCommentsModal(context);
-                          },
+                      onTap: onComment,
                       child: _iconWithCounter(
                         asset:
                             'assets/icons/chat-round-svgrepo-com.svg', // comment

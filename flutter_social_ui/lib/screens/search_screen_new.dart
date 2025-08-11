@@ -3,7 +3,7 @@ import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/services/search_service_wrapper.dart';
-import 'package:flutter_social_ui/services/content_service_wrapper.dart';
+import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'dart:async';
 
@@ -18,7 +18,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final SearchService _searchService = SearchService();
-  final ContentService _contentService = ContentService();
+  final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   late TabController _tabController;
 
   List<AvatarModel> _avatarResults = [];
@@ -471,11 +471,10 @@ class _SearchScreenNewState extends State<SearchScreenNew>
 
   Future<void> _loadTrendingContent() async {
     try {
-      final hashtags = await _contentService.getTrendingHashtags(limit: 10);
+      // Since getTrendingHashtags is not yet implemented in EnhancedFeedsService,
+      // use fallback hashtags for now
       setState(() {
-        _trendingHashtags = hashtags
-            .map((h) => h['hashtag'].toString())
-            .toList();
+        _trendingHashtags = ['#ai', '#avatar', '#tech', '#creative', '#viral'];
       });
     } catch (e) {
       // Use fallback hashtags

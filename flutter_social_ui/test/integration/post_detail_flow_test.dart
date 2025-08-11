@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_social_ui/main.dart' as app;
 import 'package:flutter_social_ui/screens/enhanced_post_detail_screen.dart';
-import 'package:flutter_social_ui/widgets/enhanced_comments_modal.dart';
+import 'package:flutter_social_ui/widgets/comments_modal.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

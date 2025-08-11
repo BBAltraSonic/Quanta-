@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/comment.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
-import '../config/app_config.dart';
+
 import 'auth_service.dart';
 import 'ai_service.dart';
 import 'avatar_service.dart';
@@ -227,8 +227,18 @@ class CommentService {
 
   // Supabase implementations
   Future<Comment> _addCommentSupabase(String postId, String text, String? parentCommentId) async {
+    // Verify authentication state
     final user = _authService.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    final session = _authService.supabase.auth.currentSession;
+    
+    if (user == null || session == null) {
+      throw Exception('User not authenticated');
+    }
+    
+    // Double-check the user ID matches the session
+    if (user.id != session.user.id) {
+      throw Exception('Authentication state mismatch');
+    }
 
     final response = await _authService.supabase
         .from('post_comments')
@@ -259,10 +269,11 @@ class CommentService {
   Future<int> _getCommentCountSupabase(String postId) async {
     final response = await _authService.supabase
         .from('post_comments')
-        .select('id', const FetchOptions(count: CountOption.exact))
-        .eq('post_id', postId);
+        .select('id')
+        .eq('post_id', postId)
+        .count();
 
-    return response.count ?? 0;
+    return response.count;
   }
 
   Future<bool> _toggleCommentLikeSupabase(String commentId) async {

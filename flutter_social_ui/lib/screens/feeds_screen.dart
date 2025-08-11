@@ -4,8 +4,8 @@ import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../models/user_model.dart';
-import '../services/feeds_service.dart';
-import '../services/video_service.dart';
+import '../services/enhanced_feeds_service.dart';
+import '../services/enhanced_video_service.dart';
 import '../widgets/video_feed_item.dart';
 
 class FeedsScreen extends StatefulWidget {
@@ -19,8 +19,8 @@ class _FeedsScreenState extends State<FeedsScreen>
     with AutomaticKeepAliveClientMixin {
   final PageController _pageController = PageController();
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
-  final FeedsService _feedsService = FeedsService();
-  final VideoService _videoService = VideoService();
+  final EnhancedFeedsService _feedsService = EnhancedFeedsService();
+  final EnhancedVideoService _videoService = EnhancedVideoService();
 
   List<PostModel> _posts = [];
   Map<String, AvatarModel> _avatarCache = {};

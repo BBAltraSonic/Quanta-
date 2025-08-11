@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
-import '../widgets/overlay_icon.dart';
+
 import '../screens/chat_screen.dart';
-import '../screens/enhanced_comments_screen.dart';
+import '../widgets/comments_modal.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
 import '../models/post_model.dart';
@@ -357,11 +357,20 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       'timestamp': DateTime.now().toIso8601String(),
     });
     
-    final result = await Navigator.push(
+    await openCommentsModal(
       context,
-      MaterialPageRoute(
-        builder: (context) => EnhancedCommentsScreen(postId: post.id),
-      ),
+      postId: post.id,
+      onCommentCountChanged: (int newCount) {
+        // Update the post's comment count in real time
+        final index = _posts.indexWhere((p) => p.id == post.id);
+        if (index != -1) {
+          setState(() {
+            _posts[index] = _posts[index].copyWith(
+              commentsCount: newCount,
+            );
+          });
+        }
+      },
     );
     
     // Refresh post data when returning from comments

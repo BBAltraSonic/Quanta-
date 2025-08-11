@@ -7,6 +7,7 @@ import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
+import '../screens/avatar_management_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -132,6 +133,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
+  }
+
+  void _navigateToAvatarManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AvatarManagementScreen(),
+      ),
+    );
   }
 
   @override
@@ -303,6 +313,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           hintText: 'Email',
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Avatar Management Section
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: kCardColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Avatar Management',
+                          style: TextStyle(
+                            color: kTextColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Create and manage your virtual avatars for content creation',
+                          style: TextStyle(
+                            color: kLightTextColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: CustomButton(
+                            text: 'Manage Avatars',
+                            onPressed: _navigateToAvatarManagement,
+                            icon: Icons.person_add,
+                            backgroundColor: kPrimaryColor.withOpacity(0.1),
+                            textColor: kPrimaryColor,
+                          ),
                         ),
                       ],
                     ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/services/content_service_wrapper.dart';
+import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
@@ -72,7 +72,7 @@ class NotificationsScreenNew extends StatefulWidget {
 
 class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     with SingleTickerProviderStateMixin {
-  final ContentService _contentService = ContentService();
+  final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
   final notification_service.NotificationService _notificationService = notification_service.NotificationService();
@@ -94,7 +94,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
   Future<void> _initializeServices() async {
     try {
-      await _contentService.initialize();
+      // Initialize any required services here if needed
       _loadNotifications();
     } catch (e) {
       debugPrint('Error initializing services: $e');

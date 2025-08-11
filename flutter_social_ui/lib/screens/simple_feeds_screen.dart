@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/post_model.dart';
-import '../models/avatar_model.dart';
-import '../services/simple_supabase_service.dart';
+
+import '../services/enhanced_feeds_service.dart';
 import '../constants.dart';
 
 class SimpleFeedsScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class SimpleFeedsScreen extends StatefulWidget {
 }
 
 class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
-  final SimpleSupabaseService _supabaseService = SimpleSupabaseService();
+  final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   
   List<PostModel> _posts = [];
   bool _isLoading = true;
@@ -34,7 +34,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
       });
 
       // Get posts directly from Supabase
-      final posts = await _supabaseService.getFeedPosts();
+      final posts = await _feedsService.getVideoFeed();
       
       setState(() {
         _posts = posts;

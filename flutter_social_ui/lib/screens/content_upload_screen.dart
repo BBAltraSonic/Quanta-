@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/services/content_service.dart';
+import 'package:flutter_social_ui/services/content_upload_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service.dart';
+import 'package:flutter_social_ui/screens/avatar_creation_wizard.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -18,7 +19,7 @@ class ContentUploadScreen extends StatefulWidget {
 
 class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final TextEditingController _captionController = TextEditingController();
-  final ContentService _contentService = ContentService();
+  final ContentUploadService _contentService = ContentUploadService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
 
@@ -109,7 +110,20 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               ),
               SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () async {
+                  // Navigate to avatar creation
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AvatarCreationWizard(),
+                    ),
+                  );
+                  
+                  // Reload avatars after creation
+                  if (result != null) {
+                    await _loadUserAvatars();
+                  }
+                },
                 style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
                 child: Text('Create Avatar'),
               ),
