@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
-import '../utils/environment.dart';
 import 'auth_service.dart';
 
 class ProfileService {
@@ -31,11 +28,13 @@ class ProfileService {
           .select()
           .eq('owner_user_id', userId);
 
-      // Get user stats
-      final statsResponse = await _authService.supabase
+      // Get user stats (following count)
+      final followsResponse = await _authService.supabase
           .from('follows')
-          .select('avatar_id', const FetchOptions(count: CountOption.exact))
+          .select('avatar_id')
           .eq('user_id', userId);
+      
+      final followingCount = (followsResponse as List).length;
 
       return {
         'user': UserModel.fromJson(userResponse),
@@ -43,7 +42,7 @@ class ProfileService {
             .map((avatar) => AvatarModel.fromJson(avatar))
             .toList(),
         'stats': {
-          'following_count': statsResponse.count ?? 0,
+          'following_count': followingCount,
           'followers_count': userResponse['followers_count'] ?? 0,
           'posts_count': userResponse['posts_count'] ?? 0,
         },
@@ -124,15 +123,10 @@ class ProfileService {
   // Set active avatar
   Future<void> setActiveAvatar(String userId, String avatarId) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/user/$userId/active-avatar'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'avatar_id': avatarId}),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to set active avatar: ${response.statusCode}');
-      }
+      await _authService.supabase
+          .from('users')
+          .update({'active_avatar_id': avatarId})
+          .eq('id', userId);
     } catch (e) {
       throw Exception('Error setting active avatar: $e');
     }
@@ -144,15 +138,10 @@ class ProfileService {
     required Map<String, dynamic> preferences,
   }) async {
     try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/api/user/$userId/preferences'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'preferences': preferences}),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update preferences: ${response.statusCode}');
-      }
+      await _authService.supabase
+          .from('users')
+          .update({'preferences': preferences})
+          .eq('id', userId);
     } catch (e) {
       throw Exception('Error updating preferences: $e');
     }
@@ -161,14 +150,17 @@ class ProfileService {
   // Delete account
   Future<void> deleteAccount(String userId) async {
     try {
-      final response = await http.delete(
-        Uri.parse('$baseUrl/api/user/$userId'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to delete account: ${response.statusCode}');
-      }
+      // Delete user's avatars first
+      await _authService.supabase
+          .from('avatars')
+          .delete()
+          .eq('owner_user_id', userId);
+      
+      // Delete user
+      await _authService.supabase
+          .from('users')
+          .delete()
+          .eq('id', userId);
     } catch (e) {
       throw Exception('Error deleting account: $e');
     }

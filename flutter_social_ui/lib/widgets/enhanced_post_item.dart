@@ -336,7 +336,7 @@ class _EnhancedPostItemState extends State<EnhancedPostItem>
                     GestureDetector(
                       onTap: widget.onComment ??
                           () {
-                            openCommentsModal(context, postId: widget.postId ?? 'unknown');
+                            openCommentsModal(context);
                           },
                       child: _iconWithCounter(
                         asset: 'assets/icons/comment.svg',

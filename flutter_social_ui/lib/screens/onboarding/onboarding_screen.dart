@@ -18,8 +18,9 @@ class OnboardingScreen extends StatelessWidget {
           child: Column(
             children: [
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Welcome Section
                     Container(
@@ -91,6 +92,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                  ),
                 ),
               ),
               

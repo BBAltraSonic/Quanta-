@@ -57,6 +57,10 @@ dependencies:
   provider: ^6.1.2
   uuid: ^4.4.0
   timeago: ^3.7.0
+  
+  # Additional packages for Feeds functionality
+  share_plus: ^7.2.1
+  pull_to_refresh: ^2.0.0
 
 dev_dependencies:
   flutter_test:
