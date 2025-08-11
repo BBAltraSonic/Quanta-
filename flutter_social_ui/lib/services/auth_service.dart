@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../utils/environment.dart';
+import '../config/app_config.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -27,6 +28,7 @@ class AuthService {
     }
     
     try {
+      // Validate core configuration only (AI services are completely optional)
       Environment.validateConfiguration();
       
       // Debug: Print the URL being used

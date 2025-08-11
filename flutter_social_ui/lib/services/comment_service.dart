@@ -82,12 +82,13 @@ class CommentService {
     int maxReplies = 3,
   }) async {
     try {
-      final avatars = await _avatarService.getPopularAvatars(limit: 10);
+      final avatars = await _avatarService.getUserAvatar(); // Get user's avatar
+      final avatarList = avatars != null ? [avatars] : <AvatarModel>[];
       final aiComments = <Comment>[];
       
       // Select random avatars to comment
-      avatars.shuffle();
-      final commentingAvatars = avatars.take(maxReplies);
+      avatarList.shuffle();
+      final commentingAvatars = avatarList.take(maxReplies);
       
       for (final avatar in commentingAvatars) {
         // Skip if avatar already commented
@@ -97,18 +98,13 @@ class CommentService {
         try {
           final aiCommentText = await _generateAIComment(post, avatar, existingComments);
           
-          final aiComment = Comment(
-            id: 'ai_comment_${DateTime.now().millisecondsSinceEpoch}_${avatar.id}',
+          final aiComment = Comment.create(
             postId: postId,
-            userId: avatar.id,
-            userName: avatar.name,
-            userAvatar: avatar.avatarImageUrl ?? 'assets/images/p.jpg',
             text: aiCommentText,
-            createdAt: DateTime.now().add(Duration(
-              seconds: aiComments.length * 30 + 10, // Stagger AI comments
-            )),
-            likes: 0,
-            repliesCount: 0,
+            authorId: avatar.id,
+            authorType: CommentAuthorType.avatar,
+            avatarId: avatar.id,
+            isAiGenerated: true,
           );
           
           aiComments.add(aiComment);
@@ -145,10 +141,9 @@ class CommentService {
       final commentContext = existingComments.take(3).map((c) => c.text).toList();
       
       final response = await _aiService.generateComment(
-        postCaption: post.caption,
-        postType: post.type == PostType.video ? 'video' : 'image',
         avatar: avatar,
-        context: commentContext.join(' | '),
+        postContent: post.caption,
+        postType: post.type == PostType.video ? 'video' : 'image',
       );
       
       return response;
@@ -232,24 +227,42 @@ class CommentService {
 
   // Supabase implementations
   Future<Comment> _addCommentSupabase(String postId, String text, String? parentCommentId) async {
-    throw Exception(
-      'Comment system is not yet fully implemented. '
-      'Please ensure Supabase database is properly configured with comments table.'
-    );
+    final user = _authService.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final response = await _authService.supabase
+        .from('post_comments')
+        .insert({
+          'post_id': postId,
+          'user_id': user.id,
+          'text': text,
+          'parent_comment_id': parentCommentId,
+        })
+        .select()
+        .single();
+
+    return Comment.fromJson(response);
   }
 
   Future<List<Comment>> _getPostCommentsSupabase(String postId, int limit, int offset) async {
-    throw Exception(
-      'Comment retrieval service is not yet fully implemented. '
-      'Please ensure Supabase database is properly configured with comments table.'
-    );
+    final response = await _authService.supabase
+        .from('post_comments')
+        .select()
+        .eq('post_id', postId)
+        .order('created_at', ascending: false)
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+    return (response as List).map((json) => Comment.fromJson(json)).toList();
   }
 
   Future<int> _getCommentCountSupabase(String postId) async {
-    throw Exception(
-      'Comment counting service is not yet fully implemented. '
-      'Please ensure Supabase database is properly configured with comments table.'
-    );
+    final response = await _authService.supabase
+        .from('post_comments')
+        .select('id', const FetchOptions(count: CountOption.exact))
+        .eq('post_id', postId);
+
+    return response.count ?? 0;
   }
 
   Future<bool> _toggleCommentLikeSupabase(String commentId) async {

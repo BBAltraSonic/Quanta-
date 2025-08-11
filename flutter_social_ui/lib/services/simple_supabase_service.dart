@@ -16,12 +16,6 @@ class SimpleSupabaseService {
   // Initialize Supabase (only if not already initialized)
   static Future<void> initialize() async {
     try {
-      // Check if Supabase is already initialized
-      if (Supabase.instance.client != null) {
-        debugPrint('✅ Supabase already initialized, skipping...');
-        return;
-      }
-      
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
         anonKey: AppConfig.supabaseAnonKey,

@@ -2,38 +2,53 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../utils/environment.dart';
+import 'auth_service.dart';
 
 class ProfileService {
   static final ProfileService _instance = ProfileService._internal();
   factory ProfileService() => _instance;
   ProfileService._internal();
 
-  final String baseUrl = Environment.apiBaseUrl;
+  final AuthService _authService = AuthService();
 
   // Get user profile with avatars
   Future<Map<String, dynamic>> getUserProfileData(String userId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/user/profile/$userId'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      // Get user data from Supabase
+      final userResponse = await _authService.supabase
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .single();
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {
-          'user': UserModel.fromJson(data['user']),
-          'avatars': (data['avatars'] as List)
-              .map((avatar) => AvatarModel.fromJson(avatar))
-              .toList(),
-          'stats': data['stats'] ?? {},
-          'preferences': data['preferences'] ?? {},
-        };
-      } else {
-        throw Exception('Failed to load profile: ${response.statusCode}');
-      }
+      // Get user's avatars
+      final avatarsResponse = await _authService.supabase
+          .from('avatars')
+          .select()
+          .eq('owner_user_id', userId);
+
+      // Get user stats
+      final statsResponse = await _authService.supabase
+          .from('follows')
+          .select('avatar_id', const FetchOptions(count: CountOption.exact))
+          .eq('user_id', userId);
+
+      return {
+        'user': UserModel.fromJson(userResponse),
+        'avatars': (avatarsResponse as List)
+            .map((avatar) => AvatarModel.fromJson(avatar))
+            .toList(),
+        'stats': {
+          'following_count': statsResponse.count ?? 0,
+          'followers_count': userResponse['followers_count'] ?? 0,
+          'posts_count': userResponse['posts_count'] ?? 0,
+        },
+        'preferences': {},
+      };
     } catch (e) {
       debugPrint('Error loading profile data: $e');
       rethrow;
@@ -49,25 +64,20 @@ class ProfileService {
     String? profileImageUrl,
   }) async {
     try {
-      final body = {
-        'display_name': displayName,
-        'username': username,
-        'email': email,
-        'profile_image_url': profileImageUrl,
-      };
+      final updateData = <String, dynamic>{};
+      if (displayName != null) updateData['display_name'] = displayName;
+      if (username != null) updateData['username'] = username;
+      if (email != null) updateData['email'] = email;
+      if (profileImageUrl != null) updateData['profile_image_url'] = profileImageUrl;
 
-      final response = await http.put(
-        Uri.parse('$baseUrl/api/user/profile/$userId'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(body),
-      );
+      final response = await _authService.supabase
+          .from('users')
+          .update(updateData)
+          .eq('id', userId)
+          .select()
+          .single();
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return UserModel.fromJson(data);
-      } else {
-        throw Exception('Failed to update profile: ${response.statusCode}');
-      }
+      return UserModel.fromJson(response);
     } catch (e) {
       throw Exception('Error updating profile: $e');
     }
@@ -76,26 +86,19 @@ class ProfileService {
   // Upload profile image
   Future<String> uploadProfileImage(File imageFile, String userId) async {
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/api/upload/profile-image'),
-      );
+      final fileName = '$userId/profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      // Upload to Supabase storage
+      await _authService.supabase.storage
+          .from('avatars')
+          .upload(fileName, imageFile);
 
-      request.fields['user_id'] = userId;
-      request.files.add(await http.MultipartFile.fromPath(
-        'image',
-        imageFile.path,
-      ));
+      // Get public URL
+      final publicUrl = _authService.supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
 
-      final response = await request.send();
-      final responseData = await http.Response.fromStream(response);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(responseData.body);
-        return data['image_url'];
-      } else {
-        throw Exception('Failed to upload image: ${response.statusCode}');
-      }
+      return publicUrl;
     } catch (e) {
       throw Exception('Error uploading image: $e');
     }
@@ -104,19 +107,14 @@ class ProfileService {
   // Get user's avatars
   Future<List<AvatarModel>> getUserAvatars(String userId) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/user/$userId/avatars'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await _authService.supabase
+          .from('avatars')
+          .select()
+          .eq('owner_user_id', userId);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return (data['avatars'] as List)
-            .map((avatar) => AvatarModel.fromJson(avatar))
-            .toList();
-      } else {
-        throw Exception('Failed to load avatars: ${response.statusCode}');
-      }
+      return (response as List)
+          .map((avatar) => AvatarModel.fromJson(avatar))
+          .toList();
     } catch (e) {
       debugPrint('Error loading user avatars: $e');
       return [];

@@ -4,6 +4,7 @@ import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/services/content_service_wrapper.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
+import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -74,6 +75,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   final ContentService _contentService = ContentService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
+  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
   late TabController _tabController;
 
   List<NotificationItem> _allNotifications = [];
@@ -360,24 +362,49 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     setState(() => _isLoading = true);
 
     try {
-      // In production, this would fetch from a notifications service
-      // Notifications service not yet implemented
+      final notifications = await _notificationService.getUserNotifications();
+      
+      // Convert NotificationModel to NotificationItem for UI compatibility
+      final notificationItems = notifications.map((n) => NotificationItem(
+        id: n.id,
+        type: _mapNotificationType(n.type),
+        title: n.title,
+        message: n.message,
+        isRead: n.isRead,
+        timestamp: n.createdAt,
+        avatarId: n.relatedAvatarId,
+        postId: n.relatedPostId,
+      )).toList();
+
       setState(() {
+        _allNotifications = notificationItems;
+        _unreadNotifications = notificationItems.where((n) => !n.isRead).toList();
         _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+      // Still show empty state on error
+      setState(() {
         _allNotifications = [];
         _unreadNotifications = [];
+        _isLoading = false;
       });
-      
-      throw Exception(
-        'Notifications service is not yet fully implemented. '
-        'Please ensure Supabase database is properly configured with notifications table.'
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading notifications: $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  // Map notification service types to UI types
+  NotificationType _mapNotificationType(notification_service.NotificationType serviceType) {
+    switch (serviceType) {
+      case notification_service.NotificationType.like:
+        return NotificationType.like;
+      case notification_service.NotificationType.comment:
+        return NotificationType.comment;
+      case notification_service.NotificationType.follow:
+        return NotificationType.follow;
+      case notification_service.NotificationType.mention:
+        return NotificationType.mention;
+      case notification_service.NotificationType.system:
+        return NotificationType.postFeatured; // Default mapping
     }
   }
 

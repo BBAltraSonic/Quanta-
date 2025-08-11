@@ -16,7 +16,7 @@ class AIService {
       'https://api-inference.huggingface.co';
 
   // Default models for each provider
-  static const String _defaultOpenRouterModel = 'microsoft/DialoGPT-medium';
+  static const String _defaultOpenRouterModel = 'moonshotai/kimi-k2:free';
   static const String _defaultHuggingFaceModel = 'microsoft/DialoGPT-medium';
 
   // Generate AI response for avatar
@@ -27,6 +27,11 @@ class AIService {
     AIProvider provider = AIProvider.openRouter,
   }) async {
     try {
+      // Check if AI services are available, otherwise use fallback
+      if (!Environment.hasAIServices) {
+        return _generateFallbackResponse(avatar, userMessage);
+      }
+
       // Build context from avatar and recent messages
       final context = _buildChatContext(avatar, userMessage, recentMessages);
 
@@ -43,7 +48,7 @@ class AIService {
       // Post-process and validate response
       return _processAIResponse(response, avatar);
     } catch (e) {
-      // Fallback to personality-based response if AI fails
+      // Always fallback to personality-based response if AI fails
       return _generateFallbackResponse(avatar, userMessage);
     }
   }
@@ -53,7 +58,7 @@ class AIService {
     String context,
     AvatarModel avatar,
   ) async {
-    if (Environment.openRouterApiKey == 'your-openrouter-key-here') {
+    if (Environment.openRouterApiKey.isEmpty || Environment.openRouterApiKey == 'your-openrouter-key-here') {
       throw Exception('OpenRouter API key not configured');
     }
 
@@ -104,7 +109,7 @@ class AIService {
     String context,
     AvatarModel avatar,
   ) async {
-    if (Environment.huggingFaceApiKey == 'your-huggingface-key-here') {
+    if (Environment.huggingFaceApiKey.isEmpty || Environment.huggingFaceApiKey == 'your-huggingface-key-here') {
       throw Exception('Hugging Face API key not configured');
     }
 

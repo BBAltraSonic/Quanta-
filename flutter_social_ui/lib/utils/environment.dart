@@ -13,6 +13,7 @@ class Environment {
   // AI Service Configuration
   static const String openRouterApiKey = String.fromEnvironment(
     'OPENROUTER_API_KEY',
+    defaultValue: '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',
   );
   
   static const String huggingFaceApiKey = String.fromEnvironment(
@@ -65,10 +66,11 @@ class Environment {
         'SUPABASE_URL must be a valid HTTPS URL.',
       );
     }
-    if (openRouterApiKey.isEmpty && huggingFaceApiKey.isEmpty) {
-      throw Exception(
-        'At least one AI service API key (OPENROUTER_API_KEY or HUGGINGFACE_API_KEY) must be configured.',
-      );
-    }
+    // AI services are completely optional - no validation required
+  }
+  
+  // Check if AI services are available
+  static bool get hasAIServices {
+    return openRouterApiKey.isNotEmpty || huggingFaceApiKey.isNotEmpty;
   }
 }

@@ -1,8 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
+import '../models/comment.dart';
+import '../services/comment_service.dart';
+import '../widgets/comment_tile.dart';
 
-class CommentsScreen extends StatelessWidget {
-  const CommentsScreen({super.key});
+class CommentsScreen extends StatefulWidget {
+  final String postId;
+  final List<Comment>? initialComments;
+  
+  const CommentsScreen({
+    super.key,
+    required this.postId,
+    this.initialComments,
+  });
+
+  @override
+  State<CommentsScreen> createState() => _CommentsScreenState();
+}
+
+class _CommentsScreenState extends State<CommentsScreen> {
+  final _commentController = TextEditingController();
+  final _commentService = CommentService();
+  List<Comment> _comments = [];
+  bool _isLoading = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _comments = widget.initialComments ?? [];
+    if (_comments.isEmpty) {
+      _loadComments();
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadComments() async {
+    setState(() => _isLoading = true);
+    try {
+      final comments = await _commentService.getComments(widget.postId);
+      setState(() {
+        _comments = comments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading comments: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final comment = await _commentService.addComment(
+        postId: widget.postId,
+        text: text,
+      );
+      
+      setState(() {
+        _comments.insert(0, comment);
+        _commentController.clear();
+        _isSubmitting = false;
+      });
+    } catch (e) {
+      setState(() => _isSubmitting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding comment: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +124,8 @@ class CommentsScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
+                  child:                   TextField(
+                    controller: _commentController,
                     decoration: InputDecoration(
                       hintText: 'Add a comment...',
                       hintStyle: TextStyle(color: kLightTextColor),
@@ -60,52 +141,63 @@ class CommentsScreen extends StatelessWidget {
                       ),
                     ),
                     style: TextStyle(color: kTextColor),
+                    enabled: !_isSubmitting,
+                    onSubmitted: (_) => _addComment(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.send),
                   color: kPrimaryColor,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Comment functionality is not yet implemented'),
-                      ),
-                    );
-                  },
+                  onPressed: _addComment,
                 ),
               ],
             ),
           ),
           // Comment List
           Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.comment_outlined,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Comments not available',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Comment system is not yet implemented.\nPlease ensure the backend service is configured.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _comments.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.comment_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No comments yet',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Be the first to comment!',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(kDefaultPadding),
+                        itemCount: _comments.length,
+                        itemBuilder: (context, index) {
+                          final comment = _comments[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: CommentTile(comment: comment),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
