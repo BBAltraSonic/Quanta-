@@ -5,7 +5,6 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../models/comment.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/auth_service.dart';
-import '../config/db_config.dart';
 import '../constants.dart';
 
 /// Enhanced comments modal with realtime updates and infinite scroll
@@ -354,61 +353,110 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
       position: _slideAnimation,
       child: Container(
         height: modalHeight + keyboardHeight,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(child: _buildCommentsList()),
-            _buildCommentInput(),
-            if (keyboardHeight > 0) SizedBox(height: keyboardHeight),
-          ],
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: Text(
+              '${_comments.length + _optimisticComments.length} Comments',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            centerTitle: false,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.filter_list),
+                onPressed: () {
+                  // Handle filter/sort - placeholder for now
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Filter/sort coming soon!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              // Comment Input Field
+              _buildCommentInput(),
+              
+              // Comment List
+              Expanded(
+                child: _buildCommentsList(),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
+  Widget _buildCommentInput() {
+    return Padding(
+      padding: const EdgeInsets.all(kDefaultPadding),
       child: Row(
         children: [
-          const Text(
-            'Comments',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: kCardColor,
+            backgroundImage: _authService.currentUser?.profileImageUrl != null
+                ? NetworkImage(_authService.currentUser!.profileImageUrl!)
+                : const AssetImage('assets/images/p.jpg') as ImageProvider,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              focusNode: _commentFocusNode,
+              decoration: InputDecoration(
+                hintText: 'Add a comment...',
+                hintStyle: TextStyle(color: kLightTextColor),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: kCardColor,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: kDefaultPadding,
+                  vertical: 10,
+                ),
+              ),
+              style: TextStyle(color: kTextColor),
+              maxLines: null,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _addComment(),
+              enabled: !_isSubmitting,
             ),
           ),
-          const Spacer(),
-          Text(
-            '${_comments.length + _optimisticComments.length}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(width: 16),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.close,
-                size: 20,
-              ),
-            ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: _isSubmitting
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                    ),
+                  )
+                : const Icon(Icons.send),
+            color: kPrimaryColor,
+            onPressed: _isSubmitting ? null : _addComment,
           ),
         ],
       ),
@@ -432,7 +480,7 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
             Icon(
               Icons.comment_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: kLightTextColor,
             ),
             const SizedBox(height: 16),
             Text(
@@ -440,7 +488,7 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+                color: kTextColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -448,7 +496,7 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
               'Be the first to comment!',
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: kLightTextColor,
               ),
             ),
           ],
@@ -458,7 +506,6 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: allComments.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= allComments.length) {
@@ -471,236 +518,15 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
         final comment = allComments[index];
         final isOptimistic = _optimisticComments.contains(comment);
         
-        return _buildCommentItem(comment, isOptimistic);
+        return CommentItem(
+          comment: comment,
+          isOptimistic: isOptimistic,
+          onDelete: () => _deleteComment(comment),
+          onLike: () => _likeComment(comment),
+          onReply: () => _replyToComment(comment),
+          isOwnComment: comment.userId == _authService.currentUserId,
+        );
       },
-    );
-  }
-
-  Widget _buildCommentItem(Comment comment, bool isOptimistic) {
-    final isOwnComment = comment.userId == _authService.currentUserId;
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Avatar
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Colors.grey[300],
-            backgroundImage: comment.userAvatar != null && comment.userAvatar!.isNotEmpty
-                ? (comment.userAvatar!.startsWith('http')
-                    ? NetworkImage(comment.userAvatar!)
-                    : AssetImage(comment.userAvatar!) as ImageProvider)
-                : null,
-            child: comment.userAvatar == null || comment.userAvatar!.isEmpty
-                ? Icon(
-                    Icons.person,
-                    size: 16,
-                    color: Colors.grey[600],
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          
-          // Comment content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Username and time
-                Row(
-                  children: [
-                    Text(
-                      comment.userName ?? 'Anonymous',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isOptimistic ? 'Sending...' : timeago.format(comment.createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    if (comment.isAiGenerated) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'AI',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                
-                // Comment text
-                Text(
-                  comment.text,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                
-                // Actions
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: isOptimistic ? null : () => _likeComment(comment),
-                      child: Row(
-                        children: [
-                          Icon(
-                            comment.hasLiked ? Icons.favorite : Icons.favorite_border,
-                            size: 16,
-                            color: comment.hasLiked ? Colors.red : Colors.grey[600],
-                          ),
-                          if (comment.likesCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              comment.likesCount.toString(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    GestureDetector(
-                      onTap: isOptimistic ? null : () => _replyToComment(comment),
-                      child: Text(
-                        'Reply',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (isOwnComment && !isOptimistic) ...[
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => _deleteComment(comment),
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 16,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommentInput() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            // User avatar
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.grey[300],
-              backgroundImage: _authService.currentUser?.profileImageUrl != null
-                  ? NetworkImage(_authService.currentUser!.profileImageUrl!)
-                  : null,
-              child: _authService.currentUser?.profileImageUrl == null
-                  ? Icon(
-                      Icons.person,
-                      size: 16,
-                      color: Colors.grey[600],
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            
-            // Text input
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: TextField(
-                  controller: _commentController,
-                  focusNode: _commentFocusNode,
-                  decoration: InputDecoration(
-                    hintText: 'Add a comment...',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                  ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _addComment(),
-                  enabled: !_isSubmitting,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            
-            // Send button
-            GestureDetector(
-              onTap: _isSubmitting ? null : _addComment,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _isSubmitting ? Colors.grey[300] : kPrimaryColor,
-                  shape: BoxShape.circle,
-                ),
-                child: _isSubmitting
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[600]!),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -718,5 +544,138 @@ class _EnhancedCommentsModalState extends State<EnhancedCommentsModal>
   void _replyToComment(Comment comment) {
     _commentController.text = '@${comment.userName ?? 'user'} ';
     _commentFocusNode.requestFocus();
+  }
+}
+
+class CommentItem extends StatelessWidget {
+  final Comment comment;
+  final bool isOptimistic;
+  final VoidCallback onDelete;
+  final VoidCallback onLike;
+  final VoidCallback onReply;
+  final bool isOwnComment;
+
+  const CommentItem({
+    super.key,
+    required this.comment,
+    required this.isOptimistic,
+    required this.onDelete,
+    required this.onLike,
+    required this.onReply,
+    required this.isOwnComment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: kDefaultPadding,
+        vertical: kDefaultPadding / 2,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: kCardColor,
+            backgroundImage: comment.userAvatar != null && comment.userAvatar!.isNotEmpty
+                ? (comment.userAvatar!.startsWith('http')
+                    ? NetworkImage(comment.userAvatar!)
+                    : AssetImage(comment.userAvatar!) as ImageProvider)
+                : const AssetImage('assets/images/p.jpg') as ImageProvider,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      comment.userName ?? 'Anonymous',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isOptimistic ? 'now' : timeago.format(comment.createdAt),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  comment.text,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: isOptimistic ? null : onLike,
+                      child: Row(
+                        children: [
+                          Icon(
+                            comment.hasLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
+                            size: 16,
+                            color: comment.hasLiked ? kPrimaryColor : kLightTextColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            comment.likesCount.toString(),
+                            style: TextStyle(color: kLightTextColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    GestureDetector(
+                      onTap: isOptimistic ? null : onReply,
+                      child: Text(
+                        'REPLY',
+                        style: TextStyle(
+                          color: kLightTextColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    if (comment.repliesCount > 0)
+                      GestureDetector(
+                        onTap: () {
+                          // Handle view replies
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('View replies coming soon!'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          'View All ${comment.repliesCount} Replies',
+                          style: TextStyle(color: kPrimaryColor),
+                        ),
+                      ),
+                    if (isOwnComment && !isOptimistic) ...[
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: onDelete,
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: kLightTextColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
