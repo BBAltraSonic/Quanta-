@@ -176,9 +176,12 @@ class _FeedsScreenState extends State<FeedsScreen>
 
   /// Preload videos around current index for smooth playback
   void _preloadVideosAroundCurrent() {
+    if (_posts.isEmpty) return; // Early return if no posts
+    
     final preloadRange = 2; // Preload 2 videos before and after current
-    final startIndex = (_currentIndex - preloadRange).clamp(0, _posts.length - 1);
-    final endIndex = (_currentIndex + preloadRange).clamp(0, _posts.length - 1);
+    final maxIndex = _posts.length - 1;
+    final startIndex = (_currentIndex - preloadRange).clamp(0, maxIndex);
+    final endIndex = (_currentIndex + preloadRange).clamp(0, maxIndex);
 
     for (int i = startIndex; i <= endIndex; i++) {
       final videoUrl = _posts[i].videoUrl;
@@ -190,6 +193,8 @@ class _FeedsScreenState extends State<FeedsScreen>
 
   /// Handle page change
   void _onPageChanged(int index) {
+    if (_posts.isEmpty || index >= _posts.length) return;
+    
     setState(() {
       _currentIndex = index;
     });

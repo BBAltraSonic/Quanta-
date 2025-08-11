@@ -450,7 +450,7 @@ class _VideoFeedItemState extends State<VideoFeedItem>
                 return Transform.scale(
                   scale: 0.8 + (1.2 * _likeAnimation.value),
                   child: Opacity(
-                    opacity: 1.0 - _likeAnimation.value,
+                    opacity: (1.0 - _likeAnimation.value).clamp(0.0, 1.0),
                     child: const Icon(
                       Icons.favorite,
                       color: Colors.red,

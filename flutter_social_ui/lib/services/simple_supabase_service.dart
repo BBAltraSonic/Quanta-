@@ -120,9 +120,9 @@ class SimpleSupabaseService {
     if (!isSignedIn) return false;
 
     try {
-      // Check if already liked
+      // Check if already liked using the likes table
       final existingLike = await _supabase
-          .from('post_likes')
+          .from('likes')
           .select()
           .eq('post_id', postId)
           .eq('user_id', currentUser!.id)
@@ -131,14 +131,14 @@ class SimpleSupabaseService {
       if (existingLike != null) {
         // Unlike
         await _supabase
-            .from('post_likes')
+            .from('likes')
             .delete()
             .eq('post_id', postId)
             .eq('user_id', currentUser!.id);
         return false;
       } else {
         // Like
-        await _supabase.from('post_likes').insert({
+        await _supabase.from('likes').insert({
           'post_id': postId,
           'user_id': currentUser!.id,
           'created_at': DateTime.now().toIso8601String(),
@@ -156,7 +156,7 @@ class SimpleSupabaseService {
 
     try {
       final like = await _supabase
-          .from('post_likes')
+          .from('likes')
           .select()
           .eq('post_id', postId)
           .eq('user_id', currentUser!.id)
@@ -173,7 +173,7 @@ class SimpleSupabaseService {
   Future<List<Comment>> getPostComments(String postId, {int page = 0, int limit = 20}) async {
     try {
       final response = await _supabase
-          .from('comments')
+          .from('post_comments')
           .select()
           .eq('post_id', postId)
           .order('created_at', ascending: true)
@@ -190,7 +190,7 @@ class SimpleSupabaseService {
     if (!isSignedIn) return null;
 
     try {
-      final response = await _supabase.from('comments').insert({
+      final response = await _supabase.from('post_comments').insert({
         'post_id': postId,
         'user_id': currentUser!.id,
         'text': text,
