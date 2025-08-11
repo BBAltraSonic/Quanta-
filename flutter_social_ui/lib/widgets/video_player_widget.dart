@@ -188,33 +188,25 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   Widget _buildFallbackImage() {
-    if (widget.fallbackImageUrl != null) {
-      return widget.fallbackImageUrl!.startsWith('http')
-          ? Image.network(
-              widget.fallbackImageUrl!,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  color: Colors.grey[900],
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return _buildErrorWidget();
-              },
-            )
-          : Image.asset(
-              widget.fallbackImageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return _buildErrorWidget();
-              },
-            );
+    if (widget.fallbackImageUrl != null && widget.fallbackImageUrl!.isNotEmpty && widget.fallbackImageUrl!.startsWith('http')) {
+      return Image.network(
+        widget.fallbackImageUrl!,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: Colors.grey[900],
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildErrorWidget();
+        },
+      );
     }
     return _buildErrorWidget();
   }

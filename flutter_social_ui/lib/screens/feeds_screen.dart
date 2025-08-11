@@ -8,6 +8,9 @@ import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
 import '../widgets/video_feed_item.dart';
 
+/// @deprecated This feed screen is deprecated. 
+/// Use PostDetailScreen instead, which now has feature parity and is the default home screen.
+/// This file will be removed in a future version.
 class FeedsScreen extends StatefulWidget {
   const FeedsScreen({super.key});
 

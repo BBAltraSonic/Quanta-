@@ -12,7 +12,9 @@ import '../models/avatar_model.dart';
 import '../config/db_config.dart';
 import '../constants.dart';
 
-/// Enhanced Post Detail Screen with full functionality
+/// @deprecated Enhanced Post Detail Screen with full functionality
+/// This screen is deprecated. Use PostDetailScreen instead, which now has feature parity 
+/// and is the default home screen. This file will be removed in a future version.
 class EnhancedPostDetailScreen extends StatefulWidget {
   final String? postId;
   final PostModel? initialPost;

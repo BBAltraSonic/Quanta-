@@ -60,7 +60,7 @@ class _AppShellState extends State<AppShell> {
           // Left of center: Search (magnifier)
           _shadowedSvg('assets/icons/magnifer-svgrepo-com.svg', size: 26),
           // Center: Create (unchanged)
-          _shadowedSvg('assets/icons/add-square-svgrepo-com.svg', size: 28),
+          _shadowedSvg('assets/icons/add-square-svgrepo-com.svg', size: 30),
           // Right of center: Notifications (heart)
           _shadowedSvg('assets/icons/heart-svgrepo-com.svg', size: 26),
           // Far right: Profile (existing)

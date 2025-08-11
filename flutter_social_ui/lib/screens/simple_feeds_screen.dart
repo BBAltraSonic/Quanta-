@@ -4,6 +4,9 @@ import '../models/post_model.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../constants.dart';
 
+/// @deprecated Simple Feeds Screen is deprecated. 
+/// Use PostDetailScreen instead, which now has feature parity and is the default home screen.
+/// This file will be removed in a future version.
 class SimpleFeedsScreen extends StatefulWidget {
   const SimpleFeedsScreen({super.key});
 

@@ -217,6 +217,38 @@ class EnhancedVideoService {
     }
   }
 
+  /// Mute all videos
+  Future<void> muteAllVideos() async {
+    try {
+      _isMuted = true;
+      await _saveSettings();
+      
+      for (final controller in _controllers.values) {
+        if (controller.value.isInitialized) {
+          await controller.setVolume(0.0);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error muting all videos: $e');
+    }
+  }
+
+  /// Unmute all videos
+  Future<void> unmuteAllVideos() async {
+    try {
+      _isMuted = false;
+      await _saveSettings();
+      
+      for (final controller in _controllers.values) {
+        if (controller.value.isInitialized) {
+          await controller.setVolume(_volume);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error unmuting all videos: $e');
+    }
+  }
+
   /// Seek to position with analytics
   Future<void> seekTo(String videoUrl, Duration position) async {
     try {

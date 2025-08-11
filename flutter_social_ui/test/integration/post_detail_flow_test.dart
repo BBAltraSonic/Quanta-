@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_social_ui/main.dart' as app;
-import 'package:flutter_social_ui/screens/enhanced_post_detail_screen.dart';
+import 'package:flutter_social_ui/screens/post_detail_screen.dart';
 import 'package:flutter_social_ui/widgets/comments_modal.dart';
 
 void main() {
@@ -103,7 +103,7 @@ void main() {
       }
 
       // Test video controls (play/pause)
-      final videoArea = find.byType(EnhancedPostDetailScreen);
+      final videoArea = find.byType(PostDetailScreen);
       if (videoArea.evaluate().isNotEmpty) {
         await tester.tap(videoArea.first);
         await tester.pump();
@@ -181,11 +181,11 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       
       // Pause video
-      await tester.tap(find.byType(EnhancedPostDetailScreen));
+      await tester.tap(find.byType(PostDetailScreen));
       await tester.pump();
       
       // Resume video
-      await tester.tap(find.byType(EnhancedPostDetailScreen));
+      await tester.tap(find.byType(PostDetailScreen));
       await tester.pump();
       
       // Seek video (if controls are available)

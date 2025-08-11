@@ -14,6 +14,9 @@ class PostItem extends StatelessWidget {
   final String? avatarUrl;
   final String? videoUrl;
   final bool isVideo;
+  final bool isLiked;
+  final bool isBookmarked;
+  final bool isFollowing;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
@@ -30,6 +33,9 @@ class PostItem extends StatelessWidget {
     this.avatarUrl,
     this.videoUrl,
     this.isVideo = false,
+    this.isLiked = false,
+    this.isBookmarked = false,
+    this.isFollowing = false,
     this.onLike,
     this.onComment,
     this.onShare,
@@ -37,7 +43,7 @@ class PostItem extends StatelessWidget {
     this.onAvatarTap,
   });
 
-  Widget _iconWithCounter({required String asset, String? count}) {
+  Widget _iconWithCounter({required String asset, String? count, Color? iconColor}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -46,7 +52,7 @@ class PostItem extends StatelessWidget {
           asset,
           width: 28, // bigger reaction icons
           height: 28,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(iconColor ?? Colors.white, BlendMode.srcIn),
         ),
         if (count != null && count.isNotEmpty) ...[
           const SizedBox(width: 8),
@@ -80,7 +86,7 @@ class PostItem extends StatelessWidget {
                     // Handle video tap
                   },
                 )
-              : imageUrl.startsWith('http')
+              : imageUrl.isNotEmpty && imageUrl.startsWith('http')
                   ? Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
@@ -123,30 +129,15 @@ class PostItem extends StatelessWidget {
                         );
                       },
                     )
-                  : Image.asset(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      frameBuilder:
-                          (context, child, frame, wasSynchronouslyLoaded) {
-                            if (wasSynchronouslyLoaded) return child;
-                            return AnimatedOpacity(
-                              opacity: frame == null ? 0 : 1,
-                              duration: const Duration(milliseconds: 300),
-                              child: child,
-                            );
-                          },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[900],
-                          child: const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              color: Colors.white54,
-                              size: 48,
-                            ),
-                          ),
-                        );
-                      },
+                  : Container(
+                      color: Colors.grey[900],
+                      child: const Center(
+                        child: Icon(
+                          Icons.image,
+                          color: Colors.white54,
+                          size: 48,
+                        ),
+                      ),
                     ),
         ),
 
@@ -173,7 +164,7 @@ class PostItem extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => ChatScreen(
                                 name: author,
-                                avatar: 'assets/images/p.jpg',
+                                avatar: '', // Let ChatScreen handle missing avatars
                               ),
                             ),
                           );
@@ -182,11 +173,13 @@ class PostItem extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-                              ? (avatarUrl!.startsWith('http')
-                                  ? NetworkImage(avatarUrl!) as ImageProvider
-                                  : AssetImage(avatarUrl!))
-                              : const AssetImage('assets/images/p.jpg'),
+                          backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty && avatarUrl!.startsWith('http')
+                              ? NetworkImage(avatarUrl!) as ImageProvider
+                              : null,
+                          backgroundColor: Colors.grey[800],
+                          child: avatarUrl == null || avatarUrl!.isEmpty || !avatarUrl!.startsWith('http')
+                              ? Icon(Icons.person, color: Colors.white54, size: 16)
+                              : null,
                           onBackgroundImageError: (exception, stackTrace) {
                             debugPrint('Error loading avatar image: $exception');
                           },
@@ -256,6 +249,7 @@ class PostItem extends StatelessWidget {
                       child: _iconWithCounter(
                         asset: 'assets/icons/heart-svgrepo-com.svg', // like
                         count: likes,
+                        iconColor: isLiked ? Colors.red : Colors.white,
                       ),
                     ),
                     GestureDetector(
@@ -276,6 +270,7 @@ class PostItem extends StatelessWidget {
                       onTap: onSave,
                       child: _iconWithCounter(
                         asset: 'assets/icons/bookmark-svgrepo-com.svg', // save
+                        iconColor: isBookmarked ? kPrimaryColor : Colors.white,
                       ),
                     ),
                   ],
