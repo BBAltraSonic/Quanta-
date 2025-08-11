@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
+import 'package:flutter_social_ui/widgets/video_player_widget.dart';
 import 'comments_modal.dart';
 
 class PostItem extends StatelessWidget {
@@ -10,6 +11,9 @@ class PostItem extends StatelessWidget {
   final String description;
   final String likes;
   final String comments;
+  final String? avatarUrl;
+  final String? videoUrl;
+  final bool isVideo;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
@@ -23,6 +27,9 @@ class PostItem extends StatelessWidget {
     required this.description,
     required this.likes,
     required this.comments,
+    this.avatarUrl,
+    this.videoUrl,
+    this.isVideo = false,
     this.onLike,
     this.onComment,
     this.onShare,
@@ -62,76 +69,85 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Edge-to-edge media with optimized loading
+        // Edge-to-edge media with video/image support
         Positioned.fill(
-          child: imageUrl.startsWith('http')
-              ? Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  frameBuilder:
-                      (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 300),
-                          child: child,
-                        );
-                      },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[900],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                              : null,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[900],
-                      child: const Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Colors.white54,
-                          size: 48,
-                        ),
-                      ),
-                    );
+          child: isVideo && videoUrl != null
+              ? VideoPlayerWidget(
+                  videoUrl: videoUrl,
+                  fallbackImageUrl: imageUrl,
+                  isPlaying: true, // Auto-play for feeds
+                  onTap: () {
+                    // Handle video tap
                   },
                 )
-              : Image.asset(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  frameBuilder:
-                      (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 300),
-                          child: child,
+              : imageUrl.startsWith('http')
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      frameBuilder:
+                          (context, child, frame, wasSynchronouslyLoaded) {
+                            if (wasSynchronouslyLoaded) return child;
+                            return AnimatedOpacity(
+                              opacity: frame == null ? 0 : 1,
+                              duration: const Duration(milliseconds: 300),
+                              child: child,
+                            );
+                          },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[900],
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                  : null,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          ),
                         );
                       },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[900],
-                      child: const Center(
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Colors.white54,
-                          size: 48,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[900],
+                          child: const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.white54,
+                              size: 48,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      frameBuilder:
+                          (context, child, frame, wasSynchronouslyLoaded) {
+                            if (wasSynchronouslyLoaded) return child;
+                            return AnimatedOpacity(
+                              opacity: frame == null ? 0 : 1,
+                              duration: const Duration(milliseconds: 300),
+                              child: child,
+                            );
+                          },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[900],
+                          child: const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              color: Colors.white54,
+                              size: 48,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
         ),
 
         // Top overlay: search, Spacer, volume, 12, menu
@@ -164,9 +180,16 @@ class PostItem extends StatelessWidget {
                         },
                     child: Stack(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 16,
-                          backgroundImage: AssetImage('assets/images/p.jpg'),
+                          backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+                              ? (avatarUrl!.startsWith('http')
+                                  ? NetworkImage(avatarUrl!) as ImageProvider
+                                  : AssetImage(avatarUrl!))
+                              : const AssetImage('assets/images/p.jpg'),
+                          onBackgroundImageError: (exception, stackTrace) {
+                            debugPrint('Error loading avatar image: $exception');
+                          },
                         ),
                         // AI indicator
                         Positioned(

@@ -43,7 +43,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
   Future<void> _loadComments() async {
     setState(() => _isLoading = true);
     try {
-      final comments = await _commentService.getComments(widget.postId);
+      final comments = await _commentService.getPostComments(postId: widget.postId);
       setState(() {
         _comments = comments;
         _isLoading = false;

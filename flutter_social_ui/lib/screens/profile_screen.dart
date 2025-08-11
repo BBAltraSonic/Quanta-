@@ -176,8 +176,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.55),
-                        Colors.black.withOpacity(0.78),
+                        Colors.black.withOpacity(0.65),
+                        Colors.black.withOpacity(0.88),
                       ],
                     ),
                   ),
@@ -261,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.black87,
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
                         fontSize: 22,
                         height: 1.1,
@@ -278,17 +278,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 8),
         Text(
           activeAvatar?.bio ?? 'Virtual influencer creator',
-          style: const TextStyle(color: Colors.black54, fontSize: 13.5, height: 1.35),
+          style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.35),
         ),
         const SizedBox(height: 14),
-        // Metrics chips
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+        // Stats row (Posts • Followers • Following)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _MetricChip(value: _formatNumber(_stats['total_followers'] ?? 0), label: 'Followers'),
-            _MetricChip(value: _formatNumber(_stats['total_posts'] ?? 0), label: 'Posts'),
-            _MetricChip(value: '${_avatars.length}', label: 'Avatars'),
+            _StatColumn(
+              value: _formatNumber(_stats['total_posts'] ?? 0),
+              label: 'Posts',
+            ),
+            _StatColumn(
+              value: _formatNumber(_stats['total_followers'] ?? 0),
+              label: 'Followers',
+            ),
+            _StatColumn(
+              value: _formatNumber(_stats['total_following'] ?? 0),
+              label: 'Following',
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Primary actions
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Follow',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {},
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24, width: 1.2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Message',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
           ],
         ),
       ],
@@ -304,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Text(
             'Analytics Overview',
             style: TextStyle(
-              color: Colors.black87,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
@@ -411,7 +461,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: Colors.black54,
+                    color: Colors.white70,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -425,7 +475,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             value,
             style: TextStyle(
-              color: Colors.black87,
+              color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -442,8 +492,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: Text(
                   subtitle,
-                  style: TextStyle(
-                    color: isPositive ? Colors.green : Colors.red,
+                   style: TextStyle(
+                    color: isPositive ? Colors.greenAccent : Colors.redAccent,
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
                   ),
@@ -464,9 +514,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: kPrimaryColor.withOpacity(0.05),
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kPrimaryColor.withOpacity(0.2)),
+        border: Border.all(color: Colors.white10),
       ),
       child: Row(
         children: [
@@ -489,7 +539,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   topAvatar.name,
                   style: const TextStyle(
-                    color: Colors.black87,
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -497,7 +547,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   '${_formatNumber(topAvatar.followersCount)} followers • ${(topAvatar.engagementRate * 100).toStringAsFixed(1)}% engagement',
                   style: const TextStyle(
-                    color: Colors.black54,
+                    color: Colors.white70,
                     fontSize: 11,
                   ),
                 ),
@@ -540,7 +590,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const Text(
                 'My Avatars',
                 style: TextStyle(
-                  color: Colors.black87,
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
@@ -569,11 +619,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return Container(
                   width: 90,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Colors.white.withOpacity(0.06),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withOpacity(0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -597,7 +647,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         avatar.name,
                         style: const TextStyle(
-                          color: Colors.black87,
+                          color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -705,7 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Colors.black.withOpacity(0.8),
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
@@ -718,7 +768,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Text(
                     badge,
                     style: const TextStyle(
-                      color: Colors.black87,
+                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
                     ),
@@ -823,16 +873,16 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.black.withOpacity(0.6),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withOpacity(0.5),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        border: Border.all(color: Colors.white10),
       ),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: child,
@@ -851,26 +901,26 @@ class _MetricChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.95)),
+        border: Border.all(color: Colors.white10),
       ),
       child: DefaultTextStyle(
-        style: const TextStyle(color: kPrimaryColor),
+        style: const TextStyle(color: Colors.white),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               value,
               style: const TextStyle(
-                color: kPrimaryColor,
+                color: Colors.white,
                 fontWeight: FontWeight.w900,
                 fontSize: 14,
               ),
@@ -879,7 +929,7 @@ class _MetricChip extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                color: kPrimaryColor,
+                color: Colors.white70,
                 fontWeight: FontWeight.w700,
                 fontSize: 12.5,
               ),
@@ -887,6 +937,39 @@ class _MetricChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Compact stat column used in dark header
+class _StatColumn extends StatelessWidget {
+  final String value;
+  final String label;
+  const _StatColumn({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

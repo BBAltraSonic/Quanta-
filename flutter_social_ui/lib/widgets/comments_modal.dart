@@ -132,7 +132,22 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                                   ),
                         ),
                       ),
-                      // Only Close button (filter removed)
+                      // Filter button
+                      _RoundIconChip(
+                        icon: Icons.tune,
+                        onTap: () {
+                          // Placeholder for sort/filter options
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Filter options coming soon'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        tooltip: 'Filter',
+                      ),
+                      const SizedBox(width: 8),
+                      // Close button
                       _RoundIconChip(
                         icon: Icons.close_rounded,
                         onTap: () => Navigator.of(context).pop(),

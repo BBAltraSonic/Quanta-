@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../widgets/feeds_video_player.dart';
-import '../screens/enhanced_comments_screen.dart';
+import '../widgets/comments_modal.dart';
 import '../constants.dart';
 
 class VideoFeedItem extends StatefulWidget {
@@ -104,13 +105,8 @@ class _VideoFeedItemState extends State<VideoFeedItem>
 
   void _openComments() {
     widget.onComment?.call();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => EnhancedCommentsScreen(
-          postId: widget.post.id,
-        ),
-      ),
-    );
+    // Open dark draggable bottom sheet to match design
+    openCommentsModal(context);
   }
 
   String _formatCount(int count) {
@@ -194,6 +190,44 @@ class _VideoFeedItemState extends State<VideoFeedItem>
               icon,
               color: iconColor ?? Colors.white,
               size: 32,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              count,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSvgAction({
+    required String assetPath,
+    required String count,
+    required VoidCallback onTap,
+    Color iconColor = Colors.white,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            // SVG icon to match the thin-stroke design
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: SvgPicture.asset(
+                assetPath,
+                width: 32,
+                height: 32,
+                colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -399,9 +433,9 @@ class _VideoFeedItemState extends State<VideoFeedItem>
               
               const SizedBox(height: 24),
               
-              // Like button
-              _buildActionButton(
-                icon: widget.isLiked ? Icons.favorite : Icons.favorite_border,
+              // Like button (SVG to match mock)
+              _buildSvgAction(
+                assetPath: 'assets/icons/heart-svgrepo-com.svg',
                 count: _formatCount(widget.post.likesCount),
                 onTap: () {
                   widget.onLike?.call();
@@ -415,8 +449,8 @@ class _VideoFeedItemState extends State<VideoFeedItem>
               const SizedBox(height: 16),
               
               // Comment button
-              _buildActionButton(
-                icon: Icons.chat_bubble_outline,
+              _buildSvgAction(
+                assetPath: 'assets/icons/chat-round-svgrepo-com.svg',
                 count: _formatCount(widget.post.commentsCount),
                 onTap: _openComments,
               ),
@@ -424,8 +458,8 @@ class _VideoFeedItemState extends State<VideoFeedItem>
               const SizedBox(height: 16),
               
               // Share button
-              _buildActionButton(
-                icon: Icons.share,
+              _buildSvgAction(
+                assetPath: 'assets/icons/reply-svgrepo-com.svg',
                 count: _formatCount(widget.post.sharesCount),
                 onTap: _handleShare,
               ),
@@ -439,6 +473,22 @@ class _VideoFeedItemState extends State<VideoFeedItem>
           right: 80,
           bottom: 0,
           child: _buildCaptionOverlay(),
+        ),
+
+        // Bottom progress bar (visual cue similar to reference)
+        Positioned(
+          left: 6,
+          right: 6,
+          bottom: 76,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: 0.7, // TODO: bind to actual playback progress
+              minHeight: 3,
+              backgroundColor: Colors.white.withOpacity(0.15),
+              valueColor: const AlwaysStoppedAnimation<Color>(kPrimaryColor),
+            ),
+          ),
         ),
 
         // Like animation

@@ -78,6 +78,23 @@ class FeedsService {
     }
   }
 
+  /// Get a specific post by ID
+  Future<PostModel?> getPostById(String postId) async {
+    try {
+      final response = await _supabase
+          .from('posts')
+          .select('*')
+          .eq('id', postId)
+          .eq('is_active', true)
+          .single();
+
+      return PostModel.fromJson(response);
+    } catch (e) {
+      debugPrint('❌ Failed to get post by ID: $e');
+      return null;
+    }
+  }
+
   /// Toggle like on a post
   Future<bool> toggleLike(String postId) async {
     final userId = _authService.currentUserId;
