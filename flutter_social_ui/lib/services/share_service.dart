@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../constants.dart';
 
 enum ShareType {
@@ -52,11 +53,14 @@ class ShareService {
     return '''<iframe src="$link/embed" width="400" height="600" frameborder="0"></iframe>''';
   }
 
-  /// Share to external apps (would integrate with share_plus package)
+  /// Share to external apps using share_plus package
   Future<void> shareToExternal(String text, String url) async {
-    // TODO: Implement with share_plus package
-    // Share.share('$text\n\n$url');
-    debugPrint('Sharing: $text\n$url');
+    try {
+      await Share.share('$text\n\n$url');
+    } catch (e) {
+      debugPrint('Error sharing to external: $e');
+      rethrow;
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:flutter_social_ui/widgets/comments_modal.dart';
 import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/services/enhanced_video_service.dart';
+import 'package:flutter_social_ui/services/share_service.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/constants.dart';
@@ -30,6 +31,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   final PageController _pageController = PageController();
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final EnhancedVideoService _videoService = EnhancedVideoService();
+  final ShareService _shareService = ShareService();
   
   // State for interactions
   Map<String, bool> _likedStatus = {};
@@ -574,16 +576,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         'share_method': 'system_share',
       });
 
-      // TODO: Implement proper share functionality with share_plus package
-      // For now, copy link to clipboard
-      await Clipboard.setData(ClipboardData(
-        text: 'Check out this post: ${post.caption}\n\n'
-              'Shared from Quanta Social'
-      ));
+      // Get avatar info for sharing
+      final avatar = _avatarCache[post.avatarId];
+      final shareText = '${avatar?.name ?? 'Avatar'}: ${post.caption}';
+      final shareUrl = _shareService.generatePostLink(post.id);
+      
+      // Share using ShareService.shareToExternal
+      await _shareService.shareToExternal(shareText, shareUrl);
+      
+      // Record the share in database
+      await _feedsService.sharePost(post.id, platform: 'native_share');
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Post link copied to clipboard!'),
+          content: Text('Post shared successfully!'),
           duration: Duration(seconds: 2),
         ),
       );

@@ -67,12 +67,12 @@
 ## Development Plan (phased, small tasks)
 
 ### Phase 1: Close critical gaps for a fully live Home feed
-1) Comment like/delete and replies
+1) Comment like/delete and replies - Done ✌
    - DB: add `comment_likes` table, RLS, indexes.
    - Backend: implement `CommentService.toggleCommentLike` and `deleteComment` with authorization checks; add replies list fetching; wire to UI.
    - UI: replace "coming soon" replies and filter buttons with real interactions and basic sorting.
 
-2) Share flow integration
+2) Share flow integration - Done ✌ 
    - Add `share_plus` dependency and hook `PostDetailScreen._onPostShare` to use `ShareService.shareToExternal`.
    - Record shares via `EnhancedFeedsService.sharePost` to `post_shares` and increment share counters.
 

@@ -712,13 +712,8 @@ class EnhancedFeedsService {
 
   Future<void> _incrementSharesCount(String postId) async {
     try {
-      await _supabase
-          .from(DbConfig.postsTable)
-          .update({
-            'shares_count': 'shares_count + 1',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', postId);
+      // Use RPC to properly increment the counter
+      await _supabase.rpc('increment_shares_count', params: {'post_id': postId});
     } catch (e) {
       debugPrint('❌ Failed to increment shares count: $e');
     }
