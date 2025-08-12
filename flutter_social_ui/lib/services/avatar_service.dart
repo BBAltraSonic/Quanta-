@@ -137,22 +137,27 @@ class AvatarService {
         avatarImageUrl = await _uploadAvatarImage(userId, newAvatarImage);
       }
 
-      // Create updated avatar
-      final updatedAvatar = existingAvatar.copyWith(
-        name: name?.trim(),
-        bio: bio?.trim(),
-        backstory: backstory?.trim(),
-        niche: niche,
-        personalityTraits: personalityTraits,
-        avatarImageUrl: avatarImageUrl,
-        voiceStyle: voiceStyle,
-        allowAutonomousPosting: allowAutonomousPosting,
-      );
+      // Create update map with only the fields that should be updated
+      final updateData = <String, dynamic>{};
+      
+      if (name != null) updateData['name'] = name.trim();
+      if (bio != null) updateData['bio'] = bio.trim();
+      if (backstory != null) updateData['backstory'] = backstory.trim();
+      if (niche != null) updateData['niche'] = niche.toString().split('.').last;
+      if (personalityTraits != null) {
+        updateData['personality_traits'] = personalityTraits.map((t) => t.toString().split('.').last).toList();
+      }
+      if (avatarImageUrl != null) updateData['avatar_image_url'] = avatarImageUrl;
+      if (voiceStyle != null) updateData['voice_style'] = voiceStyle;
+      if (allowAutonomousPosting != null) updateData['allow_autonomous_posting'] = allowAutonomousPosting;
+      
+      // Always update the updated_at timestamp, but not created_at
+      updateData['updated_at'] = DateTime.now().toIso8601String();
 
       // Update in database
       final response = await _supabase
           .from('avatars')
-          .update(updatedAvatar.toJson())
+          .update(updateData)
           .eq('id', avatarId)
           .eq('owner_user_id', userId)
           .select()

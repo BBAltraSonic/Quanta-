@@ -16,6 +16,11 @@ class UserSafetyService {
   SharedPreferences? _prefs;
   late final SupabaseClient _supabase;
   late final AuthService _authService;
+  
+  // Cache for performance optimization
+  Map<String, Set<String>>? _blockedAvatarIdsCache;
+  Map<String, Set<String>>? _mutedAvatarIdsCache;
+  DateTime? _cacheLastUpdated;
 
   // Legacy storage keys for migration
   static const String _blockedUsersKey = 'blocked_users';
@@ -169,6 +174,7 @@ class UserSafetyService {
       });
 
       debugPrint('User blocked: $userId');
+      _clearSafetyCache(); // Clear cache after blocking
       return true;
     } catch (e) {
       debugPrint('Error blocking user: $e');
@@ -191,6 +197,7 @@ class UserSafetyService {
           .eq('blocked_user_id', userId);
 
       debugPrint('User unblocked: $userId');
+      _clearSafetyCache(); // Clear cache after unblocking
       return true;
     } catch (e) {
       debugPrint('Error unblocking user: $e');
@@ -257,6 +264,7 @@ class UserSafetyService {
       });
 
       debugPrint('User muted: $userId for ${duration?.toString() ?? 'indefinitely'}');
+      _clearSafetyCache(); // Clear cache after muting
       return true;
     } catch (e) {
       debugPrint('Error muting user: $e');
@@ -279,6 +287,7 @@ class UserSafetyService {
           .eq('muted_user_id', userId);
 
       debugPrint('User unmuted: $userId');
+      _clearSafetyCache(); // Clear cache after unmuting
       return true;
     } catch (e) {
       debugPrint('Error unmuting user: $e');
@@ -437,48 +446,18 @@ class UserSafetyService {
   Future<List<PostModel>> filterContent(List<PostModel> posts) async {
     final settings = getSafetySettings();
 
-    // Get blocked user IDs
-    final blockedUserIds = await getBlockedUsers();
-
-    // Map blocked user IDs to avatar IDs (owners' avatars)
-    final Set<String> blockedAvatarIds = {};
-    for (final userId in blockedUserIds) {
-      try {
-        final rows = await _supabase
-            .from(DbConfig.avatarsTable)
-            .select('id')
-            .eq('owner_user_id', userId);
-        blockedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
-      } catch (e) {
-        debugPrint('Error fetching blocked avatar IDs for user $userId: $e');
-      }
-    }
-
-    // Get active mutes and map to user IDs
-    final muted = await getMutedUsers();
+    // Check cache validity (refresh every 5 minutes)
     final now = DateTime.now();
-    final mutedUserIds = muted
-        .where((m) {
-          final expiresAt = m['expiresAt'] as String?;
-          if (expiresAt == null) return true; // Indefinite mute
-          return now.isBefore(DateTime.parse(expiresAt));
-        })
-        .map((m) => m['userId'] as String)
-        .toList();
-
-    // Map muted user IDs to avatar IDs
-    final Set<String> mutedAvatarIds = {};
-    for (final userId in mutedUserIds) {
-      try {
-        final rows = await _supabase
-            .from(DbConfig.avatarsTable)
-            .select('id')
-            .eq('owner_user_id', userId);
-        mutedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
-      } catch (e) {
-        debugPrint('Error fetching muted avatar IDs for user $userId: $e');
-      }
+    if (_cacheLastUpdated == null || 
+        now.difference(_cacheLastUpdated!).inMinutes > 5) {
+      await _refreshSafetyCache();
     }
+
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return posts;
+
+    final blockedAvatarIds = _blockedAvatarIdsCache?[currentUserId] ?? <String>{};
+    final mutedAvatarIds = _mutedAvatarIdsCache?[currentUserId] ?? <String>{};
 
     // Filter posts
     return posts.where((post) {
@@ -577,6 +556,67 @@ class UserSafetyService {
     if (_authService.currentUserId != null) {
       await _migrateLocalDataToSupabase();
     }
+  }
+
+  /// Refresh safety cache for performance optimization
+  Future<void> _refreshSafetyCache() async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return;
+
+    try {
+      _blockedAvatarIdsCache ??= {};
+      _mutedAvatarIdsCache ??= {};
+
+      // Get blocked user IDs
+      final blockedUserIds = await getBlockedUsers();
+
+      // Map blocked user IDs to avatar IDs (owners' avatars)
+      final Set<String> blockedAvatarIds = {};
+      if (blockedUserIds.isNotEmpty) {
+        final rows = await _supabase
+            .from(DbConfig.avatarsTable)
+            .select('id')
+            .in_('owner_user_id', blockedUserIds);
+        blockedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
+      }
+
+      // Get active mutes and map to user IDs
+      final muted = await getMutedUsers();
+      final now = DateTime.now();
+      final mutedUserIds = muted
+          .where((m) {
+            final expiresAt = m['expiresAt'] as String?;
+            if (expiresAt == null) return true; // Indefinite mute
+            return now.isBefore(DateTime.parse(expiresAt));
+          })
+          .map((m) => m['userId'] as String)
+          .toList();
+
+      // Map muted user IDs to avatar IDs
+      final Set<String> mutedAvatarIds = {};
+      if (mutedUserIds.isNotEmpty) {
+        final rows = await _supabase
+            .from(DbConfig.avatarsTable)
+            .select('id')
+            .in_('owner_user_id', mutedUserIds);
+        mutedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
+      }
+
+      _blockedAvatarIdsCache![currentUserId] = blockedAvatarIds;
+      _mutedAvatarIdsCache![currentUserId] = mutedAvatarIds;
+      _cacheLastUpdated = DateTime.now();
+
+      debugPrint('🔄 Refreshed safety cache: ${blockedAvatarIds.length} blocked, ${mutedAvatarIds.length} muted avatars');
+    } catch (e) {
+      debugPrint('Error refreshing safety cache: $e');
+    }
+  }
+
+  /// Clear safety cache when blocking/muting operations are performed
+  void _clearSafetyCache() {
+    _blockedAvatarIdsCache?.clear();
+    _mutedAvatarIdsCache?.clear();
+    _cacheLastUpdated = null;
   }
 }
 

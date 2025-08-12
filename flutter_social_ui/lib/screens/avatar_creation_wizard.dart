@@ -8,7 +8,12 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 class AvatarCreationWizard extends StatefulWidget {
-  const AvatarCreationWizard({super.key});
+  final bool returnResultOnCreate;
+  
+  const AvatarCreationWizard({
+    super.key,
+    this.returnResultOnCreate = false,
+  });
 
   @override
   _AvatarCreationWizardState createState() => _AvatarCreationWizardState();
@@ -29,6 +34,46 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   final List<PersonalityTrait> _selectedTraits = [];
   File? _avatarImage;
   String? _backstory;
+  String? _voiceStyle;
+  bool _allowAutonomousPosting = false;
+
+  // Track if there are unsaved changes
+  bool get _hasUnsavedChanges {
+    return _name.isNotEmpty || 
+           _bio.isNotEmpty || 
+           _selectedTraits.isNotEmpty || 
+           _avatarImage != null || 
+           (_backstory?.isNotEmpty ?? false) ||
+           (_voiceStyle?.isNotEmpty ?? false) ||
+           _allowAutonomousPosting;
+  }
+
+  // Validation helpers
+  String? _getNameError() {
+    if (_name.isEmpty) return null;
+    if (_name.trim().length < 3) return 'Name must be at least 3 characters';
+    if (_name.trim().length > 50) return 'Name must be less than 50 characters';
+    return null;
+  }
+
+  String? _getBioError() {
+    if (_bio.isEmpty) return null;
+    if (_bio.trim().length < 10) return 'Bio must be at least 10 characters';
+    if (_bio.trim().length > 500) return 'Bio must be less than 500 characters';
+    return null;
+  }
+
+  String? _getBackstoryError() {
+    if (_backstory == null || _backstory!.isEmpty) return null;
+    if (_backstory!.trim().length > 1000) return 'Backstory must be less than 1000 characters';
+    return null;
+  }
+
+  String? _getTraitsError() {
+    if (_selectedTraits.length < 3) return 'Please select at least 3 personality traits';
+    if (_selectedTraits.length > 5) return 'Please select no more than 5 personality traits';
+    return null;
+  }
 
   final List<String> _stepTitles = [
     'Basic Info',
@@ -37,16 +82,58 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
     'Preview & Create',
   ];
 
+  // Handle close with confirmation if there are unsaved changes
+  Future<void> _handleClose() async {
+    if (!_hasUnsavedChanges) {
+      Navigator.pop(context);
+      return;
+    }
+
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Text(
+          'Discard Changes?',
+          style: kHeadingTextStyle.copyWith(fontSize: 18),
+        ),
+        content: Text(
+          'You have unsaved changes. Are you sure you want to exit without creating your avatar?',
+          style: kBodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: kLightTextColor)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Discard', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true) {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        await _handleClose();
+        return false; // We handle the pop ourselves
+      },
+      child: Scaffold(
       backgroundColor: kBackgroundColor,
       appBar: AppBar(
         title: Text('Create Avatar (${_currentStep + 1}/4)'),
         backgroundColor: kBackgroundColor,
         leading: IconButton(
           icon: Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleClose,
         ),
         actions: [
           if (_currentStep > 0)
@@ -134,6 +221,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -170,6 +258,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
+              errorText: _getNameError(),
             ),
             onChanged: (value) => setState(() => _name = value),
           ),
@@ -193,6 +282,7 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
+              errorText: _getBioError(),
             ),
             onChanged: (value) => setState(() => _bio = value),
           ),
@@ -275,9 +365,22 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
           ),
 
           SizedBox(height: 24),
-          Text(
-            'Selected: ${_selectedTraits.length}/5',
-            style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+          Row(
+            children: [
+              Text(
+                'Selected: ${_selectedTraits.length}/5',
+                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+              ),
+              if (_getTraitsError() != null) ...[
+                SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    _getTraitsError()!,
+                    style: kCaptionTextStyle.copyWith(color: Colors.red),
+                  ),
+                ),
+              ],
+            ],
           ),
 
           SizedBox(height: 32),
@@ -300,8 +403,67 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
+              errorText: _getBackstoryError(),
             ),
             onChanged: (value) => setState(() => _backstory = value),
+          ),
+
+          SizedBox(height: 32),
+
+          // Voice style
+          Text(
+            'Voice Style (Optional)',
+            style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          TextField(
+            style: kBodyTextStyle,
+            decoration: InputDecoration(
+              hintText: 'e.g., friendly, professional, casual, energetic...',
+              filled: true,
+              fillColor: kCardColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (value) => setState(() => _voiceStyle = value),
+          ),
+
+          SizedBox(height: 24),
+
+          // Autonomous posting toggle
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Allow Autonomous Posting',
+                        style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Let your avatar create and post content automatically',
+                        style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _allowAutonomousPosting,
+                  onChanged: (value) => setState(() => _allowAutonomousPosting = value),
+                  activeColor: kPrimaryColor,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -462,6 +624,54 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                     );
                   }).toList(),
                 ),
+
+                // Voice style and autonomous posting
+                if (_voiceStyle?.isNotEmpty == true || _allowAutonomousPosting) ...[
+                  SizedBox(height: 16),
+                  if (_voiceStyle?.isNotEmpty == true)
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kBackgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Voice Style:',
+                            style: kCaptionTextStyle.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 4),
+                          Text(_voiceStyle!, style: kCaptionTextStyle),
+                        ],
+                      ),
+                    ),
+                  if (_allowAutonomousPosting)
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12),
+                      margin: EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 16, color: kPrimaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Autonomous Posting Enabled',
+                            style: kCaptionTextStyle.copyWith(
+                              color: kPrimaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -473,9 +683,14 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   bool _canProceed() {
     switch (_currentStep) {
       case 0:
-        return _name.isNotEmpty && _bio.isNotEmpty;
+        return _name.isNotEmpty && 
+               _bio.isNotEmpty && 
+               _getNameError() == null && 
+               _getBioError() == null;
       case 1:
-        return _selectedTraits.length >= 3;
+        return _selectedTraits.length >= 3 && 
+               _selectedTraits.length <= 5 &&
+               _getBackstoryError() == null;
       case 2:
         return true; // Image is optional
       case 3:
@@ -535,21 +750,29 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
         personalityTraits: _selectedTraits,
         backstory: _backstory,
         avatarImage: _avatarImage,
+        voiceStyle: _voiceStyle,
+        allowAutonomousPosting: _allowAutonomousPosting,
       );
 
-      // Navigate to main app
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => AppShell()),
-        (route) => false,
-      );
+      // Navigate based on the returnResultOnCreate parameter
+      if (widget.returnResultOnCreate) {
+        // Return the created avatar to the calling screen
+        Navigator.pop(context, avatar);
+      } else {
+        // Navigate to main app
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => AppShell()),
+          (route) => false,
+        );
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Avatar "$_name" created successfully! 🎉'),
-          backgroundColor: Colors.green,
-        ),
-      );
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Avatar "$_name" created successfully! 🎉'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

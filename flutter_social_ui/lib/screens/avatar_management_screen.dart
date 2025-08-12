@@ -80,13 +80,23 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
     final result = await Navigator.push<AvatarModel>(
       context,
       MaterialPageRoute(
-        builder: (context) => const AvatarCreationWizard(),
+        builder: (context) => const AvatarCreationWizard(
+          returnResultOnCreate: true,
+        ),
       ),
     );
 
     if (result != null) {
       // Refresh avatars list
       await _loadAvatars();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Avatar "${result.name}" created successfully! 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 

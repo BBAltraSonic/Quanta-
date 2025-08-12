@@ -188,7 +188,7 @@ static const String commentsTable = 'post_comments';
    - Return public URL via `.getPublicUrl(...)`.
 2. For videos:
    - Generate and upload a thumbnail (first frame or placeholder image) → return `thumbnail_url`.
-3. Add optional compression step (using a plugin like `video_compress`).
+3. Add compression step (using a plugin like `video_compress`).
 
 #### Phase C — Create Post (DB Insert)
 1. Implement `_uploadContentSupabase` to:

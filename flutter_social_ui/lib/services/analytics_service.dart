@@ -14,8 +14,8 @@ class AnalyticsService {
   
   // Event queue for batch processing
   final List<Map<String, dynamic>> _eventQueue = [];
-  static const int _batchSize = 10;
-  static const int _flushIntervalMs = 5000; // 5 seconds
+  static const int _batchSize = 20; // Increased batch size
+  static const int _flushIntervalMs = 15000; // Increased to 15 seconds
   
   /// Initialize analytics service
   Future<void> initialize() async {
@@ -251,8 +251,15 @@ class AnalyticsService {
         debugPrint('📊 Flushed ${eventsToFlush.length} analytics events');
       }
     } catch (e) {
-      // If flush fails, put events back in queue for retry
-      _eventQueue.addAll(eventsToFlush);
+      // If flush fails, only retry if it's a temporary network error
+      if (e.toString().contains('network') || e.toString().contains('timeout')) {
+        _eventQueue.addAll(eventsToFlush);
+      } else {
+        // For 404 errors or schema errors, don't retry to avoid endless loops
+        if (kDebugMode) {
+          debugPrint('⚠️ Discarding ${eventsToFlush.length} analytics events due to persistent error');
+        }
+      }
       
       if (kDebugMode) {
         debugPrint('❌ Failed to flush analytics events: $e');

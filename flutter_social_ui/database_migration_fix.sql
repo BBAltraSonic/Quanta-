@@ -38,6 +38,10 @@ CREATE POLICY "System can create notifications" ON public.notifications
 CREATE POLICY "Users can update their own notifications" ON public.notifications
     FOR UPDATE USING (auth.uid() = user_id);
 
+-- Add RLS policy for active_avatar_id updates
+CREATE POLICY "Users can set their active avatar" ON public.users
+    FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
 -- Add updated_at trigger for notifications
 CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON public.notifications
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -49,7 +53,8 @@ ADD COLUMN IF NOT EXISTS last_name TEXT,
 ADD COLUMN IF NOT EXISTS bio TEXT,
 ADD COLUMN IF NOT EXISTS followers_count INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS following_count INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS posts_count INTEGER DEFAULT 0;
+ADD COLUMN IF NOT EXISTS posts_count INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS active_avatar_id UUID REFERENCES public.avatars(id);
 
 -- 4. Add author_type and author_id fields to comments table for better compatibility
 ALTER TABLE public.comments 

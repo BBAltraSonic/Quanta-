@@ -139,44 +139,6 @@ class OnboardingScreen extends StatelessWidget {
       ),
     );
   }
-  
-  void _showComingSoon(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: const Text(
-          'Coming Soon',
-          style: TextStyle(color: kTextColor),
-        ),
-        content: const Text(
-          'Avatar creation wizard is being implemented. For now, you can explore the app with the beautiful TikTok-style interface!',
-          style: TextStyle(color: kLightTextColor),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              
-              // Mark onboarding completed and navigate to main app
-              final authService = AuthService();
-              await authService.markOnboardingCompleted();
-              
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => const AvatarCreationWizard(),
-                      ),
-                    );
-            },
-            child: const Text(
-              'Continue to App',
-              style: TextStyle(color: kPrimaryColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FeatureItem extends StatelessWidget {
