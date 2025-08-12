@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/post_model.dart';
+import '../services/enhanced_feeds_service.dart';
+import '../config/db_config.dart';
 
 /// Service for user safety features
 class UserSafetyService {
@@ -436,6 +438,8 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
   ReportReason? _selectedReason;
   final _additionalInfoController = TextEditingController();
   final _safetyService = UserSafetyService();
+  final _feedsService = EnhancedFeedsService();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -485,8 +489,14 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _selectedReason != null ? _submitReport : null,
-          child: const Text('Submit Report'),
+          onPressed: _selectedReason != null && !_isSubmitting ? _submitReport : null,
+          child: _isSubmitting 
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Submit Report'),
         ),
       ],
     );
@@ -514,26 +524,97 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
   }
 
   void _submitReport() async {
-    if (_selectedReason == null) return;
+    if (_selectedReason == null || _isSubmitting) return;
 
-    await _safetyService.reportContent(
-      contentId: widget.contentId,
-      contentType: widget.contentType,
-      reason: _selectedReason!,
-      additionalInfo: _additionalInfoController.text.trim().isEmpty
-          ? null
-          : _additionalInfoController.text.trim(),
-      reportedUserId: widget.reportedUserId,
-    );
+    setState(() {
+      _isSubmitting = true;
+    });
 
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Report submitted successfully'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // Map ReportReason to DB report types
+      String reportType;
+      switch (_selectedReason!) {
+        case ReportReason.spam:
+          reportType = DbConfig.spamReport;
+          break;
+        case ReportReason.harassment:
+          reportType = DbConfig.harassmentReport;
+          break;
+        case ReportReason.hateContent:
+          reportType = DbConfig.inappropriateReport;
+          break;
+        case ReportReason.violence:
+          reportType = DbConfig.inappropriateReport;
+          break;
+        case ReportReason.explicitContent:
+          reportType = DbConfig.inappropriateReport;
+          break;
+        case ReportReason.misinformation:
+          reportType = DbConfig.otherReport;
+          break;
+        case ReportReason.copyright:
+          reportType = DbConfig.copyrightReport;
+          break;
+        case ReportReason.other:
+          reportType = DbConfig.otherReport;
+          break;
+      }
+
+      // Submit to server-side via EnhancedFeedsService
+      final success = await _feedsService.reportPost(
+        widget.contentId,
+        reportType,
+        reason: _getReasonDisplayName(_selectedReason!),
+        details: _additionalInfoController.text.trim().isEmpty
+            ? null
+            : _additionalInfoController.text.trim(),
       );
+
+      if (success) {
+        // Also keep local record for user's reference
+        await _safetyService.reportContent(
+          contentId: widget.contentId,
+          contentType: widget.contentType,
+          reason: _selectedReason!,
+          additionalInfo: _additionalInfoController.text.trim().isEmpty
+              ? null
+              : _additionalInfoController.text.trim(),
+          reportedUserId: widget.reportedUserId,
+        );
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Report submitted successfully. Thank you for helping keep our community safe.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to submit report');
+      }
+    } catch (e) {
+      debugPrint('Error submitting report: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit report: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _submitReport,
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 }

@@ -10,6 +10,7 @@ import 'package:flutter_social_ui/services/share_service.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/constants.dart';
+import 'package:flutter_social_ui/services/user_safety_service.dart';
 
 
 
@@ -383,7 +384,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               title: const Text('Report', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                // Handle report
+                _showReportDialog(_posts[_currentPage]);
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
@@ -891,6 +892,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  void _showReportDialog(PostModel post) {
+    showDialog(
+      context: context,
+      builder: (context) => ReportContentDialog(
+        contentId: post.id,
+        contentType: ContentType.post,
+        reportedUserId: post.avatarId, // Use avatar ID as the reported user ID
       ),
     );
   }

@@ -11,6 +11,7 @@ import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../config/db_config.dart';
 import '../constants.dart';
+import '../services/user_safety_service.dart';
 
 /// @deprecated Enhanced Post Detail Screen with full functionality
 /// This screen is deprecated. Use PostDetailScreen instead, which now has feature parity 
@@ -589,61 +590,17 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   }
 
   Future<void> _reportPost(PostModel post) async {
-    final result = await showDialog<String>(
+    showDialog(
       context: context,
-      builder: (context) => _buildReportDialog(),
+      builder: (context) => ReportContentDialog(
+        contentId: post.id,
+        contentType: ContentType.post,
+        reportedUserId: post.avatarId, // Use avatar ID as the reported user ID
+      ),
     );
-    
-    if (result != null) {
-      try {
-        await _feedsService.reportPost(post.id, result);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Report submitted. Thank you for helping keep our community safe.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-        
-        _trackAnalyticsEvent(post.id, DbConfig.reportEvent, {
-          'report_type': result,
-          'timestamp': DateTime.now().toIso8601String(),
-        });
-      } catch (e) {
-        debugPrint('Error reporting post: $e');
-        _showErrorSnackBar('Failed to submit report', () => _reportPost(post));
-      }
-    }
   }
 
-  Widget _buildReportDialog() {
-    return AlertDialog(
-      title: const Text('Report Post'),
-      content: const Text('Why are you reporting this post?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, DbConfig.spamReport),
-          child: const Text('Spam'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, DbConfig.inappropriateReport),
-          child: const Text('Inappropriate'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, DbConfig.harassmentReport),
-          child: const Text('Harassment'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, DbConfig.otherReport),
-          child: const Text('Other'),
-        ),
-      ],
-    );
-  }
+
 
   Future<void> _blockUser(PostModel post) async {
     final avatar = _avatarCache[post.avatarId];
