@@ -1,212 +1,408 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
 import '../services/enhanced_feeds_service.dart';
+import '../services/auth_service.dart';
 import '../config/db_config.dart';
 
-/// Service for user safety features
+/// Service for user safety features with Supabase backend and migration support
 class UserSafetyService {
   static final UserSafetyService _instance = UserSafetyService._internal();
   factory UserSafetyService() => _instance;
   UserSafetyService._internal();
 
   SharedPreferences? _prefs;
+  late final SupabaseClient _supabase;
+  late final AuthService _authService;
 
-  // Storage keys
+  // Legacy storage keys for migration
   static const String _blockedUsersKey = 'blocked_users';
   static const String _mutedUsersKey = 'muted_users';
   static const String _reportedContentKey = 'reported_content';
   static const String _safetySettingsKey = 'safety_settings';
+  static const String _migrationCompletedKey = 'safety_migration_completed';
 
   /// Initialize user safety service
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    _supabase = Supabase.instance.client;
+    _authService = AuthService();
+    
     debugPrint('UserSafetyService initialized');
-  }
-
-  /// Block a user
-  Future<void> blockUser(String userId) async {
-    if (_prefs == null) return;
-
-    try {
-      final blockedUsers = getBlockedUsers();
-      if (!blockedUsers.contains(userId)) {
-        blockedUsers.add(userId);
-        await _prefs!.setStringList(_blockedUsersKey, blockedUsers);
-        debugPrint('User blocked: $userId');
-      }
-    } catch (e) {
-      debugPrint('Error blocking user: $e');
+    
+    // Check if migration is needed and user is authenticated
+    if (_authService.currentUserId != null && !_isMigrationCompleted()) {
+      await _migrateLocalDataToSupabase();
     }
   }
 
-  /// Unblock a user
-  Future<void> unblockUser(String userId) async {
-    if (_prefs == null) return;
+  /// Check if migration has been completed
+  bool _isMigrationCompleted() {
+    return _prefs?.getBool(_migrationCompletedKey) ?? false;
+  }
+
+  /// Mark migration as completed
+  Future<void> _markMigrationCompleted() async {
+    await _prefs?.setBool(_migrationCompletedKey, true);
+  }
+
+  /// Migrate local SharedPreferences data to Supabase
+  Future<void> _migrateLocalDataToSupabase() async {
+    if (_authService.currentUserId == null) return;
 
     try {
-      final blockedUsers = getBlockedUsers();
-      if (blockedUsers.remove(userId)) {
-        await _prefs!.setStringList(_blockedUsersKey, blockedUsers);
-        debugPrint('User unblocked: $userId');
-      }
+      debugPrint('🔄 Starting safety data migration to Supabase...');
+
+      // Migrate blocked users
+      await _migrateBlockedUsers();
+
+      // Migrate muted users
+      await _migrateMutedUsers();
+
+      // Note: Reports are not migrated as they should be server-side anyway
+
+      // Clear local data after successful migration
+      await _clearLocalData();
+
+      // Mark migration as completed
+      await _markMigrationCompleted();
+
+      debugPrint('✅ Safety data migration completed successfully');
     } catch (e) {
-      debugPrint('Error unblocking user: $e');
+      debugPrint('❌ Error during safety data migration: $e');
+      // Don't mark as completed if migration failed
     }
   }
 
-  /// Get list of blocked users
-  List<String> getBlockedUsers() {
-    if (_prefs == null) return [];
-    return _prefs!.getStringList(_blockedUsersKey) ?? [];
-  }
+  /// Migrate blocked users from SharedPreferences to Supabase
+  Future<void> _migrateBlockedUsers() async {
+    final localBlockedUsers = _prefs?.getStringList(_blockedUsersKey) ?? [];
+    if (localBlockedUsers.isEmpty) return;
 
-  /// Check if user is blocked
-  bool isUserBlocked(String userId) {
-    return getBlockedUsers().contains(userId);
-  }
+    final userId = _authService.currentUserId!;
+    final blocksToInsert = <Map<String, dynamic>>[];
 
-  /// Mute a user
-  Future<void> muteUser(String userId, {Duration? duration}) async {
-    if (_prefs == null) return;
+    for (final blockedUserId in localBlockedUsers) {
+      blocksToInsert.add({
+        'blocker_user_id': userId,
+        'blocked_user_id': blockedUserId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
 
-    try {
-      final mutedUsers = getMutedUsers();
-      final muteData = {
-        'userId': userId,
-        'mutedAt': DateTime.now().toIso8601String(),
-        'duration': duration?.inMilliseconds,
-      };
-
-      // Remove existing mute for this user
-      mutedUsers.removeWhere((mute) => mute['userId'] == userId);
-
-      // Add new mute
-      mutedUsers.add(muteData);
-
-      await _prefs!.setString(_mutedUsersKey, jsonEncode(mutedUsers));
-      debugPrint(
-        'User muted: $userId for ${duration?.toString() ?? 'indefinitely'}',
-      );
-    } catch (e) {
-      debugPrint('Error muting user: $e');
+    if (blocksToInsert.isNotEmpty) {
+      await _supabase.from(DbConfig.userBlocksTable).upsert(blocksToInsert);
+      debugPrint('📦 Migrated ${blocksToInsert.length} blocked users');
     }
   }
 
-  /// Unmute a user
-  Future<void> unmuteUser(String userId) async {
-    if (_prefs == null) return;
+  /// Migrate muted users from SharedPreferences to Supabase
+  Future<void> _migrateMutedUsers() async {
+    final mutedData = _prefs?.getString(_mutedUsersKey);
+    if (mutedData == null) return;
 
     try {
-      final mutedUsers = getMutedUsers();
-      final originalLength = mutedUsers.length;
+      final List<dynamic> localMutedUsers = jsonDecode(mutedData);
+      if (localMutedUsers.isEmpty) return;
 
-      mutedUsers.removeWhere((mute) => mute['userId'] == userId);
+      final userId = _authService.currentUserId!;
+      final mutesToInsert = <Map<String, dynamic>>[];
 
-      if (mutedUsers.length < originalLength) {
-        await _prefs!.setString(_mutedUsersKey, jsonEncode(mutedUsers));
-        debugPrint('User unmuted: $userId');
-      }
-    } catch (e) {
-      debugPrint('Error unmuting user: $e');
-    }
-  }
-
-  /// Get list of muted users
-  List<Map<String, dynamic>> getMutedUsers() {
-    if (_prefs == null) return [];
-
-    try {
-      final mutedData = _prefs!.getString(_mutedUsersKey);
-      if (mutedData != null) {
-        final List<dynamic> mutedList = jsonDecode(mutedData);
-        return mutedList.cast<Map<String, dynamic>>();
-      }
-    } catch (e) {
-      debugPrint('Error getting muted users: $e');
-    }
-
-    return [];
-  }
-
-  /// Check if user is muted
-  bool isUserMuted(String userId) {
-    final mutedUsers = getMutedUsers();
-
-    for (final mute in mutedUsers) {
-      if (mute['userId'] == userId) {
-        // Check if mute has expired
-        if (mute['duration'] != null) {
-          final mutedAt = DateTime.parse(mute['mutedAt']);
-          final duration = Duration(milliseconds: mute['duration']);
-
-          if (DateTime.now().isAfter(mutedAt.add(duration))) {
-            // Mute has expired, remove it
-            unmuteUser(userId);
-            return false;
+      for (final mute in localMutedUsers) {
+        final muteMap = mute as Map<String, dynamic>;
+        final mutedAt = DateTime.parse(muteMap['mutedAt']);
+        final durationMs = muteMap['duration'] as int?;
+        
+        // Check if mute hasn't expired
+        if (durationMs != null) {
+          final expiresAt = mutedAt.add(Duration(milliseconds: durationMs));
+          if (DateTime.now().isAfter(expiresAt)) {
+            continue; // Skip expired mutes
           }
         }
-        return true;
-      }
-    }
 
-    return false;
+        mutesToInsert.add({
+          'muter_user_id': userId,
+          'muted_user_id': muteMap['userId'],
+          'muted_at': mutedAt.toIso8601String(),
+          'duration_minutes': durationMs != null ? (durationMs / 60000).round() : null,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      if (mutesToInsert.isNotEmpty) {
+        await _supabase.from(DbConfig.userMutesTable).upsert(mutesToInsert);
+        debugPrint('📦 Migrated ${mutesToInsert.length} muted users');
+      }
+    } catch (e) {
+      debugPrint('Error migrating muted users: $e');
+    }
   }
 
-  /// Report content
-  Future<void> reportContent({
+  /// Clear local SharedPreferences data after migration
+  Future<void> _clearLocalData() async {
+    await Future.wait([
+      _prefs?.remove(_blockedUsersKey) ?? Future.value(),
+      _prefs?.remove(_mutedUsersKey) ?? Future.value(),
+      _prefs?.remove(_reportedContentKey) ?? Future.value(),
+    ]);
+  }
+
+  /// Block a user (Supabase-backed)
+  Future<bool> blockUser(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    if (currentUserId == userId) {
+      throw Exception('Cannot block yourself');
+    }
+
+    try {
+      await _supabase.from(DbConfig.userBlocksTable).upsert({
+        'blocker_user_id': currentUserId,
+        'blocked_user_id': userId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('User blocked: $userId');
+      return true;
+    } catch (e) {
+      debugPrint('Error blocking user: $e');
+      return false;
+    }
+  }
+
+  /// Unblock a user (Supabase-backed)
+  Future<bool> unblockUser(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      await _supabase
+          .from(DbConfig.userBlocksTable)
+          .delete()
+          .eq('blocker_user_id', currentUserId)
+          .eq('blocked_user_id', userId);
+
+      debugPrint('User unblocked: $userId');
+      return true;
+    } catch (e) {
+      debugPrint('Error unblocking user: $e');
+      return false;
+    }
+  }
+
+  /// Get list of blocked users (Supabase-backed)
+  Future<List<String>> getBlockedUsers() async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return [];
+
+    try {
+      final response = await _supabase
+          .from(DbConfig.userBlocksTable)
+          .select('blocked_user_id')
+          .eq('blocker_user_id', currentUserId);
+
+      return response.map<String>((block) => block['blocked_user_id'] as String).toList();
+    } catch (e) {
+      debugPrint('Error getting blocked users: $e');
+      return [];
+    }
+  }
+
+  /// Check if user is blocked (Supabase-backed)
+  Future<bool> isUserBlocked(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return false;
+
+    try {
+      final response = await _supabase
+          .from(DbConfig.userBlocksTable)
+          .select('id')
+          .eq('blocker_user_id', currentUserId)
+          .eq('blocked_user_id', userId)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      debugPrint('Error checking if user is blocked: $e');
+      return false;
+    }
+  }
+
+  /// Mute a user (Supabase-backed)
+  Future<bool> muteUser(String userId, {Duration? duration}) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    if (currentUserId == userId) {
+      throw Exception('Cannot mute yourself');
+    }
+
+    try {
+      await _supabase.from(DbConfig.userMutesTable).upsert({
+        'muter_user_id': currentUserId,
+        'muted_user_id': userId,
+        'muted_at': DateTime.now().toIso8601String(),
+        'duration_minutes': duration?.inMinutes,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('User muted: $userId for ${duration?.toString() ?? 'indefinitely'}');
+      return true;
+    } catch (e) {
+      debugPrint('Error muting user: $e');
+      return false;
+    }
+  }
+
+  /// Unmute a user (Supabase-backed)
+  Future<bool> unmuteUser(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      await _supabase
+          .from(DbConfig.userMutesTable)
+          .delete()
+          .eq('muter_user_id', currentUserId)
+          .eq('muted_user_id', userId);
+
+      debugPrint('User unmuted: $userId');
+      return true;
+    } catch (e) {
+      debugPrint('Error unmuting user: $e');
+      return false;
+    }
+  }
+
+  /// Get list of muted users (Supabase-backed)
+  Future<List<Map<String, dynamic>>> getMutedUsers() async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return [];
+
+    try {
+      final response = await _supabase
+          .from(DbConfig.userMutesTable)
+          .select('muted_user_id, muted_at, duration_minutes, expires_at')
+          .eq('muter_user_id', currentUserId)
+          .order('created_at', ascending: false);
+
+      return response.map<Map<String, dynamic>>((mute) => {
+        'userId': mute['muted_user_id'],
+        'mutedAt': mute['muted_at'],
+        'duration': mute['duration_minutes'] != null 
+            ? mute['duration_minutes'] * 60000 // Convert minutes to milliseconds for compatibility
+            : null,
+        'expiresAt': mute['expires_at'],
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting muted users: $e');
+      return [];
+    }
+  }
+
+  /// Check if user is muted (Supabase-backed with automatic cleanup)
+  Future<bool> isUserMuted(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return false;
+
+    try {
+      // Use the database function that includes automatic cleanup
+      final response = await _supabase.rpc('is_user_muted', params: {
+        'muter_id': currentUserId,
+        'muted_id': userId,
+      });
+
+      return response == true;
+    } catch (e) {
+      debugPrint('Error checking if user is muted: $e');
+      return false;
+    }
+  }
+
+  /// Report content (Supabase-backed)
+  Future<bool> reportContent({
     required String contentId,
     required ContentType contentType,
     required ReportReason reason,
     String? additionalInfo,
     String? reportedUserId,
   }) async {
-    if (_prefs == null) return;
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) {
+      throw Exception('User not authenticated');
+    }
 
     try {
-      final reports = getReportedContent();
-
-      final report = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'contentId': contentId,
-        'contentType': contentType.name,
+      final reportData = <String, dynamic>{
+        'user_id': currentUserId,
+        'content_type': contentType.name,
+        'report_type': reason.toReportType(),
         'reason': reason.name,
-        'additionalInfo': additionalInfo,
-        'reportedUserId': reportedUserId,
-        'reportedAt': DateTime.now().toIso8601String(),
-        'status': ReportStatus.pending.name,
+        'details': additionalInfo,
+        'status': DbConfig.pendingReport,
+        'created_at': DateTime.now().toIso8601String(),
       };
 
-      reports.add(report);
+      // Add content-specific fields
+      switch (contentType) {
+        case ContentType.post:
+          reportData['post_id'] = contentId;
+          break;
+        case ContentType.comment:
+          reportData['comment_id'] = contentId;
+          break;
+        case ContentType.profile:
+          reportData['reported_user_id'] = reportedUserId ?? contentId;
+          break;
+        case ContentType.message:
+          // For messages, we might need a different approach
+          reportData['reported_user_id'] = reportedUserId;
+          reportData['details'] = '${reportData['details'] ?? ''}\nMessage ID: $contentId';
+          break;
+      }
 
-      await _prefs!.setString(_reportedContentKey, jsonEncode(reports));
+      await _supabase.from(DbConfig.reportsTable).insert(reportData);
+
       debugPrint('Content reported: $contentId for ${reason.name}');
-
-      // In production, this would send to backend moderation system
+      return true;
     } catch (e) {
       debugPrint('Error reporting content: $e');
+      return false;
     }
   }
 
-  /// Get reported content
-  List<Map<String, dynamic>> getReportedContent() {
-    if (_prefs == null) return [];
+  /// Get reported content (Supabase-backed)
+  Future<List<Map<String, dynamic>>> getReportedContent() async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return [];
 
     try {
-      final reportsData = _prefs!.getString(_reportedContentKey);
-      if (reportsData != null) {
-        final List<dynamic> reportsList = jsonDecode(reportsData);
-        return reportsList.cast<Map<String, dynamic>>();
-      }
+      final response = await _supabase
+          .from(DbConfig.reportsTable)
+          .select('*')
+          .eq('user_id', currentUserId)
+          .order('created_at', ascending: false);
+
+      return response.cast<Map<String, dynamic>>();
     } catch (e) {
       debugPrint('Error getting reported content: $e');
+      return [];
     }
-
-    return [];
   }
 
-  /// Update safety settings
+  /// Update safety settings (still using SharedPreferences for user preferences)
   Future<void> updateSafetySettings(SafetySettings settings) async {
     if (_prefs == null) return;
 
@@ -221,7 +417,7 @@ class UserSafetyService {
     }
   }
 
-  /// Get safety settings
+  /// Get safety settings (still using SharedPreferences for user preferences)
   SafetySettings getSafetySettings() {
     if (_prefs == null) return SafetySettings.defaultSettings();
 
@@ -237,22 +433,62 @@ class UserSafetyService {
     return SafetySettings.defaultSettings();
   }
 
-  /// Filter content based on safety settings
-  List<PostModel> filterContent(List<PostModel> posts) {
+  /// Filter content based on safety settings and blocks/mutes
+  Future<List<PostModel>> filterContent(List<PostModel> posts) async {
     final settings = getSafetySettings();
-    final blockedUsers = getBlockedUsers();
-    final mutedUsers = getMutedUsers()
+
+    // Get blocked user IDs
+    final blockedUserIds = await getBlockedUsers();
+
+    // Map blocked user IDs to avatar IDs (owners' avatars)
+    final Set<String> blockedAvatarIds = {};
+    for (final userId in blockedUserIds) {
+      try {
+        final rows = await _supabase
+            .from(DbConfig.avatarsTable)
+            .select('id')
+            .eq('owner_user_id', userId);
+        blockedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
+      } catch (e) {
+        debugPrint('Error fetching blocked avatar IDs for user $userId: $e');
+      }
+    }
+
+    // Get active mutes and map to user IDs
+    final muted = await getMutedUsers();
+    final now = DateTime.now();
+    final mutedUserIds = muted
+        .where((m) {
+          final expiresAt = m['expiresAt'] as String?;
+          if (expiresAt == null) return true; // Indefinite mute
+          return now.isBefore(DateTime.parse(expiresAt));
+        })
         .map((m) => m['userId'] as String)
         .toList();
 
+    // Map muted user IDs to avatar IDs
+    final Set<String> mutedAvatarIds = {};
+    for (final userId in mutedUserIds) {
+      try {
+        final rows = await _supabase
+            .from(DbConfig.avatarsTable)
+            .select('id')
+            .eq('owner_user_id', userId);
+        mutedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
+      } catch (e) {
+        debugPrint('Error fetching muted avatar IDs for user $userId: $e');
+      }
+    }
+
+    // Filter posts
     return posts.where((post) {
-      // Filter blocked users
-      if (blockedUsers.contains(post.avatarId)) {
+      // Filter blocked avatars
+      if (blockedAvatarIds.contains(post.avatarId)) {
         return false;
       }
 
-      // Filter muted users
-      if (mutedUsers.contains(post.avatarId)) {
+      // Filter muted avatars
+      if (mutedAvatarIds.contains(post.avatarId)) {
         return false;
       }
 
@@ -286,30 +522,60 @@ class UserSafetyService {
   }
 
   /// Get safety statistics
-  Map<String, dynamic> getSafetyStats() {
+  Future<Map<String, dynamic>> getSafetyStats() async {
+    final blockedUsers = await getBlockedUsers();
+    final mutedUsers = await getMutedUsers();
+    final reportedContent = await getReportedContent();
+
     return {
-      'blockedUsers': getBlockedUsers().length,
-      'mutedUsers': getMutedUsers().length,
-      'reportedContent': getReportedContent().length,
+      'blockedUsers': blockedUsers.length,
+      'mutedUsers': mutedUsers.length,
+      'reportedContent': reportedContent.length,
       'safetySettings': getSafetySettings().toJson(),
+      'migrationCompleted': _isMigrationCompleted(),
     };
   }
 
-  /// Clear all safety data
+  /// Clear all safety data (for testing/debugging)
   Future<void> clearAllSafetyData() async {
-    if (_prefs == null) return;
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return;
 
     try {
       await Future.wait([
-        _prefs!.remove(_blockedUsersKey),
-        _prefs!.remove(_mutedUsersKey),
-        _prefs!.remove(_reportedContentKey),
-        _prefs!.remove(_safetySettingsKey),
+        // Clear Supabase data
+        _supabase
+            .from(DbConfig.userBlocksTable)
+            .delete()
+            .eq('blocker_user_id', currentUserId),
+        _supabase
+            .from(DbConfig.userMutesTable)
+            .delete()
+            .eq('muter_user_id', currentUserId),
+        _supabase
+            .from(DbConfig.reportsTable)
+            .delete()
+            .eq('user_id', currentUserId),
+        
+        // Clear local data
+        _clearLocalData(),
+        
+        // Reset migration flag
+        _prefs?.remove(_migrationCompletedKey) ?? Future.value(),
+        _prefs?.remove(_safetySettingsKey) ?? Future.value(),
       ]);
 
       debugPrint('All safety data cleared');
     } catch (e) {
       debugPrint('Error clearing safety data: $e');
+    }
+  }
+
+  /// Force migration for testing
+  Future<void> forceMigration() async {
+    await _prefs?.setBool(_migrationCompletedKey, false);
+    if (_authService.currentUserId != null) {
+      await _migrateLocalDataToSupabase();
     }
   }
 }
@@ -329,6 +595,30 @@ enum ReportReason {
   other,
 }
 
+/// Extension to convert ReportReason to database report type
+extension ReportReasonExtension on ReportReason {
+  String toReportType() {
+    switch (this) {
+      case ReportReason.spam:
+        return DbConfig.spamReport;
+      case ReportReason.harassment:
+        return DbConfig.harassmentReport;
+      case ReportReason.hateContent:
+        return DbConfig.inappropriateReport;
+      case ReportReason.violence:
+        return DbConfig.inappropriateReport;
+      case ReportReason.explicitContent:
+        return DbConfig.inappropriateReport;
+      case ReportReason.misinformation:
+        return DbConfig.inappropriateReport;
+      case ReportReason.copyright:
+        return DbConfig.copyrightReport;
+      case ReportReason.other:
+        return DbConfig.otherReport;
+    }
+  }
+}
+
 /// Report status
 enum ReportStatus { pending, reviewed, resolved, dismissed }
 
@@ -336,34 +626,25 @@ enum ReportStatus { pending, reviewed, resolved, dismissed }
 class SafetySettings {
   final bool showExplicitContent;
   final bool showViolentContent;
+  final bool autoMuteSpam;
   final bool allowDirectMessages;
-  final bool allowMentions;
-  final bool showOnlineStatus;
-  final bool allowLocationSharing;
-  final int minimumAge;
-  final bool requireFollowToMessage;
+  final bool showSensitiveContent;
 
   SafetySettings({
     required this.showExplicitContent,
     required this.showViolentContent,
+    required this.autoMuteSpam,
     required this.allowDirectMessages,
-    required this.allowMentions,
-    required this.showOnlineStatus,
-    required this.allowLocationSharing,
-    required this.minimumAge,
-    required this.requireFollowToMessage,
+    required this.showSensitiveContent,
   });
 
   factory SafetySettings.defaultSettings() {
     return SafetySettings(
       showExplicitContent: false,
       showViolentContent: false,
+      autoMuteSpam: true,
       allowDirectMessages: true,
-      allowMentions: true,
-      showOnlineStatus: true,
-      allowLocationSharing: false,
-      minimumAge: 13,
-      requireFollowToMessage: false,
+      showSensitiveContent: false,
     );
   }
 
@@ -371,12 +652,9 @@ class SafetySettings {
     return SafetySettings(
       showExplicitContent: json['showExplicitContent'] ?? false,
       showViolentContent: json['showViolentContent'] ?? false,
+      autoMuteSpam: json['autoMuteSpam'] ?? true,
       allowDirectMessages: json['allowDirectMessages'] ?? true,
-      allowMentions: json['allowMentions'] ?? true,
-      showOnlineStatus: json['showOnlineStatus'] ?? true,
-      allowLocationSharing: json['allowLocationSharing'] ?? false,
-      minimumAge: json['minimumAge'] ?? 13,
-      requireFollowToMessage: json['requireFollowToMessage'] ?? false,
+      showSensitiveContent: json['showSensitiveContent'] ?? false,
     );
   }
 
@@ -384,237 +662,25 @@ class SafetySettings {
     return {
       'showExplicitContent': showExplicitContent,
       'showViolentContent': showViolentContent,
+      'autoMuteSpam': autoMuteSpam,
       'allowDirectMessages': allowDirectMessages,
-      'allowMentions': allowMentions,
-      'showOnlineStatus': showOnlineStatus,
-      'allowLocationSharing': allowLocationSharing,
-      'minimumAge': minimumAge,
-      'requireFollowToMessage': requireFollowToMessage,
+      'showSensitiveContent': showSensitiveContent,
     };
   }
 
   SafetySettings copyWith({
     bool? showExplicitContent,
     bool? showViolentContent,
+    bool? autoMuteSpam,
     bool? allowDirectMessages,
-    bool? allowMentions,
-    bool? showOnlineStatus,
-    bool? allowLocationSharing,
-    int? minimumAge,
-    bool? requireFollowToMessage,
+    bool? showSensitiveContent,
   }) {
     return SafetySettings(
       showExplicitContent: showExplicitContent ?? this.showExplicitContent,
       showViolentContent: showViolentContent ?? this.showViolentContent,
+      autoMuteSpam: autoMuteSpam ?? this.autoMuteSpam,
       allowDirectMessages: allowDirectMessages ?? this.allowDirectMessages,
-      allowMentions: allowMentions ?? this.allowMentions,
-      showOnlineStatus: showOnlineStatus ?? this.showOnlineStatus,
-      allowLocationSharing: allowLocationSharing ?? this.allowLocationSharing,
-      minimumAge: minimumAge ?? this.minimumAge,
-      requireFollowToMessage:
-          requireFollowToMessage ?? this.requireFollowToMessage,
+      showSensitiveContent: showSensitiveContent ?? this.showSensitiveContent,
     );
-  }
-}
-
-/// Widget for reporting content
-class ReportContentDialog extends StatefulWidget {
-  final String contentId;
-  final ContentType contentType;
-  final String? reportedUserId;
-
-  const ReportContentDialog({
-    super.key,
-    required this.contentId,
-    required this.contentType,
-    this.reportedUserId,
-  });
-
-  @override
-  State<ReportContentDialog> createState() => _ReportContentDialogState();
-}
-
-class _ReportContentDialogState extends State<ReportContentDialog> {
-  ReportReason? _selectedReason;
-  final _additionalInfoController = TextEditingController();
-  final _safetyService = UserSafetyService();
-  final _feedsService = EnhancedFeedsService();
-  bool _isSubmitting = false;
-
-  @override
-  void dispose() {
-    _additionalInfoController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Report Content'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Why are you reporting this content?'),
-            const SizedBox(height: 16),
-            ...ReportReason.values.map(
-              (reason) => RadioListTile<ReportReason>(
-                title: Text(_getReasonDisplayName(reason)),
-                value: reason,
-                groupValue: _selectedReason,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedReason = value;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _additionalInfoController,
-              decoration: const InputDecoration(
-                labelText: 'Additional Information (Optional)',
-                hintText: 'Provide more details...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _selectedReason != null && !_isSubmitting ? _submitReport : null,
-          child: _isSubmitting 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Submit Report'),
-        ),
-      ],
-    );
-  }
-
-  String _getReasonDisplayName(ReportReason reason) {
-    switch (reason) {
-      case ReportReason.spam:
-        return 'Spam';
-      case ReportReason.harassment:
-        return 'Harassment';
-      case ReportReason.hateContent:
-        return 'Hate Content';
-      case ReportReason.violence:
-        return 'Violence';
-      case ReportReason.explicitContent:
-        return 'Explicit Content';
-      case ReportReason.misinformation:
-        return 'Misinformation';
-      case ReportReason.copyright:
-        return 'Copyright Violation';
-      case ReportReason.other:
-        return 'Other';
-    }
-  }
-
-  void _submitReport() async {
-    if (_selectedReason == null || _isSubmitting) return;
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      // Map ReportReason to DB report types
-      String reportType;
-      switch (_selectedReason!) {
-        case ReportReason.spam:
-          reportType = DbConfig.spamReport;
-          break;
-        case ReportReason.harassment:
-          reportType = DbConfig.harassmentReport;
-          break;
-        case ReportReason.hateContent:
-          reportType = DbConfig.inappropriateReport;
-          break;
-        case ReportReason.violence:
-          reportType = DbConfig.inappropriateReport;
-          break;
-        case ReportReason.explicitContent:
-          reportType = DbConfig.inappropriateReport;
-          break;
-        case ReportReason.misinformation:
-          reportType = DbConfig.otherReport;
-          break;
-        case ReportReason.copyright:
-          reportType = DbConfig.copyrightReport;
-          break;
-        case ReportReason.other:
-          reportType = DbConfig.otherReport;
-          break;
-      }
-
-      // Submit to server-side via EnhancedFeedsService
-      final success = await _feedsService.reportPost(
-        widget.contentId,
-        reportType,
-        reason: _getReasonDisplayName(_selectedReason!),
-        details: _additionalInfoController.text.trim().isEmpty
-            ? null
-            : _additionalInfoController.text.trim(),
-      );
-
-      if (success) {
-        // Also keep local record for user's reference
-        await _safetyService.reportContent(
-          contentId: widget.contentId,
-          contentType: widget.contentType,
-          reason: _selectedReason!,
-          additionalInfo: _additionalInfoController.text.trim().isEmpty
-              ? null
-              : _additionalInfoController.text.trim(),
-          reportedUserId: widget.reportedUserId,
-        );
-
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Report submitted successfully. Thank you for helping keep our community safe.'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      } else {
-        throw Exception('Failed to submit report');
-      }
-    } catch (e) {
-      debugPrint('Error submitting report: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit report: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _submitReport,
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
-    }
   }
 }

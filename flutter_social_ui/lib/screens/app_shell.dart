@@ -7,6 +7,7 @@ import 'package:flutter_social_ui/screens/profile_screen.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_social_ui/screens/search_screen_new.dart';
 import 'package:flutter_social_ui/screens/notifications_screen_new.dart';
+import 'package:flutter_social_ui/services/analytics_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -31,6 +32,14 @@ class _AppShellState extends State<AppShell> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+    });
+    
+    // Track tab navigation
+    final screenNames = ['Home', 'Search', 'Create', 'Notifications', 'Profile'];
+    AnalyticsService().trackEvent(AnalyticsEvents.tabSwitch, {
+      'from_tab': screenNames[_selectedIndex],
+      'to_tab': screenNames[index],
+      'tab_index': index,
     });
   }
 

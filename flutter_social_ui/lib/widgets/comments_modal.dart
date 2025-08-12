@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/comment.dart';
+import '../models/post_model.dart';
 import '../services/comment_service.dart';
 import '../services/auth_service.dart';
+import '../services/ai_comment_suggestion_service.dart';
+import '../services/analytics_service.dart';
 import 'comment_tile.dart';
+import 'user_avatar.dart';
+import 'ai_comment_suggestion_widget.dart';
 
 Future<void> openCommentsModal(
   BuildContext context, {
   required String postId,
+  PostModel? post,
   List<Comment>? initial,
   Function(int)? onCommentCountChanged,
 }) async {
@@ -19,6 +25,7 @@ Future<void> openCommentsModal(
     builder: (ctx) {
       return _CommentsSheet(
         postId: postId,
+        post: post,
         initialComments: initial ?? [],
         onCommentCountChanged: onCommentCountChanged,
       );
@@ -28,12 +35,14 @@ Future<void> openCommentsModal(
 
 class _CommentsSheet extends StatefulWidget {
   final String postId;
+  final PostModel? post;
   final List<Comment> initialComments;
   final Function(int)? onCommentCountChanged;
   
   const _CommentsSheet({
     super.key,
     required this.postId,
+    this.post,
     required this.initialComments,
     this.onCommentCountChanged,
   });
@@ -53,10 +62,13 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   final FocusNode _focusNode = FocusNode();
   final CommentService _commentService = CommentService();
   final AuthService _authService = AuthService();
+  final AICommentSuggestionService _aiSuggestionService = AICommentSuggestionService();
   
   List<Comment> _comments = [];
+  List<AICommentSuggestion> _aiSuggestions = [];
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isLoadingAISuggestions = false;
   String? _errorMessage;
   CommentSortOrder _sortOrder = CommentSortOrder.newest;
 
@@ -68,6 +80,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       _loadComments();
     } else {
       _isLoading = false;
+    }
+    
+    // Load AI suggestions if we have a post
+    if (widget.post != null) {
+      _loadAISuggestions();
     }
   }
 
@@ -115,6 +132,35 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         debugPrint('🔍 This appears to be a type casting/null value issue');
         debugPrint('Check database for NULL values in required fields');
       }
+    }
+  }
+
+  Future<void> _loadAISuggestions() async {
+    if (widget.post == null) return;
+
+    setState(() {
+      _isLoadingAISuggestions = true;
+    });
+
+    try {
+      final suggestions = await _aiSuggestionService.generateSuggestions(
+        postId: widget.postId,
+        post: widget.post!,
+        existingComments: _comments,
+        maxSuggestions: 2,
+      );
+
+      setState(() {
+        _aiSuggestions = suggestions;
+        _isLoadingAISuggestions = false;
+      });
+
+      debugPrint('💡 Loaded ${suggestions.length} AI suggestions');
+    } catch (e) {
+      setState(() {
+        _isLoadingAISuggestions = false;
+      });
+      debugPrint('❌ Error loading AI suggestions: $e');
     }
   }
 
@@ -394,6 +440,46 @@ class _CommentsSheetState extends State<_CommentsSheet> {
     }
   }
 
+  Future<void> _handleAcceptAISuggestion(AICommentSuggestion suggestion) async {
+    try {
+      final comment = await _aiSuggestionService.acceptSuggestion(suggestion);
+      if (comment != null) {
+        setState(() {
+          _comments.insert(0, comment);
+          _aiSuggestions.removeWhere((s) => s.id == suggestion.id);
+        });
+
+        // Notify parent about comment count change
+        widget.onCommentCountChanged?.call(_comments.length);
+        
+        // Apply current sorting
+        _sortComments();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to accept AI suggestion: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleDeclineAISuggestion(AICommentSuggestion suggestion) {
+    _aiSuggestionService.declineSuggestion(suggestion);
+    setState(() {
+      _aiSuggestions.removeWhere((s) => s.id == suggestion.id);
+    });
+  }
+
+  void _handleAllAISuggestionsDismissed() {
+    setState(() {
+      _aiSuggestions.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -479,9 +565,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: Row(
                     children: [
-                      const CircleAvatar(
+                      UserAvatar(
+                        user: _authService.currentUser,
                         radius: 16,
-                        backgroundImage: AssetImage('assets/images/p.jpg'),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -554,6 +640,16 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                // AI Suggestions
+                if (_aiSuggestions.isNotEmpty) ...[
+                  AICommentSuggestionsContainer(
+                    suggestions: _aiSuggestions,
+                    onAccept: _handleAcceptAISuggestion,
+                    onDecline: _handleDeclineAISuggestion,
+                    onAllDismissed: _handleAllAISuggestionsDismissed,
+                  ),
+                ],
+
                 // List
                 Expanded(
                   child: _buildCommentsList(scrollController),
@@ -868,9 +964,9 @@ class _RepliesSheetState extends State<_RepliesSheet> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                   child: Row(
                     children: [
-                      const CircleAvatar(
+                      UserAvatar(
+                        user: _authService.currentUser,
                         radius: 16,
-                        backgroundImage: AssetImage('assets/images/p.jpg'),
                       ),
                       const SizedBox(width: 10),
                       Expanded(

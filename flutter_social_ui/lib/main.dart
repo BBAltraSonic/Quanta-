@@ -8,6 +8,7 @@ import 'package:flutter_social_ui/services/offline_service.dart';
 import 'package:flutter_social_ui/services/enhanced_video_service.dart';
 import 'package:flutter_social_ui/services/content_moderation_service.dart';
 import 'package:flutter_social_ui/services/user_safety_service.dart';
+import 'package:flutter_social_ui/services/analytics_service.dart';
 
 
 
@@ -29,6 +30,7 @@ void main() async {
     EnhancedVideoService().initialize(),
     ContentModerationService().initialize(),
     UserSafetyService().initialize(),
+    AnalyticsService().initialize(),
   ]);
 
   runApp(const MyApp());

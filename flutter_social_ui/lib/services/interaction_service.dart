@@ -6,6 +6,7 @@ import '../config/app_config.dart';
 import '../config/db_config.dart';
 import 'auth_service.dart';
 import 'error_handling_service.dart';
+import 'analytics_service.dart';
 
 /// Service for handling social interactions like likes, comments, shares, and saves
 class InteractionService {
@@ -14,6 +15,7 @@ class InteractionService {
   InteractionService._internal();
 
   final AuthService _authService = AuthService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   final SupabaseClient _supabase = Supabase.instance.client;
   
   // Liked posts storage

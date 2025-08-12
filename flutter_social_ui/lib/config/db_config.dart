@@ -14,6 +14,7 @@ class DbConfig {
   static const String viewEventsTable = 'view_events';
   static const String reportsTable = 'reports';
   static const String userBlocksTable = 'user_blocks';
+  static const String userMutesTable = 'user_mutes';
   
   // Storage buckets
   static const String avatarsBucket = 'avatars';
@@ -35,6 +36,12 @@ class DbConfig {
   static const String harassmentReport = 'harassment';
   static const String copyrightReport = 'copyright';
   static const String otherReport = 'other';
+  
+  // Content types for reporting
+  static const String postContentType = 'post';
+  static const String commentContentType = 'comment';
+  static const String messageContentType = 'message';
+  static const String profileContentType = 'profile';
   
   // Report statuses
   static const String pendingReport = 'pending';
@@ -71,12 +78,26 @@ class DbConfig {
   static const double significantWatchPercentage = 0.3;
   
   // Analytics events
-  static const String playEvent = 'play';
-  static const String pauseEvent = 'pause';
-  static const String seekEvent = 'seek';
-  static const String likeEvent = 'like';
-  static const String commentEvent = 'comment';
-  static const String shareEvent = 'share';
+  static const String playEvent = 'video_play';
+  static const String pauseEvent = 'video_pause';
+  static const String seekEvent = 'video_seek';
+  static const String likeEvent = 'like_toggle';
+  static const String commentEvent = 'comment_add';
+  static const String shareEvent = 'share_attempt';
   static const String downloadEvent = 'download';
-  static const String reportEvent = 'report';
+  static const String reportEvent = 'report_content';
+  
+  // Additional analytics events
+  static const String postViewEvent = 'post_view';
+  static const String bookmarkEvent = 'bookmark_toggle';
+  static const String followEvent = 'follow_toggle';
+  static const String commentModalEvent = 'comment_modal_open';
+  static const String screenViewEvent = 'screen_view';
+  
+  // Mute durations (in minutes)
+  static const int muteDuration15Min = 15;
+  static const int muteDuration1Hour = 60;
+  static const int muteDuration24Hours = 1440;
+  static const int muteDuration7Days = 10080;
+  static const int? muteDurationIndefinite = null;
 }

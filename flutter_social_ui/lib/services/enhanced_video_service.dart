@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/db_config.dart';
+import 'analytics_service.dart';
 
 /// Enhanced video service with advanced playback controls and analytics
 class EnhancedVideoService {
@@ -19,7 +20,10 @@ class EnhancedVideoService {
   double _volume = 1.0;
   String? _currentlyPlayingUrl;
   
-  // Event callbacks
+  // Analytics service
+  final AnalyticsService _analyticsService = AnalyticsService();
+  
+  // Event callbacks (deprecated - use analytics service instead)
   Function(String url, String event, Map<String, dynamic> data)? onAnalyticsEvent;
   
   /// Initialize video service
@@ -385,7 +389,18 @@ class EnhancedVideoService {
 
   /// Track analytics event
   void _trackEvent(String videoUrl, String event, Map<String, dynamic> data) {
+    // Use analytics service for proper tracking
+    _analyticsService.trackVideoEvent(event, _getPostIdFromUrl(videoUrl), data);
+    
+    // Also call legacy callback if set
     onAnalyticsEvent?.call(videoUrl, event, data);
+  }
+  
+  /// Extract post ID from video URL (simple implementation)
+  String _getPostIdFromUrl(String videoUrl) {
+    // In a real implementation, you'd have a proper mapping
+    // For now, use the URL as a fallback identifier
+    return videoUrl.hashCode.toString();
   }
 
   /// Dispose all controllers

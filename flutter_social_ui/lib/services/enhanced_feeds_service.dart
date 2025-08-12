@@ -5,6 +5,8 @@ import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../models/comment.dart';
 import '../services/auth_service.dart';
+import '../services/user_safety_service.dart';
+import '../services/analytics_service.dart';
 import '../config/db_config.dart';
 
 /// Enhanced feeds service with comprehensive post interaction functionality
@@ -14,18 +16,21 @@ class EnhancedFeedsService {
   EnhancedFeedsService._internal();
 
   final AuthService _authService = AuthService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   SupabaseClient get _supabase => Supabase.instance.client;
   
   // Realtime subscriptions
   final Map<String, RealtimeChannel> _realtimeSubscriptions = {};
 
-  /// Get video posts for the feed with pagination
+  /// Get video posts for the feed with pagination and safety filtering
   Future<List<PostModel>> getVideoFeed({
     int page = 0,
     int limit = DbConfig.defaultPageSize,
     bool orderByTrending = true,
+    bool applySafetyFiltering = true,
   }) async {
     try {
+      // Base query without safety subqueries (to avoid SQL syntax errors)
       PostgrestFilterBuilder<PostgrestList> query = _supabase
           .from(DbConfig.postsTable)
           .select('*')
@@ -46,7 +51,15 @@ class EnhancedFeedsService {
       final response = await orderedQuery
           .range(page * limit, (page + 1) * limit - 1);
 
-      return response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
+      var posts = response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
+
+      // Apply client-side safety filtering
+      if (applySafetyFiltering) {
+        posts = await UserSafetyService().filterContent(posts);
+      }
+      
+      debugPrint('📱 Retrieved ${posts.length} posts for feed (page $page, safety filtering: $applySafetyFiltering)');
+      return posts;
     } catch (e) {
       debugPrint('❌ Failed to get video feed: $e');
       return [];
@@ -132,6 +145,9 @@ class EnhancedFeedsService {
           throw Exception('Failed to unlike post: ${result['error']}');
         }
 
+        // Track analytics
+        _analyticsService.trackLikeToggle(postId, false);
+
         return false;
       } else {
         // Like using RPC function
@@ -145,6 +161,9 @@ class EnhancedFeedsService {
 
         // Create notification for post owner
         await _createLikeNotification(postId, userId);
+        
+        // Track analytics
+        _analyticsService.trackLikeToggle(postId, true);
         
         return true;
       }
@@ -219,6 +238,9 @@ class EnhancedFeedsService {
             .eq('avatar_id', avatarId)
             .eq('user_id', userId);
         
+        // Track analytics
+        _analyticsService.trackFollowToggle(avatarId, false);
+        
         return false;
       } else {
         // Follow
@@ -230,6 +252,9 @@ class EnhancedFeedsService {
         
         // Create notification for avatar owner
         await _createFollowNotification(avatarId, userId);
+        
+        // Track analytics
+        _analyticsService.trackFollowToggle(avatarId, true);
         
         return true;
       }
@@ -318,8 +343,12 @@ class EnhancedFeedsService {
       
       // Create notification for post owner
       await _createCommentNotification(postId, userId);
+      
+      // Track analytics
+      final comment = Comment.fromJson(response);
+      _analyticsService.trackCommentAdd(postId, comment.id!, commentLength: text.length);
 
-      return Comment.fromJson(response);
+      return comment;
     } catch (e) {
       debugPrint('❌ Failed to add comment: $e');
       return null;
@@ -419,6 +448,9 @@ class EnhancedFeedsService {
             .eq('post_id', postId)
             .eq('user_id', userId);
         
+        // Track analytics
+        _analyticsService.trackBookmarkToggle(postId, false);
+        
         return false;
       } else {
         // Add bookmark
@@ -427,6 +459,9 @@ class EnhancedFeedsService {
           'user_id': userId,
           'created_at': DateTime.now().toIso8601String(),
         });
+        
+        // Track analytics
+        _analyticsService.trackBookmarkToggle(postId, true);
         
         return true;
       }
@@ -474,6 +509,9 @@ class EnhancedFeedsService {
 
       // Update shares count
       await _incrementSharesCount(postId);
+      
+      // Track analytics
+      _analyticsService.trackShareAttempt(postId, platform ?? 'unknown', successful: true);
 
       return true;
     } catch (e) {
@@ -549,6 +587,94 @@ class EnhancedFeedsService {
       return true;
     } catch (e) {
       debugPrint('❌ Failed to unblock user: $e');
+      return false;
+    }
+  }
+
+  /// Mute a user
+  Future<bool> muteUser(String mutedUserId, {Duration? duration}) async {
+    final userId = _authService.currentUserId;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    if (userId == mutedUserId) {
+      throw Exception('Cannot mute yourself');
+    }
+
+    try {
+      await _supabase.from(DbConfig.userMutesTable).upsert({
+        'muter_user_id': userId,
+        'muted_user_id': mutedUserId,
+        'muted_at': DateTime.now().toIso8601String(),
+        'duration_minutes': duration?.inMinutes,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      debugPrint('✅ User muted: $mutedUserId for ${duration?.toString() ?? 'indefinitely'}');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Failed to mute user: $e');
+      return false;
+    }
+  }
+
+  /// Unmute a user
+  Future<bool> unmuteUser(String mutedUserId) async {
+    final userId = _authService.currentUserId;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      await _supabase
+          .from(DbConfig.userMutesTable)
+          .delete()
+          .eq('muter_user_id', userId)
+          .eq('muted_user_id', mutedUserId);
+
+      debugPrint('✅ User unmuted: $mutedUserId');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Failed to unmute user: $e');
+      return false;
+    }
+  }
+
+  /// Check if a user is muted
+  Future<bool> isUserMuted(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return false;
+
+    try {
+      // Use the database function that includes automatic cleanup
+      final response = await _supabase.rpc('is_user_muted', params: {
+        'muter_id': currentUserId,
+        'muted_id': userId,
+      });
+
+      return response == true;
+    } catch (e) {
+      debugPrint('❌ Error checking if user is muted: $e');
+      return false;
+    }
+  }
+
+  /// Check if a user is blocked
+  Future<bool> isUserBlocked(String userId) async {
+    final currentUserId = _authService.currentUserId;
+    if (currentUserId == null) return false;
+
+    try {
+      // Use the database function for consistency
+      final response = await _supabase.rpc('is_user_blocked', params: {
+        'blocker_id': currentUserId,
+        'blocked_id': userId,
+      });
+
+      return response == true;
+    } catch (e) {
+      debugPrint('❌ Error checking if user is blocked: $e');
       return false;
     }
   }

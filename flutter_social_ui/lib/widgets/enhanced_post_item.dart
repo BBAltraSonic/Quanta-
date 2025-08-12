@@ -537,6 +537,7 @@ class _EnhancedPostItemState extends State<EnhancedPostItem>
                 openCommentsModal(
                   context,
                   postId: widget.post.id,
+                  post: widget.post,
                 );
                           },
                       child: _iconWithCounter(

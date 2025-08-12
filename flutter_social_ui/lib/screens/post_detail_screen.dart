@@ -11,6 +11,9 @@ import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/services/user_safety_service.dart';
+import 'package:flutter_social_ui/services/chat_validation_service.dart';
+import 'package:flutter_social_ui/widgets/report_content_dialog.dart';
+import 'package:flutter_social_ui/services/analytics_service.dart';
 
 
 
@@ -33,6 +36,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final EnhancedVideoService _videoService = EnhancedVideoService();
   final ShareService _shareService = ShareService();
+  final ChatValidationService _chatValidationService = ChatValidationService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   
   // State for interactions
   Map<String, bool> _likedStatus = {};
@@ -86,17 +91,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
   
   void _trackAnalyticsEvent(String postId, String event, Map<String, dynamic> data) {
-    // Track analytics events
-    debugPrint('Analytics: $event for post $postId with data: $data');
-    
-    // In a real app, you would send this to your analytics service
-    // For now, we'll just log it
+    // Track analytics events using the analytics service
     try {
-      // Example: Analytics.track(event, {
-      //   'post_id': postId,
-      //   'timestamp': DateTime.now().toIso8601String(),
-      //   ...data,
-      // });
+      _analyticsService.trackEvent(event, {
+        'post_id': postId,
+        ...data,
+      });
     } catch (e) {
       debugPrint('Failed to track analytics event: $e');
     }
@@ -284,12 +284,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       });
 
       // Track analytics
-      _trackAnalyticsEvent(post.id, 'like_toggle', {
-        'liked': newLikedStatus,
-        'post_type': post.type.toString(),
-        'author_id': post.avatarId,
-        'likes_count': post.likesCount + (newLikedStatus ? 1 : -1),
-      });
+      _analyticsService.trackLikeToggle(
+        post.id, 
+        newLikedStatus,
+        postType: post.type.toString(),
+        authorId: post.avatarId,
+        likesCount: post.likesCount + (newLikedStatus ? 1 : -1),
+      );
     } catch (e) {
       debugPrint('Error liking post: $e');
       // Show error feedback
@@ -304,11 +305,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   void _onPostComment(PostModel post) {
     // Track analytics for comment modal open
-    _trackAnalyticsEvent(post.id, 'comment_modal_open', {
-      'post_type': post.type.toString(),
-      'author_id': post.avatarId,
-      'current_comments_count': post.commentsCount,
-    });
+    _analyticsService.trackCommentModalOpen(
+      post.id,
+      postType: post.type.toString(),
+      authorId: post.avatarId,
+      commentsCount: post.commentsCount,
+    );
 
     openCommentsModal(
       context, 
@@ -489,14 +491,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               title: const Text('Chat', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ChatScreen(
-                      name: avatar.name,
-                      avatar: avatar.avatarImageUrl ?? '', // Let ChatScreen handle missing avatars
-                    ),
-                  ),
-                );
+                _onAvatarChat(post, avatar);
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
@@ -543,6 +538,123 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  void _onAvatarChat(PostModel post, AvatarModel avatar) async {
+    try {
+      // First, perform basic validation without network calls
+      final basicValidation = _chatValidationService.validateBasicRequirements(post.avatarId);
+      
+      if (!basicValidation.isValid) {
+        _showChatValidationTooltip(basicValidation.errorType!, basicValidation.errorMessage!);
+        return;
+      }
+
+      // Show loading indicator while performing full validation
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: kCardColor,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: kPrimaryColor),
+              SizedBox(height: 16),
+              Text(
+                'Connecting to ${avatar.name}...',
+                style: kBodyTextStyle,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Perform full validation
+      final validation = await _chatValidationService.validateChatAvailability(post.avatarId);
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (validation.isValid) {
+        // Navigation is valid, proceed to chat
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              name: avatar.name,
+              avatar: avatar.avatarImageUrl ?? '',
+              avatarId: post.avatarId, // Pass the avatar ID for proper functionality
+            ),
+          ),
+        );
+
+        // Track analytics
+        _trackAnalyticsEvent(post.id, 'chat_started', {
+          'avatar_id': post.avatarId,
+          'avatar_name': avatar.name,
+        });
+      } else {
+        // Validation failed, show error
+        _showChatValidationTooltip(validation.errorType!, validation.errorMessage!);
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      debugPrint('Error validating chat: $e');
+      _showChatValidationTooltip(
+        ChatValidationErrorType.unknown,
+        'Unable to start chat. Please try again.',
+      );
+    }
+  }
+
+  void _showChatValidationTooltip(ChatValidationErrorType errorType, String errorMessage) {
+    final tooltip = _chatValidationService.getErrorTooltip(errorType);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    tooltip,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (errorMessage != tooltip)
+                    Text(
+                      errorMessage,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.grey[800],
+        duration: Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
   void _toggleVolume() {
     setState(() {
       _isMuted = !_isMuted;
@@ -572,10 +684,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _onPostShare(PostModel post) async {
     try {
       // Track analytics first
-      _trackAnalyticsEvent(post.id, 'share_attempt', {
-        'post_type': post.type.toString(),
-        'share_method': 'system_share',
-      });
+      _analyticsService.trackShareAttempt(
+        post.id,
+        'system_share',
+        postType: post.type.toString(),
+        successful: null, // Will be updated after share attempt
+      );
 
       // Get avatar info for sharing
       final avatar = _avatarCache[post.avatarId];
@@ -587,6 +701,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       
       // Record the share in database
       await _feedsService.sharePost(post.id, platform: 'native_share');
+      
+      // Track successful share
+      _analyticsService.trackShareAttempt(
+        post.id,
+        'system_share',
+        postType: post.type.toString(),
+        successful: true,
+      );
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -621,10 +743,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       );
 
       // Track analytics
-      _trackAnalyticsEvent(post.id, 'bookmark_toggle', {
-        'bookmarked': newBookmarkedStatus,
-        'post_type': post.type.toString(),
-      });
+      _analyticsService.trackBookmarkToggle(
+        post.id,
+        newBookmarkedStatus,
+        postType: post.type.toString(),
+      );
     } catch (e) {
       debugPrint('Error toggling bookmark: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -815,22 +938,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  // Left: back button if single post, search if feed
-                  GestureDetector(
-                    onTap: () {
-                      if (widget.postId != null || widget.initialPost != null) {
-                        Navigator.of(context).pop();
-                      } else {
-                        // Handle search
-                      }
-                    },
-                    child: OverlayIcon(
-                      assetPath: widget.postId != null || widget.initialPost != null 
-                          ? 'assets/icons/round-alt-arrow-left-svgrepo-com.svg'
-                          : 'assets/icons/magnifer-svgrepo-com.svg',
-                      size: 40,
+                  // Left: back button if single post, brand text if feed
+                  if (widget.postId != null || widget.initialPost != null)
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const OverlayIcon(
+                        assetPath: 'assets/icons/round-alt-arrow-left-svgrepo-com.svg',
+                        size: 40,
+                      ),
+                    )
+                  else
+                    const Text(
+                      'Quanta',
+                      style: TextStyle(
+                        color: Color.fromRGBO(0, 0, 0, 0.2),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
                   const Spacer(),
                   // Right: volume and menu dots
                   GestureDetector(

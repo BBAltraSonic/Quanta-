@@ -159,13 +159,19 @@ class PostItem extends StatelessWidget {
                     onTap:
                         onAvatarTap ??
                         () {
-                          // Fallback navigation to avatar chat
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(
-                                name: author,
-                                avatar: '', // Let ChatScreen handle missing avatars
+                          // Fallback when no proper avatar tap handler is provided
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.white, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Chat not available - avatar data unavailable'),
+                                ],
                               ),
+                              backgroundColor: Colors.grey[800],
+                              duration: Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         },

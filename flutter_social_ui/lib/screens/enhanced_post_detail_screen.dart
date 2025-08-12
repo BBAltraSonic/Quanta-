@@ -7,6 +7,7 @@ import '../screens/chat_screen.dart';
 import '../widgets/comments_modal.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
+import '../services/analytics_service.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../config/db_config.dart';
@@ -453,6 +454,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
           builder: (context) => ChatScreen(
             name: avatar.name,
             avatar: avatar.avatarImageUrl ?? 'assets/images/p.jpg',
+            avatarId: avatar.id,
           ),
         ),
       );
@@ -674,11 +676,15 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   // ===== VIDEO ANALYTICS =====
 
   void _trackAnalyticsEvent(String postId, String event, Map<String, dynamic> data) {
-    // Record analytics event
-    debugPrint('Analytics: $event for post $postId with data: $data');
-    
-    // In a real app, you would send this to your analytics service
-    // Example: Analytics.track(event, {'post_id': postId, ...data});
+    // Record analytics event using analytics service
+    try {
+      AnalyticsService().trackEvent(event, {
+        'post_id': postId,
+        ...data,
+      });
+    } catch (e) {
+      debugPrint('Failed to track analytics event: $e');
+    }
   }
 
   void _onVideoViewStarted(String postId) {
@@ -1151,7 +1157,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            if (widget.postId != null || widget.initialPost != null) ...[
+            if (widget.postId != null || widget.initialPost != null)
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
@@ -1165,25 +1171,16 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
                     color: Colors.white,
                   ),
                 ),
-              ),
-            ] else ...[
-              GestureDetector(
-                onTap: () {
-                  // Open search or navigate to search screen
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.search,
-                    color: Colors.white,
-                  ),
+              )
+            else
+              const Text(
+                'Quanta',
+                style: TextStyle(
+                  color: Color.fromRGBO(0, 0, 0, 0.2),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
             Row(
               children: [
                 GestureDetector(
