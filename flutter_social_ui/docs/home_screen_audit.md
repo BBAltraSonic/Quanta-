@@ -85,13 +85,13 @@
    - Add/verify Postgres functions: `increment_view_count`, `increment_likes_count`, `decrement_likes_count` with RLS-safe security definer.
    - Add integration tests that call these RPCs from the app to prevent regressions.
 
-5) Comment composer avatar
+5) Comment composer avatar - Done ✌
    - Load current user’s `profile_image_url` from `users` and display in composer instead of hardcoded asset.
 
-6) Top-left action
+6) Top-left action - Done ✌
    - When on Home feed, tap should push `SearchScreenNew` (consistent with bottom tab) to avoid a dead control.
 
-7) Progress indicator
+7) Progress indicator  - Done ✌
    - Remove the hardcoded 0.7; connect to `EnhancedVideoService` playback position and duration for each item.
 
 ### Phase 2: Improve parity with PRD and durability

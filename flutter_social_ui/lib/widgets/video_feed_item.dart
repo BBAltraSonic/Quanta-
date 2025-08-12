@@ -6,6 +6,8 @@ import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../widgets/feeds_video_player.dart';
+import 'package:video_player/video_player.dart';
+import '../services/enhanced_video_service.dart';
 import '../widgets/comments_modal.dart';
 import '../constants.dart';
 
@@ -48,6 +50,9 @@ class _VideoFeedItemState extends State<VideoFeedItem>
   late AnimationController _likeAnimationController;
   late Animation<double> _likeAnimation;
   bool _showLikeAnimation = false;
+  final EnhancedVideoService _videoService = EnhancedVideoService();
+  Duration _lastPosition = Duration.zero;
+  Duration _lastDuration = Duration.zero;
 
   @override
   void initState() {
@@ -342,6 +347,17 @@ class _VideoFeedItemState extends State<VideoFeedItem>
           isActive: widget.isActive,
           onDoubleTap: _handleDoubleTap,
           onPlayStateChanged: widget.onPlayStateChanged,
+          onPositionChanged: (pos) {
+            // Update position and duration for progress computation
+            if (!mounted) return;
+            setState(() {
+              _lastPosition = pos;
+              final controller = _videoService.getVideoController(widget.post.videoUrl!);
+              if (controller != null && controller.value.isInitialized) {
+                _lastDuration = controller.value.duration;
+              }
+            });
+          },
         ),
       );
     } else if (hasImage) {
@@ -484,21 +500,26 @@ class _VideoFeedItemState extends State<VideoFeedItem>
           child: _buildCaptionOverlay(),
         ),
 
-        // Bottom progress bar (visual cue similar to reference)
-        Positioned(
-          left: 6,
-          right: 6,
-          bottom: 76,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: 0.7, // TODO: bind to actual playback progress
-              minHeight: 3,
-              backgroundColor: Colors.white.withOpacity(0.15),
-              valueColor: const AlwaysStoppedAnimation<Color>(kPrimaryColor),
+        // Bottom progress bar bound to actual playback progress
+        if (widget.post.videoUrl != null &&
+            widget.post.videoUrl!.isNotEmpty &&
+            _lastDuration.inMilliseconds > 0)
+          Positioned(
+            left: 6,
+            right: 6,
+            bottom: 76,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: (_lastPosition.inMilliseconds /
+                        _lastDuration.inMilliseconds)
+                    .clamp(0.0, 1.0),
+                minHeight: 3,
+                backgroundColor: Colors.white.withOpacity(0.15),
+                valueColor: const AlwaysStoppedAnimation<Color>(kPrimaryColor),
+              ),
             ),
           ),
-        ),
 
         // Like animation
         if (_showLikeAnimation)

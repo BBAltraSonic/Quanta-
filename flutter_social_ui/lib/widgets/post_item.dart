@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/widgets/video_player_widget.dart';
+// import removed: legacy player replaced by EnhancedVideoPlayer
+import 'package:video_player/video_player.dart';
+import 'package:flutter_social_ui/services/enhanced_video_service.dart';
 
 
 class PostItem extends StatelessWidget {
@@ -78,13 +80,11 @@ class PostItem extends StatelessWidget {
         // Edge-to-edge media with video/image support
         Positioned.fill(
           child: isVideo && videoUrl != null
-              ? VideoPlayerWidget(
-                  videoUrl: videoUrl,
-                  fallbackImageUrl: imageUrl,
-                  isPlaying: true, // Auto-play for feeds
-                  onTap: () {
-                    // Handle video tap
-                  },
+              ? EnhancedVideoPlayer(
+                  videoUrl: videoUrl!,
+                  autoPlay: true,
+                  isActive: true,
+                  showControls: false,
                 )
               : imageUrl.isNotEmpty && imageUrl.startsWith('http')
                   ? Image.network(
@@ -282,21 +282,39 @@ class PostItem extends StatelessWidget {
           ),
         ),
 
-        // Progress indicator
-        Positioned(
-          left: 4,
-          right: 4,
-          bottom: 74, // keep progress bar aligned beneath the lowered section
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: 0.7,
-              minHeight: 3,
-              backgroundColor: Colors.white.withOpacity(0.15),
-              valueColor: const AlwaysStoppedAnimation<Color>(kPrimaryColor),
+        // Progress indicator bound to actual playback when available
+        if (isVideo && videoUrl != null)
+          Positioned(
+            left: 4,
+            right: 4,
+            bottom: 74, // keep progress bar aligned beneath the lowered section
+            child: Builder(
+              builder: (context) {
+                final controller = EnhancedVideoService().getVideoController(videoUrl!);
+                if (controller == null || !controller.value.isInitialized) {
+                  return const SizedBox.shrink();
+                }
+
+                return ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: controller,
+                  builder: (context, value, child) {
+                    final progress = value.duration.inMilliseconds > 0
+                        ? value.position.inMilliseconds / value.duration.inMilliseconds
+                        : 0.0;
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: progress.clamp(0.0, 1.0),
+                        minHeight: 3,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        valueColor: const AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
-        ),
       ],
     );
   }
