@@ -6,6 +6,8 @@ class CommentTile extends StatelessWidget {
   final VoidCallback? onLike;
   final VoidCallback? onReply;
   final VoidCallback? onViewReplies;
+  final VoidCallback? onDelete;
+  final bool showDeleteOption;
 
   const CommentTile({
     super.key,
@@ -13,6 +15,8 @@ class CommentTile extends StatelessWidget {
     this.onLike,
     this.onReply,
     this.onViewReplies,
+    this.onDelete,
+    this.showDeleteOption = false,
   });
 
   String _timeAgo(DateTime dt) {
@@ -43,7 +47,7 @@ class CommentTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name + time
+                // Name + time + delete option
                 Row(
                   children: [
                     Expanded(
@@ -54,6 +58,20 @@ class CommentTile extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (showDeleteOption && onDelete != null)
+                      InkWell(
+                        onTap: onDelete,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.delete_outline,
+                            size: 16,
+                            color: Colors.red.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
                     Text(
                       _timeAgo(comment.createdAt),
                       style: text.bodySmall?.copyWith(
@@ -80,16 +98,16 @@ class CommentTile extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.favorite_border,
+                            Icon(
+                              comment.hasLiked ? Icons.favorite : Icons.favorite_border,
                               size: 16,
-                              color: Colors.white70,
+                              color: comment.hasLiked ? Colors.red : Colors.white70,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '${comment.likes}',
                               style: text.bodySmall?.copyWith(
-                                color: Colors.white70,
+                                color: comment.hasLiked ? Colors.red : Colors.white70,
                               ),
                             ),
                           ],

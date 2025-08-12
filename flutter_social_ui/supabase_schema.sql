@@ -129,6 +129,17 @@ CREATE TABLE public.likes (
     UNIQUE(user_id, post_id)
 );
 
+-- Comment likes table (users liking comments)
+CREATE TABLE public.comment_likes (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    comment_id UUID REFERENCES public.comments(id) ON DELETE CASCADE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Unique constraint to prevent duplicate likes
+    UNIQUE(user_id, comment_id)
+);
+
 -- Create indexes for better performance
 CREATE INDEX idx_users_username ON public.users(username);
 CREATE INDEX idx_users_email ON public.users(email);
@@ -145,6 +156,8 @@ CREATE INDEX idx_follows_user ON public.follows(user_id);
 CREATE INDEX idx_follows_avatar ON public.follows(avatar_id);
 CREATE INDEX idx_likes_user ON public.likes(user_id);
 CREATE INDEX idx_likes_post ON public.likes(post_id);
+CREATE INDEX idx_comment_likes_user ON public.comment_likes(user_id);
+CREATE INDEX idx_comment_likes_comment ON public.comment_likes(comment_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -182,6 +195,7 @@ ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comment_likes ENABLE ROW LEVEL SECURITY;
 
 -- Users policies
 CREATE POLICY "Users can view their own profile" ON public.users
@@ -294,6 +308,16 @@ CREATE POLICY "Users can create their own likes" ON public.likes
 CREATE POLICY "Users can delete their own likes" ON public.likes
     FOR DELETE USING (auth.uid() = user_id);
 
+-- Comment likes policies
+CREATE POLICY "Users can view all comment likes" ON public.comment_likes
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can create their own comment likes" ON public.comment_likes
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own comment likes" ON public.comment_likes
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- Functions for updating counters (called by triggers)
 CREATE OR REPLACE FUNCTION update_avatar_stats()
 RETURNS TRIGGER AS $$
@@ -317,6 +341,13 @@ BEGIN
             WHERE id = (SELECT avatar_id FROM public.posts WHERE id = NEW.post_id);
         END IF;
         
+        -- Update likes count for comments
+        IF TG_TABLE_NAME = 'comment_likes' THEN
+            UPDATE public.comments 
+            SET likes_count = likes_count + 1 
+            WHERE id = NEW.comment_id;
+        END IF;
+        
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
         -- Update follower count for avatars
@@ -337,6 +368,13 @@ BEGIN
             WHERE id = (SELECT avatar_id FROM public.posts WHERE id = OLD.post_id);
         END IF;
         
+        -- Update likes count for comments
+        IF TG_TABLE_NAME = 'comment_likes' THEN
+            UPDATE public.comments 
+            SET likes_count = likes_count - 1 
+            WHERE id = OLD.comment_id;
+        END IF;
+        
         RETURN OLD;
     END IF;
     
@@ -351,6 +389,10 @@ CREATE TRIGGER update_avatar_followers_stats
 
 CREATE TRIGGER update_avatar_likes_stats 
     AFTER INSERT OR DELETE ON public.likes
+    FOR EACH ROW EXECUTE FUNCTION update_avatar_stats();
+
+CREATE TRIGGER update_comment_likes_stats 
+    AFTER INSERT OR DELETE ON public.comment_likes
     FOR EACH ROW EXECUTE FUNCTION update_avatar_stats();
 
 -- Storage bucket for media files

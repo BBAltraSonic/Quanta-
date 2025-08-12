@@ -4,8 +4,9 @@ class DbConfig {
   static const String postsTable = 'posts';
   static const String usersTable = 'users';
   static const String avatarsTable = 'avatars';
-  static const String likesTable = 'post_likes';
-  static const String commentsTable = 'post_comments';
+  static const String likesTable = 'likes';
+  static const String commentsTable = 'comments';
+  static const String commentLikesTable = 'comment_likes';
   static const String followsTable = 'follows';
   static const String savedPostsTable = 'saved_posts';
   static const String sharesTable = 'post_shares';

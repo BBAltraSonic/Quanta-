@@ -277,6 +277,7 @@ class _FeedsVideoPlayerState extends State<FeedsVideoPlayer>
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.error_outline,

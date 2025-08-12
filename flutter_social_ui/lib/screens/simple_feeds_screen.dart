@@ -91,6 +91,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
               Icons.error_outline,
@@ -120,6 +121,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(
               Icons.post_add,

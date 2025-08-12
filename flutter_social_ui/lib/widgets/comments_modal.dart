@@ -42,6 +42,12 @@ class _CommentsSheet extends StatefulWidget {
   State<_CommentsSheet> createState() => _CommentsSheetState();
 }
 
+enum CommentSortOrder {
+  newest,
+  oldest,
+  mostLiked,
+}
+
 class _CommentsSheetState extends State<_CommentsSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -52,6 +58,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
+  CommentSortOrder _sortOrder = CommentSortOrder.newest;
 
   @override
   void initState() {
@@ -89,12 +96,112 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
       // Notify parent about the real comment count
       widget.onCommentCountChanged?.call(_comments.length);
+      
+      // Apply current sorting
+      _sortComments();
     } catch (e) {
       setState(() {
         _isLoading = false;
         _errorMessage = 'Failed to load comments: ${e.toString()}';
       });
+      
+      // Enhanced error debugging
+      debugPrint('❌ Comments loading error details:');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error message: ${e.toString()}');
+      debugPrint('Post ID: ${widget.postId}');
+      
+      if (e.toString().contains('type cast') || e.toString().contains('Null')) {
+        debugPrint('🔍 This appears to be a type casting/null value issue');
+        debugPrint('Check database for NULL values in required fields');
+      }
     }
+  }
+
+  void _sortComments() {
+    setState(() {
+      switch (_sortOrder) {
+        case CommentSortOrder.newest:
+          _comments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          break;
+        case CommentSortOrder.oldest:
+          _comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          break;
+        case CommentSortOrder.mostLiked:
+          _comments.sort((a, b) => b.likesCount.compareTo(a.likesCount));
+          break;
+      }
+    });
+  }
+
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Sort Comments',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _SortOption(
+              title: 'Newest First',
+              isSelected: _sortOrder == CommentSortOrder.newest,
+              onTap: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _sortOrder = CommentSortOrder.newest;
+                });
+                _sortComments();
+              },
+            ),
+            _SortOption(
+              title: 'Oldest First',
+              isSelected: _sortOrder == CommentSortOrder.oldest,
+              onTap: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _sortOrder = CommentSortOrder.oldest;
+                });
+                _sortComments();
+              },
+            ),
+            _SortOption(
+              title: 'Most Liked',
+              isSelected: _sortOrder == CommentSortOrder.mostLiked,
+              onTap: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _sortOrder = CommentSortOrder.mostLiked;
+                });
+                _sortComments();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _addComment() async {
@@ -175,26 +282,111 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
   Future<void> _toggleCommentLike(Comment comment) async {
     try {
-      final success = await _commentService.toggleCommentLike(comment.id);
-      if (success) {
-        setState(() {
-          final index = _comments.indexWhere((c) => c.id == comment.id);
-          if (index != -1) {
-            _comments[index] = _comments[index].copyWith(
-              hasLiked: !_comments[index].hasLiked,
-              likesCount: _comments[index].hasLiked 
-                  ? _comments[index].likesCount - 1
-                  : _comments[index].likesCount + 1,
-            );
-          }
-        });
-        HapticFeedback.selectionClick();
-      }
+      final wasLiked = await _commentService.toggleCommentLike(comment.id);
+      setState(() {
+        final index = _comments.indexWhere((c) => c.id == comment.id);
+        if (index != -1) {
+          _comments[index] = _comments[index].copyWith(
+            hasLiked: wasLiked,
+            likesCount: wasLiked 
+                ? _comments[index].likesCount + 1
+                : _comments[index].likesCount - 1,
+          );
+        }
+      });
+      HapticFeedback.selectionClick();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to toggle like: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteComment(Comment comment) async {
+    // Show confirmation dialog
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Delete Comment', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this comment?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      try {
+        final success = await _commentService.deleteComment(comment.id);
+        if (success) {
+          setState(() {
+            _comments.removeWhere((c) => c.id == comment.id);
+          });
+          widget.onCommentCountChanged?.call(_comments.length);
+          HapticFeedback.lightImpact();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Comment deleted successfully'),
+                duration: Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete comment: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _viewReplies(Comment comment) async {
+    try {
+      final replies = await _commentService.getCommentReplies(commentId: comment.id);
+      
+      if (mounted) {
+        await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: Colors.black.withOpacity(0.7),
+          builder: (ctx) => _RepliesSheet(
+            parentComment: comment,
+            replies: replies,
+            onReplyAdded: () {
+              // Refresh the parent comment to update replies count
+              _loadComments();
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load replies: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -265,19 +457,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                                   ),
                         ),
                       ),
-                      // Filter button
+                      // Sort button
                       _RoundIconChip(
-                        icon: Icons.tune,
-                        onTap: () {
-                          // Placeholder for sort/filter options
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Filter options coming soon'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                        tooltip: 'Filter',
+                        icon: Icons.sort,
+                        onTap: _showSortOptions,
+                        tooltip: 'Sort',
                       ),
                       const SizedBox(width: 8),
                       // Close button
@@ -394,6 +578,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.error_outline,
@@ -427,6 +612,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.comment_outlined,
@@ -468,21 +654,18 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         ),
         itemBuilder: (context, index) {
           final comment = _comments[index];
+          final currentUser = _authService.currentUser;
+          final canDelete = currentUser != null && comment.userId == currentUser.id;
+          
           return CommentTile(
             comment: comment,
             onLike: () => _toggleCommentLike(comment),
             onReply: () {
               _focusNode.requestFocus();
             },
-            onViewReplies: () {
-              // TODO: Implement replies functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Replies feature coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
+            onViewReplies: comment.repliesCount > 0 ? () => _viewReplies(comment) : null,
+            onDelete: canDelete ? () => _deleteComment(comment) : null,
+            showDeleteOption: canDelete,
           );
         },
       ),
@@ -532,5 +715,343 @@ class _RoundIconChip extends StatelessWidget {
     return tooltip != null
         ? Tooltip(message: tooltip!, child: content)
         : content;
+  }
+}
+
+// Replies sheet for viewing and adding replies to a comment
+class _RepliesSheet extends StatefulWidget {
+  final Comment parentComment;
+  final List<Comment> replies;
+  final VoidCallback? onReplyAdded;
+
+  const _RepliesSheet({
+    required this.parentComment,
+    required this.replies,
+    this.onReplyAdded,
+  });
+
+  @override
+  State<_RepliesSheet> createState() => _RepliesSheetState();
+}
+
+class _RepliesSheetState extends State<_RepliesSheet> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final CommentService _commentService = CommentService();
+  final AuthService _authService = AuthService();
+  
+  List<Comment> _replies = [];
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _replies = List<Comment>.from(widget.replies);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addReply() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final newReply = await _commentService.addComment(
+        postId: widget.parentComment.postId,
+        text: text,
+        parentCommentId: widget.parentComment.id,
+      );
+
+      setState(() {
+        _replies.add(newReply);
+        _controller.clear();
+        _isSubmitting = false;
+      });
+
+      widget.onReplyAdded?.call();
+      HapticFeedback.lightImpact();
+    } catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add reply: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return AnimatedPadding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.92),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(22),
+              ),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_replies.length} Replies',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      _RoundIconChip(
+                        icon: Icons.close_rounded,
+                        onTap: () => Navigator.of(context).pop(),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Parent comment
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: CommentTile(comment: widget.parentComment),
+                ),
+                
+                const Divider(color: Colors.white24, height: 32),
+                
+                // Reply composer
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 16,
+                        backgroundImage: AssetImage('assets/images/p.jpg'),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.10),
+                            ),
+                          ),
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _controller,
+                                  focusNode: _focusNode,
+                                  maxLines: 1,
+                                  textInputAction: TextInputAction.send,
+                                  onSubmitted: (_) => _addReply(),
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: 'Add a reply...',
+                                    hintStyle: TextStyle(color: Colors.white54),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                child: Material(
+                                  color: color.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: InkWell(
+                                    onTap: _isSubmitting ? null : _addReply,
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: _isSubmitting
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.arrow_upward_rounded,
+                                              size: 18,
+                                              color: Colors.white,
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Replies list
+                Expanded(
+                  child: _replies.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No replies yet',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 16,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          controller: scrollController,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                          itemCount: _replies.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final reply = _replies[index];
+                            final currentUser = _authService.currentUser;
+                            final canDelete = currentUser != null && reply.userId == currentUser.id;
+                            
+                            return CommentTile(
+                              comment: reply,
+                              onDelete: canDelete ? () => _deleteReply(reply) : null,
+                              showDeleteOption: canDelete,
+                            );
+                          },
+                        ),
+                ),
+                SafeArea(top: false, child: SizedBox(height: 0)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteReply(Comment reply) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Delete Reply', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this reply?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      try {
+        final success = await _commentService.deleteComment(reply.id);
+        if (success) {
+          setState(() {
+            _replies.removeWhere((r) => r.id == reply.id);
+          });
+          widget.onReplyAdded?.call(); // Refresh parent
+          HapticFeedback.lightImpact();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete reply: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+}
+
+// Sort option widget for the sort modal
+class _SortOption extends StatelessWidget {
+  final String title;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SortOption({
+    required this.title,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isSelected ? Colors.blue : Colors.white,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+        ),
+      ),
+      trailing: isSelected 
+          ? const Icon(Icons.check, color: Colors.blue, size: 20)
+          : null,
+      onTap: onTap,
+    );
   }
 }

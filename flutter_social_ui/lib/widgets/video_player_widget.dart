@@ -217,6 +217,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.video_library,
@@ -243,6 +244,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
@@ -321,6 +323,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.error_outline,

@@ -26,7 +26,8 @@ class Comment {
   int get likes => likesCount;
   set likes(int value) {} // Setter for compatibility (use copyWith instead)
   
-  int get repliesCount => 0; // TODO: Implement replies counting
+  int get repliesCount => _repliesCount ?? 0;
+  int? _repliesCount;
 
   Comment({
     required this.id,
@@ -45,7 +46,8 @@ class Comment {
     this.userName,
     this.userAvatar,
     this.hasLiked = false,
-  });
+    int? repliesCount,
+  }) : _repliesCount = repliesCount;
 
   // Create new comment
   factory Comment.create({
@@ -77,21 +79,26 @@ class Comment {
   // From JSON (Supabase)
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['id'] as String,
-      postId: json['post_id'] as String,
-      userId: json['user_id'] as String?,
-      avatarId: json['avatar_id'] as String?,
-      authorId: json['user_id'] ?? json['avatar_id'] ?? '',
+      id: json['id']?.toString() ?? '',
+      postId: json['post_id']?.toString() ?? '',
+      userId: json['user_id']?.toString(),
+      avatarId: json['avatar_id']?.toString(),
+      authorId: json['user_id']?.toString() ?? json['avatar_id']?.toString() ?? '',
       authorType: json['user_id'] != null 
           ? CommentAuthorType.user 
           : CommentAuthorType.avatar,
-      text: json['text'] as String,
+      text: json['text']?.toString() ?? '',
       isAiGenerated: json['is_ai_generated'] as bool? ?? false,
-      parentCommentId: json['parent_comment_id'] as String?,
+      parentCommentId: json['parent_comment_id']?.toString(),
       likesCount: json['likes_count'] as int? ?? 0,
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'].toString()) 
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'].toString()) 
+          : DateTime.now(),
+      repliesCount: json['replies_count'] as int?,
     );
   }
 
@@ -117,6 +124,7 @@ class Comment {
     int? likesCount,
     bool? hasLiked,
     bool? isActive,
+    int? repliesCount,
   }) {
     return Comment(
       id: id,
@@ -135,6 +143,7 @@ class Comment {
       userName: userName,
       userAvatar: userAvatar,
       hasLiked: hasLiked ?? this.hasLiked,
+      repliesCount: repliesCount ?? this.repliesCount,
     );
   }
 

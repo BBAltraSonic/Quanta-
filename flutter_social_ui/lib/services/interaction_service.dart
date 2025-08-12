@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
 import '../models/comment.dart';
 import '../config/app_config.dart';
+import '../config/db_config.dart';
 import 'auth_service.dart';
 import 'error_handling_service.dart';
 
@@ -125,7 +126,7 @@ class InteractionService {
     try {
       // Check if already liked
       final existingLike = await _supabase
-          .from('post_likes')
+          .from(DbConfig.likesTable)
           .select()
           .eq('post_id', postId)
           .eq('user_id', userId)
@@ -134,14 +135,14 @@ class InteractionService {
       if (existingLike != null) {
         // Unlike
         await _supabase
-            .from('post_likes')
+            .from(DbConfig.likesTable)
             .delete()
             .eq('post_id', postId)
             .eq('user_id', userId);
         return false;
       } else {
         // Like
-        await _supabase.from('post_likes').insert({
+        await _supabase.from(DbConfig.likesTable).insert({
           'post_id': postId,
           'user_id': userId,
           'created_at': DateTime.now().toIso8601String(),
@@ -158,7 +159,7 @@ class InteractionService {
     try {
       // Check if already saved
       final existingSave = await _supabase
-          .from('saved_posts')
+          .from(DbConfig.savedPostsTable)
           .select()
           .eq('post_id', postId)
           .eq('user_id', userId)
@@ -167,14 +168,14 @@ class InteractionService {
       if (existingSave != null) {
         // Unsave
         await _supabase
-            .from('saved_posts')
+            .from(DbConfig.savedPostsTable)
             .delete()
             .eq('post_id', postId)
             .eq('user_id', userId);
         return false;
       } else {
         // Save
-        await _supabase.from('saved_posts').insert({
+        await _supabase.from(DbConfig.savedPostsTable).insert({
           'post_id': postId,
           'user_id': userId,
           'created_at': DateTime.now().toIso8601String(),
@@ -190,7 +191,7 @@ class InteractionService {
   Future<void> _sharePostSupabase(String postId, String userId, String? message) async {
     try {
       // Record the share action
-      await _supabase.from('post_shares').insert({
+      await _supabase.from(DbConfig.sharesTable).insert({
         'post_id': postId,
         'user_id': userId,
         'message': message,
@@ -205,7 +206,7 @@ class InteractionService {
 
   Future<Comment> _addCommentSupabase(String postId, String text, String userId, String? parentCommentId) async {
     try {
-      final response = await _supabase.from('comments').insert({
+      final response = await _supabase.from(DbConfig.commentsTable).insert({
         'post_id': postId,
         'user_id': userId,
         'text': text,
@@ -222,7 +223,7 @@ class InteractionService {
   Future<List<Comment>> _getCommentsSupabase(String postId, int limit, int offset) async {
     try {
       final response = await _supabase
-          .from('comments')
+          .from(DbConfig.commentsTable)
           .select()
           .eq('post_id', postId)
           .order('created_at', ascending: true)
@@ -238,7 +239,7 @@ class InteractionService {
   Future<bool> _hasLikedSupabase(String postId, String userId) async {
     try {
       final like = await _supabase
-          .from('post_likes')
+          .from(DbConfig.likesTable)
           .select()
           .eq('post_id', postId)
           .eq('user_id', userId)
@@ -254,7 +255,7 @@ class InteractionService {
   Future<bool> _hasSavedSupabase(String postId, String userId) async {
     try {
       final save = await _supabase
-          .from('saved_posts')
+          .from(DbConfig.savedPostsTable)
           .select()
           .eq('post_id', postId)
           .eq('user_id', userId)

@@ -361,6 +361,7 @@ class _VideoFeedItemState extends State<VideoFeedItem>
                 child: const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.image_not_supported,
@@ -398,6 +399,7 @@ class _VideoFeedItemState extends State<VideoFeedItem>
         child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.photo_library,

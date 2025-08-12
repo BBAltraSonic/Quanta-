@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/comment.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
+import '../config/db_config.dart';
 
 import 'auth_service.dart';
 import 'ai_service.dart';
@@ -133,6 +134,30 @@ class CommentService {
     }
   }
 
+  /// Get replies for a comment
+  Future<List<Comment>> getCommentReplies({
+    required String commentId,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      return _getCommentRepliesSupabase(commentId, limit, offset);
+    } catch (e) {
+      debugPrint('Error getting comment replies: $e');
+      return [];
+    }
+  }
+
+  /// Check if current user has liked a comment
+  Future<bool> hasUserLikedComment(String commentId) async {
+    try {
+      return _hasUserLikedCommentSupabase(commentId);
+    } catch (e) {
+      debugPrint('Error checking comment like status: $e');
+      return false;
+    }
+  }
+
 
 
   Future<String> _generateAIComment(PostModel post, AvatarModel avatar, List<Comment> existingComments) async {
@@ -241,7 +266,7 @@ class CommentService {
     }
 
     final response = await _authService.supabase
-        .from('post_comments')
+        .from(DbConfig.commentsTable)
         .insert({
           'post_id': postId,
           'user_id': user.id,
@@ -255,20 +280,72 @@ class CommentService {
   }
 
   Future<List<Comment>> _getPostCommentsSupabase(String postId, int limit, int offset) async {
-    final response = await _authService.supabase
-        .from('post_comments')
-        .select()
-        .eq('post_id', postId)
-        .order('created_at', ascending: false)
-        .limit(limit)
-        .range(offset, offset + limit - 1);
+    try {
+      debugPrint('🔍 Loading comments for post: $postId');
+      
+      // Get top-level comments first - simplified query to isolate the issue
+      final response = await _authService.supabase
+          .from(DbConfig.commentsTable)
+          .select('*')
+          .eq('post_id', postId)
+          .isFilter('parent_comment_id', null) // Only top-level comments
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-    return (response as List).map((json) => Comment.fromJson(json)).toList();
+      debugPrint('📊 Raw response from database: $response');
+
+      if (response.isEmpty) {
+        debugPrint('📝 No comments found for post $postId');
+        return [];
+      }
+
+      // Build comment objects with minimal processing first
+      List<Comment> comments = [];
+      for (final json in response) {
+        try {
+          debugPrint('🔧 Processing comment JSON: $json');
+          
+          // Validate required fields
+          if (json['id'] == null) {
+            debugPrint('⚠️ Skipping comment with null ID');
+            continue;
+          }
+          
+          if (json['text'] == null) {
+            debugPrint('⚠️ Skipping comment with null text');
+            continue;
+          }
+
+          final comment = Comment.fromJson({
+            ...json,
+            'replies_count': 0, // Start simple, no replies count for now
+          });
+
+          comments.add(comment.copyWith(hasLiked: false)); // Start simple, no likes check
+          debugPrint('✅ Successfully created comment: ${comment.id}');
+          
+        } catch (e, stackTrace) {
+          debugPrint('❌ Error parsing comment JSON: $e');
+          debugPrint('📍 Stack trace: $stackTrace');
+          debugPrint('📄 Problematic JSON: $json');
+          // Skip this comment and continue with others
+          continue;
+        }
+      }
+
+      debugPrint('✅ Successfully loaded ${comments.length} comments');
+      return comments;
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in _getPostCommentsSupabase: $e');
+      debugPrint('📍 Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<int> _getCommentCountSupabase(String postId) async {
     final response = await _authService.supabase
-        .from('post_comments')
+        .from(DbConfig.commentsTable)
         .select('id')
         .eq('post_id', postId)
         .count();
@@ -277,17 +354,109 @@ class CommentService {
   }
 
   Future<bool> _toggleCommentLikeSupabase(String commentId) async {
-    throw Exception(
-      'Comment like system is not yet fully implemented. '
-      'Please ensure Supabase database is properly configured with comment likes table.'
-    );
+    final user = _authService.currentUser;
+    final session = _authService.supabase.auth.currentSession;
+    
+    if (user == null || session == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      // Check if user already liked this comment
+      final existingLike = await _authService.supabase
+          .from(DbConfig.commentLikesTable)
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('comment_id', commentId)
+          .maybeSingle();
+
+      if (existingLike != null) {
+        // Unlike the comment
+        await _authService.supabase
+            .from(DbConfig.commentLikesTable)
+            .delete()
+            .eq('user_id', user.id)
+            .eq('comment_id', commentId);
+        return false; // Unliked
+      } else {
+        // Like the comment
+        await _authService.supabase
+            .from(DbConfig.commentLikesTable)
+            .insert({
+              'user_id': user.id,
+              'comment_id': commentId,
+            });
+        return true; // Liked
+      }
+    } catch (e) {
+      debugPrint('Error toggling comment like: $e');
+      rethrow;
+    }
   }
 
   Future<bool> _deleteCommentSupabase(String commentId) async {
-    throw Exception(
-      'Comment deletion service is not yet fully implemented. '
-      'Please ensure Supabase database is properly configured with comments table.'
-    );
+    final user = _authService.currentUser;
+    final session = _authService.supabase.auth.currentSession;
+    
+    if (user == null || session == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      // Verify user owns this comment before deleting
+      final comment = await _authService.supabase
+          .from(DbConfig.commentsTable)
+          .select('user_id')
+          .eq('id', commentId)
+          .single();
+
+      if (comment['user_id'] != user.id) {
+        throw Exception('Unauthorized: You can only delete your own comments');
+      }
+
+      // Delete the comment (cascade will handle comment_likes)
+      await _authService.supabase
+          .from(DbConfig.commentsTable)
+          .delete()
+          .eq('id', commentId)
+          .eq('user_id', user.id); // Double check for security
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting comment: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Comment>> _getCommentRepliesSupabase(String commentId, int limit, int offset) async {
+    final response = await _authService.supabase
+        .from(DbConfig.commentsTable)
+        .select()
+        .eq('parent_comment_id', commentId)
+        .order('created_at', ascending: true) // Replies should be chronological
+        .limit(limit)
+        .range(offset, offset + limit - 1);
+
+    return (response as List).map((json) => Comment.fromJson(json)).toList();
+  }
+
+  Future<bool> _hasUserLikedCommentSupabase(String commentId) async {
+    final user = _authService.currentUser;
+    if (user == null) return false;
+
+    try {
+      final response = await _authService.supabase
+          .from(DbConfig.commentLikesTable)
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('comment_id', commentId)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      debugPrint('Error checking comment like: $e');
+      return false;
+    }
   }
 
   /// Clear all cache

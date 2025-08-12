@@ -325,6 +325,7 @@ class _EnhancedPostItemState extends State<EnhancedPostItem>
                 child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
                     Icons.broken_image,

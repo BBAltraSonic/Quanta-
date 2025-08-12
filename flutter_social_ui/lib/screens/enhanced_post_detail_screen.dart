@@ -779,6 +779,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),

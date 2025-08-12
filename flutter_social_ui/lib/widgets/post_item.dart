@@ -180,9 +180,11 @@ class PostItem extends StatelessWidget {
                           child: avatarUrl == null || avatarUrl!.isEmpty || !avatarUrl!.startsWith('http')
                               ? Icon(Icons.person, color: Colors.white54, size: 16)
                               : null,
-                          onBackgroundImageError: (exception, stackTrace) {
-                            debugPrint('Error loading avatar image: $exception');
-                          },
+                          onBackgroundImageError: avatarUrl != null && avatarUrl!.isNotEmpty && avatarUrl!.startsWith('http')
+                              ? (exception, stackTrace) {
+                                  debugPrint('Error loading avatar image: $exception');
+                                }
+                              : null,
                         ),
                         // AI indicator
                         Positioned(
