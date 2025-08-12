@@ -124,29 +124,41 @@ class InteractionService {
   // Real Supabase implementations
   Future<bool> _toggleLikeSupabase(String postId, String userId) async {
     try {
-      // Check if already liked
-      final existingLike = await _supabase
-          .from(DbConfig.likesTable)
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', userId)
-          .maybeSingle();
+      // First check current status using RPC function
+      final statusResult = await _supabase.rpc('get_post_interaction_status', params: {
+        'target_post_id': postId,
+      });
 
-      if (existingLike != null) {
-        // Unlike
-        await _supabase
-            .from(DbConfig.likesTable)
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', userId);
+      if (!statusResult['success']) {
+        debugPrint('❌ Failed to get interaction status: ${statusResult['error']}');
+        return false;
+      }
+
+      final isCurrentlyLiked = statusResult['data']['user_liked'] as bool;
+
+      if (isCurrentlyLiked) {
+        // Unlike using RPC function
+        final result = await _supabase.rpc('decrement_likes_count', params: {
+          'target_post_id': postId,
+        });
+
+        if (!result['success']) {
+          debugPrint('❌ Failed to unlike post: ${result['error']}');
+          return false;
+        }
+
         return false;
       } else {
-        // Like
-        await _supabase.from(DbConfig.likesTable).insert({
-          'post_id': postId,
-          'user_id': userId,
-          'created_at': DateTime.now().toIso8601String(),
+        // Like using RPC function
+        final result = await _supabase.rpc('increment_likes_count', params: {
+          'target_post_id': postId,
         });
+
+        if (!result['success']) {
+          debugPrint('❌ Failed to like post: ${result['error']}');
+          return false;
+        }
+
         return true;
       }
     } catch (e) {

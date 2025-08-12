@@ -76,12 +76,12 @@
    - Add `share_plus` dependency and hook `PostDetailScreen._onPostShare` to use `ShareService.shareToExternal`.
    - Record shares via `EnhancedFeedsService.sharePost` to `post_shares` and increment share counters.
 
-3) Reporting and safety
+3) Reporting and safety - Done ✌
    - Replace local `UserSafetyService.reportContent` with server-side insert into `reports` table via `EnhancedFeedsService.reportPost`.
    - Wire the "Report" option in post options sheet to show `ReportContentDialog`, and submit to DB.
    - Plan follow-up to migrate block/mute to DB (Phase 2).
 
-4) View/like counters RPCs
+4) View/like counters RPCs - Done ✌
    - Add/verify Postgres functions: `increment_view_count`, `increment_likes_count`, `decrement_likes_count` with RLS-safe security definer.
    - Add integration tests that call these RPCs from the app to prevent regressions.
 

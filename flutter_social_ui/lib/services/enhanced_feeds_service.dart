@@ -103,7 +103,7 @@ class EnhancedFeedsService {
     }
   }
 
-  /// Toggle like on a post with optimistic updates
+  /// Toggle like on a post using secure RPC functions
   Future<bool> toggleLike(String postId) async {
     final userId = _authService.currentUserId;
     if (userId == null) {
@@ -111,36 +111,38 @@ class EnhancedFeedsService {
     }
 
     try {
-      // Check if already liked
-      final existingLike = await _supabase
-          .from(DbConfig.likesTable)
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', userId)
-          .maybeSingle();
+      // First check current status using RPC function
+      final statusResult = await _supabase.rpc('get_post_interaction_status', params: {
+        'target_post_id': postId,
+      });
 
-      if (existingLike != null) {
-        // Unlike - remove the like
-        await _supabase
-            .from(DbConfig.likesTable)
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', userId);
-        
-        // Update post likes count
-        await _decrementLikesCount(postId);
+      if (!statusResult['success']) {
+        throw Exception('Failed to get interaction status: ${statusResult['error']}');
+      }
+
+      final isCurrentlyLiked = statusResult['data']['user_liked'] as bool;
+
+      if (isCurrentlyLiked) {
+        // Unlike using RPC function
+        final result = await _supabase.rpc('decrement_likes_count', params: {
+          'target_post_id': postId,
+        });
+
+        if (!result['success']) {
+          throw Exception('Failed to unlike post: ${result['error']}');
+        }
+
         return false;
       } else {
-        // Like - add the like
-        await _supabase.from(DbConfig.likesTable).insert({
-          'post_id': postId,
-          'user_id': userId,
-          'created_at': DateTime.now().toIso8601String(),
+        // Like using RPC function
+        final result = await _supabase.rpc('increment_likes_count', params: {
+          'target_post_id': postId,
         });
-        
-        // Update post likes count
-        await _incrementLikesCount(postId);
-        
+
+        if (!result['success']) {
+          throw Exception('Failed to like post: ${result['error']}');
+        }
+
         // Create notification for post owner
         await _createLikeNotification(postId, userId);
         
@@ -152,20 +154,22 @@ class EnhancedFeedsService {
     }
   }
 
-  /// Check if user has liked a post
+  /// Check if user has liked a post using secure RPC function
   Future<bool> hasLiked(String postId) async {
     final userId = _authService.currentUserId;
     if (userId == null) return false;
 
     try {
-      final like = await _supabase
-          .from(DbConfig.likesTable)
-          .select()
-          .eq('post_id', postId)
-          .eq('user_id', userId)
-          .maybeSingle();
+      final result = await _supabase.rpc('get_post_interaction_status', params: {
+        'target_post_id': postId,
+      });
 
-      return like != null;
+      if (!result['success']) {
+        debugPrint('❌ Failed to get interaction status: ${result['error']}');
+        return false;
+      }
+
+      return result['data']['user_liked'] as bool;
     } catch (e) {
       debugPrint('❌ Failed to check like status: $e');
       return false;
@@ -579,12 +583,16 @@ class EnhancedFeedsService {
     }
   }
 
-  /// Update view count for a post
+  /// Update view count for a post using secure RPC function
   Future<void> incrementViewCount(String postId) async {
     try {
-      await _supabase.rpc('increment_view_count', params: {
-        'post_id': postId,
+      final result = await _supabase.rpc('increment_view_count', params: {
+        'target_post_id': postId,
       });
+
+      if (!result['success']) {
+        debugPrint('❌ RPC increment_view_count failed: ${result['error']}');
+      }
     } catch (e) {
       debugPrint('❌ Failed to increment view count: $e');
     }
@@ -666,25 +674,8 @@ class EnhancedFeedsService {
   }
 
   /// Private helper methods for database operations
-  Future<void> _incrementLikesCount(String postId) async {
-    try {
-      await _supabase.rpc('increment_likes_count', params: {
-        'post_id': postId,
-      });
-    } catch (e) {
-      debugPrint('❌ Failed to increment likes count: $e');
-    }
-  }
-
-  Future<void> _decrementLikesCount(String postId) async {
-    try {
-      await _supabase.rpc('decrement_likes_count', params: {
-        'post_id': postId,
-      });
-    } catch (e) {
-      debugPrint('❌ Failed to decrement likes count: $e');
-    }
-  }
+  /// Note: Like count operations are now handled directly by the RPC functions
+  /// in the toggleLike method for better atomicity and security.
 
   Future<void> _incrementCommentsCount(String postId) async {
     try {
