@@ -7,9 +7,7 @@ import '../models/post_model.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/follow_service.dart';
-import '../services/analytics_insights_service.dart';
 import '../services/enhanced_feeds_service.dart';
-import '../models/analytics_insight_model.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
@@ -28,7 +26,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
   final FollowService _followService = FollowService();
-  final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
   
   UserModel? _user;
   List<AvatarModel> _avatars = [];
@@ -38,13 +35,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isOwnProfile = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-  
-  // Enhanced analytics state
-  AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.month;
-  List<AnalyticsMetric> _detailedMetrics = [];
-  List<AnalyticsInsight> _insights = [];
-  bool _isAnalyticsLoading = true;
-  bool _analyticsLoading = true;
   
   // Posts content state
   List<PostModel> _userPosts = [];
@@ -323,267 +313,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return number.toString();
   }
   
-  String _formatMetricValue(AnalyticsMetric metric) {
-    switch (metric.type) {
-      case MetricType.percentage:
-        return '${metric.value.toStringAsFixed(1)}%';
-      case MetricType.duration:
-        return '${metric.value.toStringAsFixed(0)}${metric.unit}';
-      case MetricType.currency:
-        return '\$${metric.value.toStringAsFixed(0)}';
-      case MetricType.rate:
-        return '${metric.value.toStringAsFixed(2)}${metric.unit}';
-      case MetricType.count:
-      default:
-        final intValue = metric.value.toInt();
-        return _formatNumber(intValue);
-    }
-  }
   
-  void _onPeriodChanged(AnalyticsPeriod period) async {
-    if (period == _selectedPeriod) return;
-    
-    setState(() {
-      _selectedPeriod = period;
-      _analyticsLoading = true;
-    });
-    
-    await _loadEnhancedAnalytics();
-  }
   
-  Future<void> _loadEnhancedAnalytics() async {
-    if (_user == null) return;
-    
-    try {
-      final analyticsData = await _analyticsService.getProfileAnalytics(
-        userId: _user!.id,
-        period: _selectedPeriod,
-        includeComparisons: true,
-      );
-      
-      setState(() {
-        _detailedMetrics = analyticsData['metrics'] as List<AnalyticsMetric>;
-        _insights = analyticsData['insights'] as List<AnalyticsInsight>;
-        _comparisons = analyticsData['comparisons'] as Map<String, dynamic>?;
-        _analyticsLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _analyticsLoading = false;
-      });
-    }
-  }
   
-  void _handleInsightAction(AnalyticsInsight insight) {
-    // Handle insight action based on action type
-    final actionType = insight.actionData?['type'] as String?;
-    
-    switch (actionType) {
-      case 'engagement_tips':
-        _showEngagementTips();
-        break;
-      case 'growth_strategy':
-        _showGrowthStrategy();
-        break;
-      case 'reach_optimization':
-        _showReachOptimization();
-        break;
-      case 'post_scheduling':
-        _showPostScheduling();
-        break;
-      default:
-        _showGenericInsightDetails(insight);
-    }
-  }
   
-  void _showEngagementTips() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: Row(
-          children: [
-            Icon(Icons.tips_and_updates, color: kPrimaryColor),
-            const SizedBox(width: 8),
-            const Text(
-              'Engagement Tips',
-              style: TextStyle(color: kTextColor),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '• Post interactive content like polls and Q&As\n'
-              '• Respond to comments within the first hour\n'
-              '• Share behind-the-scenes content\n'
-              '• Use trending hashtags relevant to your niche\n'
-              '• Collaborate with other creators',
-              style: TextStyle(color: kLightTextColor),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Got it!', style: TextStyle(color: kPrimaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
   
-  void _showGrowthStrategy() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: Row(
-          children: [
-            Icon(Icons.trending_up, color: Colors.green),
-            const SizedBox(width: 8),
-            const Text(
-              'Growth Strategy',
-              style: TextStyle(color: kTextColor),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Your growth is accelerating! To maintain momentum:\n\n'
-              '• Keep your posting schedule consistent\n'
-              '• Analyze what content performed best\n'
-              '• Engage with your new followers\n'
-              '• Consider expanding to new content formats\n'
-              '• Cross-promote on other platforms',
-              style: TextStyle(color: kLightTextColor),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Thanks!', style: TextStyle(color: kPrimaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
   
-  void _showReachOptimization() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: Row(
-          children: [
-            Icon(Icons.visibility, color: Colors.orange),
-            const SizedBox(width: 8),
-            const Text(
-              'Improve Your Reach',
-              style: TextStyle(color: kTextColor),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'To improve your content reach:\n\n'
-              '• Post when your audience is most active\n'
-              '• Use a mix of content types (photos, videos, stories)\n'
-              '• Engage with trending topics in your niche\n'
-              '• Optimize your hashtag strategy\n'
-              '• Create shareable, valuable content',
-              style: TextStyle(color: kLightTextColor),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Apply Tips', style: TextStyle(color: kPrimaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
   
-  void _showPostScheduling() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: Row(
-          children: [
-            Icon(Icons.schedule, color: Colors.blue),
-            const SizedBox(width: 8),
-            const Text(
-              'Optimal Posting Times',
-              style: TextStyle(color: kTextColor),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Based on your audience activity:\n\n'
-              '📅 Best Days: Monday - Thursday\n'
-              '🕕 Peak Hours: 6-8 PM\n'
-              '🕙 Secondary Peak: 10-11 AM\n\n'
-              'Try scheduling your content during these times for maximum engagement!',
-              style: TextStyle(color: kLightTextColor),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Schedule Now', style: TextStyle(color: kPrimaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
   
-  void _showGenericInsightDetails(AnalyticsInsight insight) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kCardColor,
-        title: Row(
-          children: [
-            Icon(insight.type.icon, color: insight.type.color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                insight.title,
-                style: const TextStyle(color: kTextColor),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          insight.description,
-          style: const TextStyle(color: kLightTextColor),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK', style: TextStyle(color: kPrimaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
   
   /// Load pinned post for the active avatar
   Future<void> _loadPinnedPost() async {
@@ -670,12 +407,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: _HeaderCard(
                     child: SkeletonProfileHeader(),
                   ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                sliver: SliverToBoxAdapter(
-                  child: SkeletonLoader.profileAnalytics(),
                 ),
               ),
               SliverPadding(
@@ -844,12 +575,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
                   sliver: SliverToBoxAdapter(
                     child: _HeaderCard(child: _headerBlock()),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildAnalyticsSection(),
                   ),
                 ),
                 SliverPadding(
