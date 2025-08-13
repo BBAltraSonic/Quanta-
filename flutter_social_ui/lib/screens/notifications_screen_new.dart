@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
@@ -7,9 +8,12 @@ import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
 import 'package:flutter_social_ui/services/enhanced_chat_service.dart';
+import 'package:flutter_social_ui/services/messages_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:flutter_social_ui/screens/post_detail_screen.dart';
 import 'package:flutter_social_ui/screens/profile_screen.dart';
+import 'package:flutter_social_ui/screens/search_screen_new.dart';
+import 'package:flutter_social_ui/screens/public_chat_entries_screen.dart';
 import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -68,15 +72,22 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   final AuthService _authService = AuthService();
   final notification_service.NotificationService _notificationService = notification_service.NotificationService();
   final EnhancedChatService _chatService = EnhancedChatService();
+  final MessagesService _messagesService = MessagesService();
   late TabController _tabController;
 
   List<NotificationItem> _allNotifications = [];
   List<NotificationItem> _unreadNotifications = [];
-  List<ChatMessage> _messages = [];
+  List<Conversation> _conversations = [];
+  List<Conversation> _searchResults = [];
   final Map<String, AvatarModel> _avatarCache = {};
 
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _isSearching = false;
+
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  StreamSubscription<List<Conversation>>? _conversationsSub;
   
   // Real-time subscription
   Stream<List<notification_service.NotificationModel>>? _notificationStream;
@@ -85,6 +96,11 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
     _initializeServices();
   }
 
@@ -102,6 +118,19 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   }
   
   void _setupRealtimeSubscription() {
+    // Subscribe to conversations real-time updates
+    try {
+      _conversationsSub?.cancel();
+      _conversationsSub = _messagesService.getConversationsStream(limit: 20).listen((convos) {
+        if (!mounted) return;
+        setState(() {
+          // Preserve search state; only update base conversations
+          _conversations = convos;
+        });
+      });
+    } catch (e) {
+      debugPrint('Error setting up conversations stream: $e');
+    }
     try {
       _notificationStream = _notificationService.getNotificationStream();
       
@@ -142,6 +171,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _conversationsSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -163,7 +195,21 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     style: kHeadingTextStyle.copyWith(fontSize: 24),
                   ),
                   Spacer(),
-                  if (_allNotifications.any((n) => !n.isRead))
+                  if (_tabController.index == 1)
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => PublicChatEntriesScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Public Items',
+                        style: TextStyle(color: kPrimaryColor),
+                      ),
+                    ),
+                  if (_tabController.index == 0 && _allNotifications.any((n) => !n.isRead))
                     TextButton(
                       onPressed: _markAllAsRead,
                       child: Text(
@@ -185,7 +231,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 indicatorColor: kPrimaryColor,
                 tabs: [
                   Tab(text: 'All (${_allNotifications.length})'),
-                  Tab(text: 'Messages (${_messages.length})'),
+                  Tab(text: 'Messages (${_conversations.length})'),
                 ],
               ),
             ),
@@ -201,7 +247,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         controller: _tabController,
                         children: [
                           _buildNotificationsList(_allNotifications),
-                          _buildMessagesList(_messages),
+                          _buildConversationsList(_conversations),
                         ],
                       ),
                     ),
@@ -1131,83 +1177,144 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     }
   }
 
-  // ===== MESSAGE FUNCTIONALITY =====
+  // ===== CONVERSATIONS FUNCTIONALITY =====
   
-  Widget _buildMessagesList(List<ChatMessage> messages) {
-    if (messages.isEmpty) {
-      return _buildMessagesEmptyState();
-    }
+  Widget _buildConversationsList(List<Conversation> conversations) {
+    final List<Conversation> data =
+        _searchController.text.isEmpty ? conversations : _searchResults;
 
-    // Group messages by avatar/sender
-    final groupedMessages = <String, List<ChatMessage>>{};
-    for (final message in messages) {
-      final key = message.isMe ? 'me' : (message.avatarUrl ?? 'unknown');
-      groupedMessages[key] = groupedMessages[key] ?? [];
-      groupedMessages[key]!.add(message);
-    }
-
-    return ListView.separated(
-      padding: EdgeInsets.all(16),
-      itemCount: groupedMessages.length,
-      separatorBuilder: (context, index) => SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final entry = groupedMessages.entries.elementAt(index);
-        final senderKey = entry.key;
-        final senderMessages = entry.value;
-        final latestMessage = senderMessages.last;
-        
-        return _buildMessageCard(senderKey, latestMessage, senderMessages.length);
-      },
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              _onSearchChanged(value);
+            },
+            style: kBodyTextStyle,
+            decoration: InputDecoration(
+              hintText: 'Search conversations',
+              hintStyle: kCaptionTextStyle.copyWith(color: kLightTextColor),
+              filled: true,
+              fillColor: kCardColor,
+              prefixIcon: Icon(Icons.search, color: kLightTextColor),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.clear, color: kLightTextColor),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _isSearching = false;
+                          _searchResults = [];
+                        });
+                      },
+                    )
+                  : null,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: kPrimaryColor),
+              ),
+            ),
+          ),
+        ),
+        if (_isSearching)
+          LinearProgressIndicator(minHeight: 2, color: kPrimaryColor),
+        Expanded(
+          child: data.isEmpty
+              ? _buildMessagesEmptyState()
+              : ListView.separated(
+                  padding: EdgeInsets.all(16),
+                  itemCount: data.length,
+                  separatorBuilder: (context, index) => SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final conversation = data[index];
+                    return _buildConversationCard(conversation);
+                  },
+                ),
+        ),
+      ],
     );
   }
 
-  Widget _buildMessageCard(String senderKey, ChatMessage latestMessage, int messageCount) {
-    final isFromMe = senderKey == 'me';
-    final avatarUrl = isFromMe ? 'assets/images/We.jpg' : latestMessage.avatarUrl;
-    final senderName = isFromMe ? 'You' : _getSenderNameFromMessage(latestMessage);
+  Widget _buildConversationCard(Conversation conversation) {
+    final lastMessage = conversation.lastMessage;
+    final messagePreview = lastMessage?.text ?? 'No messages yet';
+    final hasUnread = conversation.unreadCount > 0;
     
     return Container(
       decoration: BoxDecoration(
-        color: kCardColor,
+        color: hasUnread ? kCardColor.withOpacity(0.9) : kCardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: hasUnread 
+            ? Border.all(color: kPrimaryColor.withOpacity(0.3))
+            : Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: InkWell(
-        onTap: () => _handleMessageTap(latestMessage),
+        onTap: () => _handleConversationTap(conversation),
+        onLongPress: () => _showConversationOptions(conversation),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: kPrimaryColor.withOpacity(0.2),
+              // Avatar image with online indicator
+              Stack(
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: avatarUrl != null && avatarUrl.startsWith('assets/')
-                      ? Image.asset(
-                          avatarUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              isFromMe ? Icons.person : Icons.smart_toy,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: conversation.avatar.avatarImageUrl != null
+                          ? Image.network(
+                              conversation.avatar.avatarImageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.smart_toy,
+                                  color: kPrimaryColor,
+                                  size: 24,
+                                );
+                              },
+                            )
+                          : Icon(
+                              Icons.smart_toy,
                               color: kPrimaryColor,
                               size: 24,
-                            );
-                          },
-                        )
-                      : Icon(
-                          isFromMe ? Icons.person : Icons.smart_toy,
-                          color: kPrimaryColor,
-                          size: 24,
-                        ),
-                ),
+                            ),
+                    ),
+                  ),
+                  // Online indicator (always show for avatars)
+                  Positioned(
+                    right: 2,
+                    bottom: 2,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: kCardColor, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
               SizedBox(width: 12),
@@ -1220,40 +1327,53 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          senderName,
-                          style: kBodyTextStyle.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            conversation.avatar.name,
+                            style: kBodyTextStyle.copyWith(
+                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
-                          timeago.format(latestMessage.time),
+                          timeago.format(conversation.lastActivity),
                           style: kCaptionTextStyle.copyWith(
-                            color: kLightTextColor,
+                            color: hasUnread ? kPrimaryColor : kLightTextColor,
                             fontSize: 12,
+                            fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
                           ),
                         ),
                       ],
                     ),
                     SizedBox(height: 4),
                     Text(
-                      latestMessage.text,
+                      messagePreview,
                       style: kCaptionTextStyle.copyWith(
-                        color: kLightTextColor,
+                        color: hasUnread ? Colors.white.withOpacity(0.9) : kLightTextColor,
                         height: 1.3,
+                        fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (messageCount > 1)
+                    // Avatar niche/specialty
+                    if (conversation.avatar.niche.displayName.isNotEmpty)
                       Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text(
-                          '$messageCount messages',
-                          style: kCaptionTextStyle.copyWith(
-                            color: kPrimaryColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        padding: EdgeInsets.only(top: 6),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            conversation.avatar.niche.displayName,
+                            style: kCaptionTextStyle.copyWith(
+                              color: kPrimaryColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
@@ -1261,14 +1381,39 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 ),
               ),
 
-              // Message indicator
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: kPrimaryColor.withOpacity(0.7),
-                  shape: BoxShape.circle,
-                ),
+              // Unread count indicator and status
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (hasUnread)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: BoxConstraints(minWidth: 18),
+                      child: Text(
+                        conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  SizedBox(height: 4),
+                  // Message status indicator
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: hasUnread ? kPrimaryColor : kPrimaryColor.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1285,83 +1430,376 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           Icon(Icons.chat_bubble_outline, size: 64, color: kLightTextColor),
           SizedBox(height: 16),
           Text(
-            'No messages yet',
+            'No conversations yet',
             style: kHeadingTextStyle.copyWith(fontSize: 18),
           ),
           SizedBox(height: 8),
           Text(
-            'Start chatting with your avatars\nto see messages here.',
+            'Start chatting with your avatars\nto see conversations here.',
             style: kBodyTextStyle.copyWith(color: kLightTextColor),
             textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 20),
+          TextButton.icon(
+            onPressed: () {
+              // Navigate to avatar discovery or search
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => SearchScreenNew(),
+                ),
+              );
+            },
+            icon: Icon(Icons.explore, color: kPrimaryColor),
+            label: Text(
+              'Discover Avatars',
+              style: TextStyle(color: kPrimaryColor),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _getSenderNameFromMessage(ChatMessage message) {
-    // Try to get avatar name from cache or return default
-    // In a real implementation, you might extract this from message metadata
-    return 'Avatar'; // Placeholder - could be enhanced to get actual avatar names
+  void _handleConversationTap(Conversation conversation) async {
+    // Mark conversation as read
+    if (conversation.unreadCount > 0) {
+      await _messagesService.markConversationAsRead(conversation.sessionId);
+    }
+    
+    // Navigate to chat screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          name: conversation.avatar.name,
+          avatar: conversation.avatar.avatarImageUrl ?? 'assets/images/p.jpg',
+          avatarId: conversation.avatar.id,
+        ),
+      ),
+    );
   }
 
-  void _handleMessageTap(ChatMessage message) {
-    // Navigate to the chat screen
-    // For messages from avatars, we can try to navigate to that specific chat
-    if (!message.isMe) {
-      // Try to determine avatar ID from message or navigate to general chat
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => ChatScreen(
-            name: _getSenderNameFromMessage(message),
-            avatar: message.avatarUrl ?? 'assets/images/p.jpg',
+  void _showConversationOptions(Conversation conversation) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            margin: EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
+          
+          // Header
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: conversation.avatar.avatarImageUrl != null
+                        ? Image.network(
+                            conversation.avatar.avatarImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.smart_toy,
+                              color: kPrimaryColor,
+                              size: 20,
+                            ),
+                          )
+                        : Icon(
+                            Icons.smart_toy,
+                            color: kPrimaryColor,
+                            size: 20,
+                          ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        conversation.avatar.name,
+                        style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        conversation.avatar.niche.displayName,
+                        style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Options
+          ListTile(
+            leading: Icon(Icons.share, color: kPrimaryColor),
+            title: Text('Make Public', style: TextStyle(color: Colors.white)),
+            subtitle: Text('Share this conversation', style: TextStyle(color: kLightTextColor)),
+            onTap: () {
+              Navigator.pop(context);
+              _showMakePublicDialog(conversation);
+            },
+          ),
+          
+          ListTile(
+            leading: Icon(Icons.notifications_off, color: Colors.orange),
+            title: Text('Mute', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              _muteConversation(conversation);
+            },
+          ),
+          
+          ListTile(
+            leading: Icon(Icons.archive, color: Colors.blue),
+            title: Text('Archive', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              _archiveConversation(conversation);
+            },
+          ),
+          
+          ListTile(
+            leading: Icon(Icons.delete, color: Colors.red),
+            title: Text('Delete', style: TextStyle(color: Colors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              _deleteConversation(conversation);
+            },
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+        ],
+      ),
+    );
+  }
+
+  void _showMakePublicDialog(Conversation conversation) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Text(
+          'Make Conversation Public',
+          style: kHeadingTextStyle.copyWith(fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose how to share this conversation:',
+              style: kBodyTextStyle,
+            ),
+            SizedBox(height: 16),
+            // Option buttons
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _makeConversationPublic(conversation, 'avatar');
+                },
+                icon: Icon(Icons.smart_toy),
+                label: Text('Show on Avatar Profile'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _makeConversationPublic(conversation, 'creator');
+                },
+                icon: Icon(Icons.person),
+                label: Text('Show on Creator Portfolio'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: kLightTextColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _makeConversationPublic(Conversation conversation, String visibility) async {
+    try {
+      final lastMsg = conversation.lastMessage;
+      if (lastMsg == null) {
+        _showErrorMessage('No message to publish in this conversation yet');
+        return;
+      }
+
+      final result = await _messagesService.makeMessagePublic(
+        sessionId: conversation.sessionId,
+        messageId: lastMsg.id,
+        visibility: visibility,
+      );
+
+      if (result == null) {
+        throw Exception('Failed to publish conversation');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.public, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Conversation made public as ${visibility == 'avatar' ? 'Avatar showcase' : 'Creator portfolio'}',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green[700],
         ),
       );
+    } catch (e) {
+      _showErrorMessage('Unable to make conversation public.');
     }
+  }
+
+  void _muteConversation(Conversation conversation) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${conversation.avatar.name} conversation muted'),
+        backgroundColor: Colors.orange[700],
+      ),
+    );
+  }
+
+  void _archiveConversation(Conversation conversation) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${conversation.avatar.name} conversation archived'),
+        backgroundColor: Colors.blue[700],
+      ),
+    );
+  }
+
+  void _deleteConversation(Conversation conversation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Text('Delete Conversation', style: kHeadingTextStyle.copyWith(fontSize: 18)),
+        content: Text(
+          'Are you sure you want to delete this conversation with ${conversation.avatar.name}? This action cannot be undone.',
+          style: kBodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: TextStyle(color: kLightTextColor)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _messagesService.deleteConversation(conversation.sessionId);
+        setState(() {
+          _conversations.removeWhere((c) => c.id == conversation.id);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Conversation deleted'),
+            backgroundColor: Colors.green[700],
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete conversation'),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    if (value.trim().isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(Duration(milliseconds: 350), () async {
+      setState(() => _isSearching = true);
+      try {
+        final results = await _messagesService.searchConversations(value.trim());
+        if (!mounted) return;
+        setState(() {
+          _searchResults = results;
+        });
+      } catch (e) {
+        debugPrint('Search error: $e');
+      } finally {
+        if (mounted) setState(() => _isSearching = false);
+      }
+    });
   }
 
   Future<void> _loadMessages() async {
     try {
-      // Load recent messages from chat service
-      // This is a placeholder implementation
-      final recentMessages = await _chatService.getRecentMessages();
+      // Load conversations from MessagesService
+      final conversations = await _messagesService.getConversations(limit: 20);
       setState(() {
-        _messages = recentMessages;
+        _conversations = conversations;
       });
     } catch (e) {
-      debugPrint('Error loading messages: $e');
-      // For now, create some sample messages for demo purposes
+      debugPrint('Error loading conversations: $e');
+      // Set empty state on error
       setState(() {
-        _messages = _createSampleMessages();
+        _conversations = [];
       });
     }
-  }
-
-  List<ChatMessage> _createSampleMessages() {
-    // Sample messages for demo purposes
-    return [
-      ChatMessage(
-        id: 'sample_1',
-        text: 'Hello! How are you doing today?',
-        isMe: false,
-        time: DateTime.now().subtract(Duration(hours: 2)),
-        avatarUrl: 'assets/images/p.jpg',
-      ),
-      ChatMessage(
-        id: 'sample_2',
-        text: 'I\'m working on some new features for the app',
-        isMe: true,
-        time: DateTime.now().subtract(Duration(hours: 1)),
-        avatarUrl: 'assets/images/We.jpg',
-      ),
-      ChatMessage(
-        id: 'sample_3',
-        text: 'That sounds exciting! Let me know if you need any help.',
-        isMe: false,
-        time: DateTime.now().subtract(Duration(minutes: 30)),
-        avatarUrl: 'assets/images/p.jpg',
-      ),
-    ];
   }
 }

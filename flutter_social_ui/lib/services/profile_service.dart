@@ -77,7 +77,14 @@ class ProfileService {
           'followers_count': userResponse['followers_count'] ?? 0,
           'posts_count': userResponse['posts_count'] ?? 0,
         },
-        'preferences': {},
+        'preferences': userResponse['preferences'] ?? {
+          'notifications_enabled': true,
+          'push_notifications': true,
+          'email_notifications': false,
+          'auto_play_videos': true,
+          'data_saver': false,
+          'privacy_level': 'public',
+        },
       };
     } catch (e) {
       debugPrint('Error loading profile data: $e');
@@ -215,9 +222,10 @@ class ProfileService {
     required Map<String, dynamic> preferences,
   }) async {
     try {
+      final validatedPrefs = _validatePreferences(preferences);
       await _authService.supabase
           .from('users')
-          .update({'preferences': preferences})
+          .update({'preferences': validatedPrefs, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', userId);
     } catch (e) {
       throw Exception('Error updating preferences: $e');
@@ -426,5 +434,365 @@ class ProfileService {
     return RegExp(r'^[a-zA-Z0-9_.\-]+$').hasMatch(username) && 
            username.length >= 3 && 
            username.length <= 30;
+  }
+
+  /// Change user password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      // Validate password strength
+      if (newPassword.length < 8) {
+        throw Exception('Password must be at least 8 characters long');
+      }
+      
+      if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)').hasMatch(newPassword)) {
+        throw Exception('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+      }
+
+      await _authService.supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+    } catch (e) {
+      throw Exception('Error changing password: $e');
+    }
+  }
+
+  /// Export user data
+  Future<Map<String, dynamic>> exportUserData(String userId) async {
+    try {
+      // Get user data
+      final userResponse = await _authService.supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+      // Get user's avatars
+      final avatarsResponse = await _authService.supabase
+          .from('avatars')
+          .select('*')
+          .eq('owner_user_id', userId);
+
+      // Get user's posts
+      final postsResponse = await _authService.supabase
+          .from('posts')
+          .select('*')
+          .eq('avatar_id', 'IN.(${(avatarsResponse as List).map((a) => a['id']).join(',')})');
+
+      // Get user's follows
+      final followsResponse = await _authService.supabase
+          .from('follows')
+          .select('*')
+          .eq('user_id', userId);
+
+      // Get user's comments
+      final commentsResponse = await _authService.supabase
+          .from('comments')
+          .select('*')
+          .eq('user_id', userId);
+
+      return {
+        'user': userResponse,
+        'avatars': avatarsResponse,
+        'posts': postsResponse,
+        'follows': followsResponse,
+        'comments': commentsResponse,
+        'exported_at': DateTime.now().toIso8601String(),
+        'export_version': '1.0',
+      };
+    } catch (e) {
+      throw Exception('Error exporting data: $e');
+    }
+  }
+
+  /// Get user preferences safely
+  Future<Map<String, dynamic>> getUserPreferences(String userId) async {
+    try {
+      final response = await _authService.supabase
+          .from('users')
+          .select('preferences')
+          .eq('id', userId)
+          .single();
+      
+      return response['preferences'] ?? {
+        'notifications_enabled': true,
+        'push_notifications': true,
+        'email_notifications': false,
+        'auto_play_videos': true,
+        'data_saver': false,
+        'privacy_level': 'public',
+      };
+    } catch (e) {
+      debugPrint('Error loading preferences: $e');
+      return {
+        'notifications_enabled': true,
+        'push_notifications': true,
+        'email_notifications': false,
+        'auto_play_videos': true,
+        'data_saver': false,
+        'privacy_level': 'public',
+      };
+    }
+  }
+
+  /// Validate preference values
+  Map<String, dynamic> _validatePreferences(Map<String, dynamic> preferences) {
+    final validatedPrefs = <String, dynamic>{};
+    
+    // Boolean preferences
+    final boolKeys = [
+      'notifications_enabled',
+      'push_notifications', 
+      'email_notifications',
+      'auto_play_videos',
+      'data_saver',
+    ];
+    
+    for (final key in boolKeys) {
+      if (preferences.containsKey(key)) {
+        validatedPrefs[key] = preferences[key] is bool ? preferences[key] : false;
+      }
+    }
+    
+    // Privacy level validation
+    if (preferences.containsKey('privacy_level')) {
+      final privacyLevel = preferences['privacy_level'] as String?;
+      if (['public', 'friends', 'private'].contains(privacyLevel)) {
+        validatedPrefs['privacy_level'] = privacyLevel;
+      } else {
+        validatedPrefs['privacy_level'] = 'public';
+      }
+    }
+    
+    return validatedPrefs;
+  }
+
+  /// Export analytics data
+  Future<Map<String, dynamic>> exportAnalyticsData(String userId, {
+    int daysBack = 30,
+  }) async {
+    try {
+      final endDate = DateTime.now();
+      final startDate = endDate.subtract(Duration(days: daysBack));
+      
+      // Get analytics events
+      final eventsResponse = await _authService.supabase
+          .from('analytics_events')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at', ascending: false);
+      
+      // Get user's avatars for context
+      final avatarsResponse = await _authService.supabase
+          .from('avatars')
+          .select('id, name, followers_count, likes_count, posts_count, engagement_rate')
+          .eq('owner_user_id', userId);
+      
+      // Get user's posts with engagement data
+      final avatarIds = (avatarsResponse as List).map((a) => a['id']).join(',');
+      final postsResponse = avatarIds.isNotEmpty ? await _authService.supabase
+          .from('posts')
+          .select('id, created_at, likes_count, comments_count, views_count, avatar_id')
+          .filter('avatar_id', 'in', '($avatarIds)')
+          .gte('created_at', startDate.toIso8601String())
+          .order('created_at', ascending: false)
+          : [];
+      
+      // Get engagement metrics
+      final engagementMetrics = await _calculateEngagementMetrics(
+        userId, 
+        eventsResponse as List, 
+        postsResponse as List,
+      );
+      
+      return {
+        'user_id': userId,
+        'export_period': {
+          'start_date': startDate.toIso8601String(),
+          'end_date': endDate.toIso8601String(),
+          'days': daysBack,
+        },
+        'summary': {
+          'total_events': (eventsResponse as List).length,
+          'total_posts': (postsResponse as List).length,
+          'active_avatars': (avatarsResponse as List).length,
+        },
+        'avatars': avatarsResponse,
+        'events': eventsResponse,
+        'posts': postsResponse,
+        'engagement_metrics': engagementMetrics,
+        'exported_at': DateTime.now().toIso8601String(),
+        'export_version': '1.0',
+      };
+    } catch (e) {
+      throw Exception('Error exporting analytics data: $e');
+    }
+  }
+
+  /// Calculate engagement metrics from raw data
+  Future<Map<String, dynamic>> _calculateEngagementMetrics(
+    String userId,
+    List<dynamic> events,
+    List<dynamic> posts,
+  ) async {
+    if (events.isEmpty && posts.isEmpty) {
+      return {
+        'total_views': 0,
+        'total_likes': 0,
+        'total_comments': 0,
+        'total_shares': 0,
+        'engagement_rate': 0.0,
+        'avg_engagement_per_post': 0.0,
+        'most_active_day': null,
+        'top_performing_post': null,
+      };
+    }
+
+    // Calculate totals from posts
+    int totalLikes = 0;
+    int totalComments = 0;
+    int totalViews = 0;
+    dynamic topPost;
+    int maxEngagement = 0;
+    
+    final Map<String, int> dailyActivity = {};
+    
+    for (final post in posts) {
+      final likes = post['likes_count'] ?? 0;
+      final comments = post['comments_count'] ?? 0;
+      final views = post['views_count'] ?? 0;
+      final engagement = likes + comments;
+      
+      totalLikes += likes as int;
+      totalComments += comments as int;
+      totalViews += views as int;
+      
+      if (engagement > maxEngagement) {
+        maxEngagement = engagement;
+        topPost = post;
+      }
+      
+      // Track daily activity
+      final createdDate = DateTime.parse(post['created_at']).toLocal();
+      final dateKey = '${createdDate.year}-${createdDate.month.toString().padLeft(2, '0')}-${createdDate.day.toString().padLeft(2, '0')}';
+      dailyActivity[dateKey] = (dailyActivity[dateKey] ?? 0) + 1;
+    }
+    
+    // Count shares and other events from analytics events
+    int totalShares = 0;
+    for (final event in events) {
+      if (event['event_type'] == 'post_share') {
+        totalShares++;
+      }
+      
+      // Track daily activity from events too
+      final eventDate = DateTime.parse(event['created_at']).toLocal();
+      final dateKey = '${eventDate.year}-${eventDate.month.toString().padLeft(2, '0')}-${eventDate.day.toString().padLeft(2, '0')}';
+      dailyActivity[dateKey] = (dailyActivity[dateKey] ?? 0) + 1;
+    }
+    
+    // Find most active day
+    String? mostActiveDay;
+    int maxActivity = 0;
+    for (final entry in dailyActivity.entries) {
+      if (entry.value > maxActivity) {
+        maxActivity = entry.value;
+        mostActiveDay = entry.key;
+      }
+    }
+    
+    // Calculate engagement rate
+    final totalEngagement = totalLikes + totalComments + totalShares;
+    final engagementRate = totalViews > 0 ? (totalEngagement / totalViews * 100) : 0.0;
+    final avgEngagementPerPost = posts.isNotEmpty ? (totalEngagement / posts.length) : 0.0;
+    
+    return {
+      'total_views': totalViews,
+      'total_likes': totalLikes,
+      'total_comments': totalComments,
+      'total_shares': totalShares,
+      'total_engagement': totalEngagement,
+      'engagement_rate': double.parse(engagementRate.toStringAsFixed(2)),
+      'avg_engagement_per_post': double.parse(avgEngagementPerPost.toStringAsFixed(2)),
+      'most_active_day': mostActiveDay,
+      'most_active_day_count': maxActivity,
+      'top_performing_post': topPost,
+      'daily_activity': dailyActivity,
+      'posts_count': posts.length,
+      'events_count': events.length,
+    };
+  }
+
+  /// Convert analytics data to CSV format
+  String convertAnalyticsToCSV(Map<String, dynamic> analyticsData) {
+    final buffer = StringBuffer();
+    
+    // Add summary information
+    buffer.writeln('QUANTA ANALYTICS EXPORT');
+    buffer.writeln('User ID,${analyticsData['user_id']}');
+    buffer.writeln('Export Date,${DateTime.parse(analyticsData['exported_at']).toLocal()}');
+    buffer.writeln('Period,${analyticsData['export_period']['start_date']} to ${analyticsData['export_period']['end_date']}');
+    buffer.writeln('Days,${analyticsData['export_period']['days']}');
+    buffer.writeln('');
+    
+    // Engagement metrics summary
+    buffer.writeln('ENGAGEMENT METRICS SUMMARY');
+    final metrics = analyticsData['engagement_metrics'] as Map<String, dynamic>;
+    buffer.writeln('Metric,Value');
+    metrics.forEach((key, value) {
+      if (value is! Map && value is! List) {
+        buffer.writeln('$key,$value');
+      }
+    });
+    buffer.writeln('');
+    
+    // Avatars data
+    buffer.writeln('AVATARS');
+    final avatars = analyticsData['avatars'] as List;
+    if (avatars.isNotEmpty) {
+      final firstAvatar = avatars.first as Map<String, dynamic>;
+      buffer.writeln(firstAvatar.keys.join(','));
+      
+      for (final avatar in avatars) {
+        final avatarMap = avatar as Map<String, dynamic>;
+        buffer.writeln(avatarMap.values.join(','));
+      }
+    }
+    buffer.writeln('');
+    
+    // Posts data
+    buffer.writeln('POSTS');
+    final posts = analyticsData['posts'] as List;
+    if (posts.isNotEmpty) {
+      final firstPost = posts.first as Map<String, dynamic>;
+      buffer.writeln(firstPost.keys.join(','));
+      
+      for (final post in posts) {
+        final postMap = post as Map<String, dynamic>;
+        buffer.writeln(postMap.values.join(','));
+      }
+    }
+    buffer.writeln('');
+    
+    // Events data (last 100 for CSV readability)
+    buffer.writeln('RECENT EVENTS (Last 100)');
+    final events = analyticsData['events'] as List;
+    if (events.isNotEmpty) {
+      buffer.writeln('Event Type,Timestamp,Properties');
+      
+      final recentEvents = events.take(100);
+      for (final event in recentEvents) {
+        final eventMap = event as Map<String, dynamic>;
+        final eventType = eventMap['event_type'] ?? 'unknown';
+        final timestamp = eventMap['created_at'] ?? '';
+        final properties = eventMap['properties']?.toString()?.replaceAll(',', ';') ?? '';
+        buffer.writeln('$eventType,$timestamp,"$properties"');
+      }
+    }
+    
+    return buffer.toString();
   }
 }

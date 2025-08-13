@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../constants.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
@@ -20,6 +25,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Map<String, dynamic> _preferences = {};
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isExporting = false;
+  bool _isExportingAnalytics = false;
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -44,7 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'notifications_enabled': true,
           'push_notifications': true,
           'email_notifications': false,
-          'dark_mode': true,
           'auto_play_videos': true,
           'data_saver': false,
           'privacy_level': 'public',
@@ -73,6 +80,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               backgroundColor: kPrimaryColor,
             ),
           );
+          setState(() {
+            _hasChanges = false;
+          });
         }
       }
     } catch (e) {
@@ -96,6 +106,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _updatePreference(String key, dynamic value) {
     setState(() {
       _preferences[key] = value;
+      // Enforce logical dependencies
+      if (key == 'notifications_enabled' && value == false) {
+        _preferences['push_notifications'] = false;
+        _preferences['email_notifications'] = false;
+      }
+      if (key == 'data_saver' && value == true) {
+        _preferences['auto_play_videos'] = false;
+      }
+      _hasChanges = true;
     });
   }
 
@@ -210,11 +229,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             )
           else
             TextButton(
-              onPressed: _savePreferences,
-              child: const Text(
+              onPressed: (!_hasChanges || _isSaving) ? null : () {
+                HapticFeedback.lightImpact();
+                _savePreferences();
+              },
+              child: Text(
                 'Save',
                 style: TextStyle(
-                  color: kPrimaryColor,
+                  color: (!_hasChanges || _isSaving) ? kLightTextColor : kPrimaryColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -223,9 +245,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: _isLoading
           ? SkeletonLoader.settingsScreen()
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
+          : SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildHeader(),
                 _buildSection('Notifications', [
                   _buildSwitchTile(
                     'Enable Notifications',
@@ -238,23 +262,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Get instant notifications on your device',
                     'push_notifications',
                     Icons.push_pin,
+                    enabled: _preferences['notifications_enabled'] == true,
                   ),
                   _buildSwitchTile(
                     'Email Notifications',
                     'Receive updates via email',
                     'email_notifications',
                     Icons.email,
-                  ),
-                ]),
-
-                const SizedBox(height: 24),
-
-                _buildSection('Appearance', [
-                  _buildSwitchTile(
-                    'Dark Mode',
-                    'Use dark theme throughout the app',
-                    'dark_mode',
-                    Icons.dark_mode,
+                    enabled: _preferences['notifications_enabled'] == true,
                   ),
                 ]),
 
@@ -266,6 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Automatically play videos in feed',
                     'auto_play_videos',
                     Icons.play_circle,
+                    enabled: _preferences['data_saver'] != true,
                   ),
                   _buildSwitchTile(
                     'Data Saver',
@@ -280,7 +296,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildSection('Privacy', [
                   _buildDropdownTile(
                     'Account Privacy',
-                    'Control who can see your profile',
+                    "Current: ${_privacyLabel(_preferences['privacy_level'])}",
                     'privacy_level',
                     Icons.privacy_tip,
                     {
@@ -301,10 +317,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _navigateToAnalytics,
                   ),
                   _buildActionTile(
-                    'Data Export',
-                    'Export your analytics data',
+                    'Analytics Export',
+                    'Export your analytics data in JSON or CSV',
                     Icons.file_download,
-                    () => _showComingSoon('Analytics Export'),
+                    _exportAnalyticsData,
+                    isLoading: _isExportingAnalytics,
                   ),
                 ]),
 
@@ -315,13 +332,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Change Password',
                     'Update your account password',
                     Icons.lock,
-                    () => _showComingSoon('Change Password'),
+                    _changePassword,
                   ),
                   _buildActionTile(
                     'Export Data',
                     'Download your account data',
                     Icons.download,
-                    () => _showComingSoon('Export Data'),
+                    _exportUserData,
+                    isLoading: _isExporting,
                   ),
                   _buildActionTile(
                     'Sign Out',
@@ -356,9 +374,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ]),
 
+                const SizedBox(height: 24),
+
+                _buildResetDefaults(),
+
                 const SizedBox(height: 100),
               ],
             ),
+          )
     );
   }
 
@@ -381,32 +404,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: BoxDecoration(
             color: kCardColor,
             borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4)),
+            ],
           ),
-          child: Column(children: children),
+          child: Column(
+            children: _withDividers(children),
+          ),
         ),
       ],
     );
+  }
+
+  List<Widget> _withDividers(List<Widget> items) {
+    final List<Widget> result = [];
+    for (int i = 0; i < items.length; i++) {
+      result.add(items[i]);
+      if (i != items.length - 1) {
+        result.add(const Divider(height: 1, color: Color(0x22FFFFFF)));
+      }
+    }
+    return result;
   }
 
   Widget _buildSwitchTile(
     String title,
     String subtitle,
     String key,
-    IconData icon,
-  ) {
+    IconData icon, {
+    bool enabled = true,
+  }) {
+    final bool value = _preferences[key] ?? false;
     return ListTile(
-      leading: Icon(icon, color: kPrimaryColor),
+      leading: Icon(icon, color: enabled ? kPrimaryColor : kLightTextColor),
       title: Text(
         title,
-        style: const TextStyle(color: kTextColor, fontWeight: FontWeight.w500),
+        style: TextStyle(color: enabled ? kTextColor : kLightTextColor, fontWeight: FontWeight.w500),
       ),
       subtitle: Text(
         subtitle,
         style: const TextStyle(color: kLightTextColor, fontSize: 13),
       ),
       trailing: Switch(
-        value: _preferences[key] ?? false,
-        onChanged: (value) => _updatePreference(key, value),
+        value: enabled ? value : false,
+        onChanged: enabled ? (val) { HapticFeedback.selectionClick(); _updatePreference(key, val); } : null,
         activeColor: kPrimaryColor,
       ),
     );
@@ -431,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: DropdownButton<String>(
         value: _preferences[key] ?? options.keys.first,
-        onChanged: (value) => _updatePreference(key, value),
+        onChanged: (value) { HapticFeedback.selectionClick(); _updatePreference(key, value); },
         items: options.entries
             .map(
               (e) => DropdownMenuItem(
@@ -452,6 +493,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     IconData icon,
     VoidCallback onTap, {
     Color? textColor,
+    bool isLoading = false,
   }) {
     return ListTile(
       leading: Icon(icon, color: textColor ?? kPrimaryColor),
@@ -466,8 +508,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle,
         style: const TextStyle(color: kLightTextColor, fontSize: 13),
       ),
-      trailing: Icon(Icons.chevron_right, color: textColor ?? kLightTextColor),
-      onTap: onTap,
+      trailing: isLoading 
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: kPrimaryColor,
+              ),
+            )
+          : Icon(Icons.chevron_right, color: textColor ?? kLightTextColor),
+      onTap: isLoading ? null : () { HapticFeedback.lightImpact(); onTap(); },
     );
   }
 
@@ -494,6 +545,346 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _changePassword() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isUpdating = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: kCardColor,
+          title: const Text(
+            'Change Password',
+            style: TextStyle(color: kTextColor),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentPasswordController,
+                obscureText: true,
+                style: const TextStyle(color: kTextColor),
+                decoration: const InputDecoration(
+                  labelText: 'Current Password',
+                  labelStyle: TextStyle(color: kLightTextColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kLightTextColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kPrimaryColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: newPasswordController,
+                obscureText: true,
+                style: const TextStyle(color: kTextColor),
+                decoration: const InputDecoration(
+                  labelText: 'New Password',
+                  labelStyle: TextStyle(color: kLightTextColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kLightTextColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kPrimaryColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: confirmPasswordController,
+                obscureText: true,
+                style: const TextStyle(color: kTextColor),
+                decoration: const InputDecoration(
+                  labelText: 'Confirm New Password',
+                  labelStyle: TextStyle(color: kLightTextColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kLightTextColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: kPrimaryColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isUpdating ? null : () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: kLightTextColor),
+              ),
+            ),
+            TextButton(
+              onPressed: isUpdating ? null : () async {
+                if (newPasswordController.text != confirmPasswordController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Passwords do not match'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() {
+                  isUpdating = true;
+                });
+
+                try {
+                  await _profileService.changePassword(
+                    currentPassword: currentPasswordController.text,
+                    newPassword: newPasswordController.text,
+                  );
+                  
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password changed successfully'),
+                      backgroundColor: kPrimaryColor,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to change password: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } finally {
+                  setDialogState(() {
+                    isUpdating = false;
+                  });
+                }
+              },
+              child: isUpdating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: kPrimaryColor,
+                      ),
+                    )
+                  : const Text(
+                      'Update',
+                      style: TextStyle(color: kPrimaryColor),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportUserData() async {
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final userId = _authService.currentUserId;
+      if (userId == null) return;
+
+      final userData = await _profileService.exportUserData(userId);
+      final jsonString = const JsonEncoder.withIndent('  ').convert(userData);
+      
+      // Get the downloads directory
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'quanta_data_export_${DateTime.now().millisecondsSinceEpoch}.json';
+      final file = File('${directory.path}/$fileName');
+      
+      await file.writeAsString(jsonString);
+      
+      // Share the file
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Your Quanta account data export',
+        subject: 'Quanta Data Export',
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data exported successfully'),
+            backgroundColor: kPrimaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  void _exportAnalyticsData() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: const Text(
+          'Export Analytics Data',
+          style: TextStyle(color: kTextColor),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Choose the format and time period for your analytics export:',
+              style: TextStyle(color: kLightTextColor),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _performAnalyticsExport('json', 30);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('JSON\n(30 days)'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _performAnalyticsExport('csv', 30);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kCardColor,
+                      foregroundColor: kTextColor,
+                      side: const BorderSide(color: kPrimaryColor),
+                    ),
+                    child: const Text('CSV\n(30 days)'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _performAnalyticsExport('json', 90);
+                    },
+                    child: const Text(
+                      '90 Days JSON',
+                      style: TextStyle(color: kPrimaryColor),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _performAnalyticsExport('csv', 90);
+                    },
+                    child: const Text(
+                      '90 Days CSV',
+                      style: TextStyle(color: kPrimaryColor),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performAnalyticsExport(String format, int daysBack) async {
+    setState(() {
+      _isExportingAnalytics = true;
+    });
+
+    try {
+      final userId = _authService.currentUserId;
+      if (userId == null) return;
+
+      final analyticsData = await _profileService.exportAnalyticsData(userId, daysBack: daysBack);
+      
+      final directory = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'quanta_analytics_${daysBack}days_$timestamp.$format';
+      final file = File('${directory.path}/$fileName');
+      
+      String fileContent;
+      if (format == 'json') {
+        fileContent = const JsonEncoder.withIndent('  ').convert(analyticsData);
+      } else {
+        fileContent = _profileService.convertAnalyticsToCSV(analyticsData);
+      }
+      
+      await file.writeAsString(fileContent);
+      
+      // Share the file
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Your Quanta analytics export ($daysBack days, $format format)',
+        subject: 'Quanta Analytics Export',
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Analytics exported successfully as $format'),
+            backgroundColor: kPrimaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export analytics: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExportingAnalytics = false;
+        });
+      }
+    }
+  }
+
   void _showComingSoon(String feature) {
     showDialog(
       context: context,
@@ -512,5 +903,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4))],
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.tune, color: kPrimaryColor, size: 28),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Personalize your experience',
+                  style: TextStyle(color: kTextColor, fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Manage notifications, privacy, and content preferences. Changes are saved to your account.',
+                  style: TextStyle(color: kLightTextColor, fontSize: 13, height: 1.3),
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResetDefaults() {
+    return Center(
+      child: TextButton.icon(
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          setState(() {
+            _preferences = {
+              'notifications_enabled': true,
+              'push_notifications': true,
+              'email_notifications': false,
+              'auto_play_videos': true,
+              'data_saver': false,
+              'privacy_level': 'public',
+            };
+            _hasChanges = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Defaults restored. Don\'t forget to save.'),
+              backgroundColor: kPrimaryColor,
+            ),
+          );
+        },
+        icon: const Icon(Icons.restore, color: kPrimaryColor),
+        label: const Text('Reset to defaults', style: TextStyle(color: kPrimaryColor, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  String _privacyLabel(dynamic key) {
+    switch (key) {
+      case 'friends':
+        return 'Friends Only';
+      case 'private':
+        return 'Private';
+      case 'public':
+      default:
+        return 'Public';
+    }
   }
 }
