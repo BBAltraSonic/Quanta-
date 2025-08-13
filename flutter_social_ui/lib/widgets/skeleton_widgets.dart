@@ -435,6 +435,70 @@ class SkeletonChatMessage extends StatelessWidget {
 }
 
 // Utility class for creating skeleton loading states
+class SkeletonVideoPostItem extends StatelessWidget {
+  const SkeletonVideoPostItem({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Background
+        Container(color: Colors.black),
+
+        // Centered loading indicator
+        const Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+        ),
+
+        // Bottom content overlay
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withOpacity(0.5),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // User info
+                Row(
+                  children: [
+                    const SkeletonWidget(
+                      width: 40,
+                      height: 40,
+                      borderRadius: BorderRadius.all(Radius.circular(20)),
+                    ),
+                    const SizedBox(width: 12),
+                    const SkeletonWidget(width: 120, height: 16),
+                    const Spacer(),
+                    const SkeletonWidget(width: 80, height: 32),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Caption
+                const SkeletonWidget(width: double.infinity, height: 14),
+                const SizedBox(height: 8),
+                const SkeletonWidget(width: 200, height: 14),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class SkeletonLoader {
   static Widget postFeed({int itemCount = 3}) {
     return ListView.builder(
@@ -499,25 +563,10 @@ class SkeletonLoader {
   }
 
   static Widget videoFeed() {
-    return Container(
-      color: Colors.black,
-      height: 400, // Fixed height instead of infinite
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Shimmer.fromColors(
-              baseColor: Colors.grey[300]!,
-              highlightColor: Colors.grey[100]!,
-              child: Container(
-                width: double.infinity,
-                height: 200, // Fixed height instead of infinite
-                color: Colors.grey[300],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      itemCount: 3,
+      itemBuilder: (context, index) => const SkeletonVideoPostItem(),
     );
   }
 

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
+import 'package:flutter_social_ui/models/chat_message.dart';
 import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
+import 'package:flutter_social_ui/services/enhanced_chat_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:flutter_social_ui/screens/post_detail_screen.dart';
 import 'package:flutter_social_ui/screens/profile_screen.dart';
@@ -65,10 +67,12 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
   final notification_service.NotificationService _notificationService = notification_service.NotificationService();
+  final EnhancedChatService _chatService = EnhancedChatService();
   late TabController _tabController;
 
   List<NotificationItem> _allNotifications = [];
   List<NotificationItem> _unreadNotifications = [];
+  List<ChatMessage> _messages = [];
   final Map<String, AvatarModel> _avatarCache = {};
 
   bool _isLoading = true;
@@ -88,10 +92,12 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     try {
       await _notificationService.initialize();
       await _loadNotifications();
+      await _loadMessages();
       _setupRealtimeSubscription();
     } catch (e) {
       debugPrint('Error initializing services: $e');
       _loadNotifications();
+      _loadMessages();
     }
   }
   
@@ -131,7 +137,6 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     
     setState(() {
       _allNotifications = notificationItems;
-      _unreadNotifications = notificationItems.where((n) => !n.isRead).toList();
     });
   }
 
@@ -158,7 +163,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     style: kHeadingTextStyle.copyWith(fontSize: 24),
                   ),
                   Spacer(),
-                  if (_unreadNotifications.isNotEmpty)
+                  if (_allNotifications.any((n) => !n.isRead))
                     TextButton(
                       onPressed: _markAllAsRead,
                       child: Text(
@@ -180,7 +185,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 indicatorColor: kPrimaryColor,
                 tabs: [
                   Tab(text: 'All (${_allNotifications.length})'),
-                  Tab(text: 'Unread (${_unreadNotifications.length})'),
+                  Tab(text: 'Messages (${_messages.length})'),
                 ],
               ),
             ),
@@ -196,7 +201,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         controller: _tabController,
                         children: [
                           _buildNotificationsList(_allNotifications),
-                          _buildNotificationsList(_unreadNotifications),
+                          _buildMessagesList(_messages),
                         ],
                       ),
                     ),
@@ -474,7 +479,6 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
       setState(() {
         _allNotifications = notificationItems;
-        _unreadNotifications = notificationItems.where((n) => !n.isRead).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -509,6 +513,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   Future<void> _refreshNotifications() async {
     setState(() => _isRefreshing = true);
     await _loadNotifications();
+    await _loadMessages();
     setState(() => _isRefreshing = false);
   }
 
@@ -1124,5 +1129,239 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       case NotificationType.systemUpdate:
         return 'System Update';
     }
+  }
+
+  // ===== MESSAGE FUNCTIONALITY =====
+  
+  Widget _buildMessagesList(List<ChatMessage> messages) {
+    if (messages.isEmpty) {
+      return _buildMessagesEmptyState();
+    }
+
+    // Group messages by avatar/sender
+    final groupedMessages = <String, List<ChatMessage>>{};
+    for (final message in messages) {
+      final key = message.isMe ? 'me' : (message.avatarUrl ?? 'unknown');
+      groupedMessages[key] = groupedMessages[key] ?? [];
+      groupedMessages[key]!.add(message);
+    }
+
+    return ListView.separated(
+      padding: EdgeInsets.all(16),
+      itemCount: groupedMessages.length,
+      separatorBuilder: (context, index) => SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final entry = groupedMessages.entries.elementAt(index);
+        final senderKey = entry.key;
+        final senderMessages = entry.value;
+        final latestMessage = senderMessages.last;
+        
+        return _buildMessageCard(senderKey, latestMessage, senderMessages.length);
+      },
+    );
+  }
+
+  Widget _buildMessageCard(String senderKey, ChatMessage latestMessage, int messageCount) {
+    final isFromMe = senderKey == 'me';
+    final avatarUrl = isFromMe ? 'assets/images/We.jpg' : latestMessage.avatarUrl;
+    final senderName = isFromMe ? 'You' : _getSenderNameFromMessage(latestMessage);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: InkWell(
+        onTap: () => _handleMessageTap(latestMessage),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: kPrimaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: avatarUrl != null && avatarUrl.startsWith('assets/')
+                      ? Image.asset(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              isFromMe ? Icons.person : Icons.smart_toy,
+                              color: kPrimaryColor,
+                              size: 24,
+                            );
+                          },
+                        )
+                      : Icon(
+                          isFromMe ? Icons.person : Icons.smart_toy,
+                          color: kPrimaryColor,
+                          size: 24,
+                        ),
+                ),
+              ),
+
+              SizedBox(width: 12),
+
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          senderName,
+                          style: kBodyTextStyle.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          timeago.format(latestMessage.time),
+                          style: kCaptionTextStyle.copyWith(
+                            color: kLightTextColor,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      latestMessage.text,
+                      style: kCaptionTextStyle.copyWith(
+                        color: kLightTextColor,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (messageCount > 1)
+                      Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          '$messageCount messages',
+                          style: kCaptionTextStyle.copyWith(
+                            color: kPrimaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Message indicator
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: kPrimaryColor.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessagesEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline, size: 64, color: kLightTextColor),
+          SizedBox(height: 16),
+          Text(
+            'No messages yet',
+            style: kHeadingTextStyle.copyWith(fontSize: 18),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Start chatting with your avatars\nto see messages here.',
+            style: kBodyTextStyle.copyWith(color: kLightTextColor),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getSenderNameFromMessage(ChatMessage message) {
+    // Try to get avatar name from cache or return default
+    // In a real implementation, you might extract this from message metadata
+    return 'Avatar'; // Placeholder - could be enhanced to get actual avatar names
+  }
+
+  void _handleMessageTap(ChatMessage message) {
+    // Navigate to the chat screen
+    // For messages from avatars, we can try to navigate to that specific chat
+    if (!message.isMe) {
+      // Try to determine avatar ID from message or navigate to general chat
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(
+            name: _getSenderNameFromMessage(message),
+            avatar: message.avatarUrl ?? 'assets/images/p.jpg',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      // Load recent messages from chat service
+      // This is a placeholder implementation
+      final recentMessages = await _chatService.getRecentMessages();
+      setState(() {
+        _messages = recentMessages;
+      });
+    } catch (e) {
+      debugPrint('Error loading messages: $e');
+      // For now, create some sample messages for demo purposes
+      setState(() {
+        _messages = _createSampleMessages();
+      });
+    }
+  }
+
+  List<ChatMessage> _createSampleMessages() {
+    // Sample messages for demo purposes
+    return [
+      ChatMessage(
+        id: 'sample_1',
+        text: 'Hello! How are you doing today?',
+        isMe: false,
+        time: DateTime.now().subtract(Duration(hours: 2)),
+        avatarUrl: 'assets/images/p.jpg',
+      ),
+      ChatMessage(
+        id: 'sample_2',
+        text: 'I\'m working on some new features for the app',
+        isMe: true,
+        time: DateTime.now().subtract(Duration(hours: 1)),
+        avatarUrl: 'assets/images/We.jpg',
+      ),
+      ChatMessage(
+        id: 'sample_3',
+        text: 'That sounds exciting! Let me know if you need any help.',
+        isMe: false,
+        time: DateTime.now().subtract(Duration(minutes: 30)),
+        avatarUrl: 'assets/images/p.jpg',
+      ),
+    ];
   }
 }

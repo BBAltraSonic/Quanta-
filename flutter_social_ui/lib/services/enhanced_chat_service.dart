@@ -102,6 +102,19 @@ class EnhancedChatService {
     }
   }
 
+  /// Get recent messages for notifications screen
+  Future<List<ChatMessage>> getRecentMessages({
+    int limit = 20,
+  }) async {
+    try {
+      return _getRecentMessagesSupabase(limit);
+    } catch (e) {
+      debugPrint('Error getting recent messages: $e');
+      // Return sample messages for demo purposes
+      return _createSampleRecentMessages();
+    }
+  }
+
 
 
   Future<String> _generateAIResponse(String userMessage, AvatarModel? avatar) async {
@@ -311,6 +324,40 @@ class EnhancedChatService {
       'Conversation suggestions service is not yet fully implemented. '
       'Please ensure Supabase database is properly configured with conversation suggestions.'
     );
+  }
+
+  Future<List<ChatMessage>> _getRecentMessagesSupabase(int limit) async {
+    throw Exception(
+      'Recent messages service is not yet fully implemented. '
+      'Please ensure Supabase database is properly configured with chat tables.'
+    );
+  }
+
+  List<ChatMessage> _createSampleRecentMessages() {
+    // Sample recent messages for demo purposes
+    return [
+      ChatMessage(
+        id: 'recent_1',
+        text: 'Hello! How are you doing today?',
+        isMe: false,
+        time: DateTime.now().subtract(Duration(hours: 2)),
+        avatarUrl: 'assets/images/p.jpg',
+      ),
+      ChatMessage(
+        id: 'recent_2',
+        text: 'I\'m working on some new features for the app',
+        isMe: true,
+        time: DateTime.now().subtract(Duration(hours: 1)),
+        avatarUrl: 'assets/images/We.jpg',
+      ),
+      ChatMessage(
+        id: 'recent_3',
+        text: 'That sounds exciting! Let me know if you need any help.',
+        isMe: false,
+        time: DateTime.now().subtract(Duration(minutes: 30)),
+        avatarUrl: 'assets/images/p.jpg',
+      ),
+    ];
   }
 
   /// Get chat statistics
