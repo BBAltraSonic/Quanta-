@@ -10,7 +10,6 @@ import 'package:flutter_social_ui/screens/avatar_creation_wizard.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'package:video_compress/video_compress.dart';
 import '../utils/environment.dart';
 
 class ContentUploadScreen extends StatefulWidget {
@@ -649,13 +648,6 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           _videoController?.dispose();
           _videoController = VideoPlayerController.file(_selectedMedia!)
             ..initialize().then((_) async {
-              try {
-                final info = await VideoCompress.getMediaInfo(_selectedMedia!.path);
-                final durationMs = info.duration ?? 0;
-                _videoDurationSeconds = (durationMs / 1000).round();
-              } catch (_) {
-                _videoDurationSeconds = null;
-              }
               setState(() {});
             });
         }
@@ -862,21 +854,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         return false;
       }
 
-      // Check video duration
-      final info = await VideoCompress.getMediaInfo(videoFile.path);
-      final duration = info.duration;
-      
-      if (duration != null && duration > Environment.maxVideoLengthSeconds * 1000) {
-        final durationSeconds = (duration / 1000).round();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Video is too long ($durationSeconds seconds). Maximum length is ${Environment.maxVideoLengthSeconds} seconds.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return false;
-      }
+      // Note: Video duration validation removed (no compression service)
 
       return true;
     } catch (e) {

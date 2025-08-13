@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'package:video_compress/video_compress.dart';
 
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
@@ -230,19 +229,7 @@ class ContentUploadService {
         errors.add('Invalid file type. Supported: ${validExtensions.join(', ')}');
       }
       
-      // Video duration validation
-      if (type == PostType.video) {
-        try {
-          final info = await VideoCompress.getMediaInfo(mediaFile.path);
-          final duration = info.duration;
-          if (duration != null && duration > Environment.maxVideoLengthSeconds * 1000) {
-            errors.add('Video duration exceeds ${Environment.maxVideoLengthSeconds} seconds');
-          }
-        } catch (e) {
-          debugPrint('Could not get video duration: $e');
-          // Don't add error for duration check failure, just log it
-        }
-      }
+      // Note: Video duration validation removed (no compression service)
     }
     
     if (externalUrl != null && !(Uri.tryParse(externalUrl)?.isAbsolute ?? false)) {
@@ -364,16 +351,8 @@ class ContentUploadService {
       final fileName = '$fileId$extension';
       final storagePath = '$avatarId/$fileName';
 
-      // Compress video if needed
-      File? processedFile;
-      if (type == PostType.video) {
-        processedFile = await _compressVideo(file);
-      } else {
-        processedFile = file;
-      }
-
-      // Upload to Supabase storage
-      final bytes = await processedFile.readAsBytes();
+      // Upload to Supabase storage (no compression)
+      final bytes = await file.readAsBytes();
       await _authService.supabase.storage
           .from(DbConfig.postsBucket)
           .uploadBinary(storagePath, bytes);
@@ -382,15 +361,6 @@ class ContentUploadService {
       final publicUrl = _authService.supabase.storage
           .from(DbConfig.postsBucket)
           .getPublicUrl(storagePath);
-
-      // Clean up compressed file if it was created
-      if (processedFile != file) {
-        try {
-          await processedFile.delete();
-        } catch (e) {
-          debugPrint('Failed to delete compressed file: $e');
-        }
-      }
 
       return publicUrl;
     } catch (e) {
@@ -438,27 +408,6 @@ class ContentUploadService {
     }
   }
 
-  /// Compress video file
-  Future<File> _compressVideo(File videoFile) async {
-    try {
-      final info = await VideoCompress.compressVideo(
-        videoFile.path,
-        quality: VideoQuality.MediumQuality,
-        deleteOrigin: false,
-        includeAudio: true,
-      );
-
-      if (info != null && info.file != null) {
-        return info.file!;
-      } else {
-        // If compression fails, return original
-        return videoFile;
-      }
-    } catch (e) {
-      debugPrint('Video compression failed, using original: $e');
-      return videoFile;
-    }
-  }
 
   Future<PostModel> _importExternalContentSupabase({
     required String avatarId,
