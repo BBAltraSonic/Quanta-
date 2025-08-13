@@ -5,10 +5,13 @@ import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/services/content_upload_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service.dart';
+import 'package:flutter_social_ui/services/content_moderation_service.dart';
 import 'package:flutter_social_ui/screens/avatar_creation_wizard.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_compress/video_compress.dart';
+import '../utils/environment.dart';
 
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
@@ -22,6 +25,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final ContentUploadService _contentService = ContentUploadService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
+  final ContentModerationService _moderationService = ContentModerationService();
 
   List<AvatarModel> _userAvatars = [];
   AvatarModel? _selectedAvatar;
@@ -32,6 +36,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final bool _isLoading = false;
   bool _isUploading = false;
   bool _loadingAvatars = true;
+  String _uploadStep = '';
+  double _uploadProgress = 0.0;
+  int? _videoDurationSeconds;
+  String? _mediaSizeLabelMB;
 
   @override
   void initState() {
@@ -141,27 +149,34 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         actions: [
           TextButton(
             onPressed: _canUpload() ? _uploadContent : null,
-            child: _isUploading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
-                    ),
-                  )
-                : Text(
-                    'Share',
-                    style: TextStyle(
-                      color: _canUpload() ? kPrimaryColor : kLightTextColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+            child: Text(
+              'Share',
+              style: TextStyle(
+                color: _canUpload() ? kPrimaryColor : kLightTextColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
+        bottom: _isUploading
+            ? PreferredSize(
+                preferredSize: Size.fromHeight(4),
+                child: LinearProgressIndicator(
+                  minHeight: 4,
+                  value: _uploadProgress > 0 && _uploadProgress < 1.0 ? _uploadProgress : null,
+                  backgroundColor: kLightTextColor.withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                ),
+              )
+            : null,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -376,9 +391,42 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               ),
             ],
 
+            // Suggested hashtags (tap to insert)
+            if (_selectedAvatar != null) ...[
+              SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ContentUploadService()
+                    .suggestHashtags(_captionController.text, _selectedAvatar!)
+                    .map((tag) => GestureDetector(
+                          onTap: () {
+                            final t = _captionController.text.trim();
+                            final newText = t.isEmpty ? tag : '$t $tag';
+                            _captionController.text = newText;
+                            _captionController.selection = TextSelection.fromPosition(
+                              TextPosition(offset: _captionController.text.length),
+                            );
+                            setState(() {
+                              _extractedHashtags = PostModel.extractHashtags(_captionController.text);
+                            });
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: kPrimaryColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(tag, style: kCaptionTextStyle.copyWith(color: kPrimaryColor)),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ],
+
             SizedBox(height: 32),
 
-            // Upload button
+            // Upload button (no spinner)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -390,25 +438,13 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: _isUploading
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                          SizedBox(width: 16),
-                          Text('Uploading...'),
-                        ],
-                      )
-                    : Text(
-                        'Share Post',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                child: Text(
+                  _isUploading ? 'Sharing…' : 'Share Post',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -423,41 +459,93 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: _videoController!.value.aspectRatio,
-              child: VideoPlayer(_videoController!),
+            child: Container(
+              color: Colors.black,
+              width: double.infinity,
+              height: 300,
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: _videoController!.value.size.width,
+                  height: _videoController!.value.size.height,
+                  child: AspectRatio(
+                    aspectRatio: _videoController!.value.aspectRatio,
+                    child: VideoPlayer(_videoController!),
+                  ),
+                ),
+              ),
             ),
           ),
+          if (_videoDurationSeconds != null || _mediaSizeLabelMB != null)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_videoDurationSeconds != null ? '${_videoDurationSeconds}s' : ''}${_videoDurationSeconds != null && _mediaSizeLabelMB != null ? ' • ' : ''}${_mediaSizeLabelMB ?? ''}',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ),
           Positioned(
             bottom: 16,
             right: 16,
-            child: FloatingActionButton.small(
-              onPressed: () {
-                setState(() {
+            child: Semantics(
+              button: true,
+              label: 'Play or pause video',
+              child: FloatingActionButton.small(
+                onPressed: () {
+                  setState(() {
+                    _videoController!.value.isPlaying
+                        ? _videoController!.pause()
+                        : _videoController!.play();
+                  });
+                },
+                backgroundColor: Colors.black54,
+                child: Icon(
                   _videoController!.value.isPlaying
-                      ? _videoController!.pause()
-                      : _videoController!.play();
-                });
-              },
-              backgroundColor: Colors.black54,
-              child: Icon(
-                _videoController!.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow,
-                color: Colors.white,
+                      ? Icons.pause
+                      : Icons.play_arrow,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
         ],
       );
     } else if (_postType == PostType.image) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          _selectedMedia!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-        ),
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              _selectedMedia!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+            ),
+          ),
+          if (_mediaSizeLabelMB != null)
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _mediaSizeLabelMB!,
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ),
+        ],
       );
     }
 
@@ -512,6 +600,14 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                       _showCameraOptions();
                     },
                   ),
+                  _MediaPickerOption(
+                    icon: Icons.link,
+                    label: 'Import',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showExternalImportOptions();
+                    },
+                  ),
                 ],
               ),
             ],
@@ -533,14 +629,33 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       }
 
       if (pickedFile != null) {
+        final file = File(pickedFile.path);
+        
+        // Validate video if it's a video file
+        if (isVideo == true) {
+          final isValid = await _validateVideoFile(file);
+          if (!isValid) {
+            return; // Don't set the file if validation failed
+          }
+        }
+
         setState(() {
-          _selectedMedia = File(pickedFile!.path);
+          _selectedMedia = file;
+          final bytes = file.lengthSync();
+          _mediaSizeLabelMB = (bytes / (1024 * 1024)).toStringAsFixed(1) + 'MB';
         });
 
         if (_postType == PostType.video) {
           _videoController?.dispose();
           _videoController = VideoPlayerController.file(_selectedMedia!)
-            ..initialize().then((_) {
+            ..initialize().then((_) async {
+              try {
+                final info = await VideoCompress.getMediaInfo(_selectedMedia!.path);
+                final durationMs = info.duration ?? 0;
+                _videoDurationSeconds = (durationMs / 1000).round();
+              } catch (_) {
+                _videoDurationSeconds = null;
+              }
               setState(() {});
             });
         }
@@ -606,9 +721,58 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   Future<void> _uploadContent() async {
     if (!_canUpload()) return;
 
-    setState(() => _isUploading = true);
+    setState(() {
+      _isUploading = true;
+      _uploadStep = 'Validating content...';
+      _uploadProgress = 0.1;
+    });
 
     try {
+      // Step 1: Validate content
+      final validation = await _contentService.validateContent(
+        caption: _captionController.text.trim(),
+        mediaFile: _selectedMedia,
+        type: _postType,
+      );
+
+      if (!validation.isValid) {
+        throw Exception(validation.errors.join(', '));
+      }
+
+      setState(() {
+        _uploadStep = 'Checking content safety...';
+        _uploadProgress = 0.2;
+      });
+
+      // Step 2: Content moderation (create a mock post for moderation)
+      final mockPost = PostModel.create(
+        avatarId: _selectedAvatar!.id,
+        type: _postType,
+        caption: _captionController.text.trim(),
+        hashtags: _extractedHashtags,
+      );
+
+      final moderationResult = await _moderationService.moderatePost(mockPost);
+      
+      // Handle moderation result
+      if (moderationResult.action == ModerationAction.block) {
+        throw Exception('Content violates community guidelines: ${moderationResult.reasons.join(', ')}');
+      }
+      
+      if (moderationResult.action == ModerationAction.warn) {
+        // Show warning dialog but allow to proceed
+        final shouldContinue = await _showModerationWarning(moderationResult);
+        if (!shouldContinue) {
+          return;
+        }
+      }
+
+      setState(() {
+        _uploadStep = 'Creating post...';
+        _uploadProgress = 0.4;
+      });
+
+      // Step 3: Create post
       final post = await _contentService.createPost(
         avatarId: _selectedAvatar!.id,
         type: _postType,
@@ -616,6 +780,11 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         caption: _captionController.text.trim(),
         hashtags: _extractedHashtags,
       );
+
+      setState(() {
+        _uploadStep = 'Finalizing...';
+        _uploadProgress = 1.0;
+      });
 
       if (post != null) {
         Navigator.pop(context, post); // Return the created post
@@ -634,7 +803,280 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         ),
       );
     } finally {
-      setState(() => _isUploading = false);
+      setState(() {
+        _isUploading = false;
+        _uploadStep = '';
+        _uploadProgress = 0.0;
+      });
+    }
+  }
+
+  Future<bool> _showModerationWarning(dynamic moderationResult) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Content Warning'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your content has been flagged for potential issues:'),
+            SizedBox(height: 8),
+            ...moderationResult.reasons.map<Widget>((reason) => 
+              Padding(
+                padding: EdgeInsets.only(left: 16, bottom: 4),
+                child: Text('• $reason'),
+              ),
+            ),
+            SizedBox(height: 16),
+            Text('Do you want to publish anyway?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Publish Anyway'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Future<bool> _validateVideoFile(File videoFile) async {
+    try {
+      // Check file size
+      final fileSize = videoFile.lengthSync();
+      final maxSize = Environment.maxVideoSizeMB * 1024 * 1024;
+      
+      if (fileSize > maxSize) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video file is too large. Maximum size is ${Environment.maxVideoSizeMB}MB.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+
+      // Check video duration
+      final info = await VideoCompress.getMediaInfo(videoFile.path);
+      final duration = info.duration;
+      
+      if (duration != null && duration > Environment.maxVideoLengthSeconds * 1000) {
+        final durationSeconds = (duration / 1000).round();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video is too long ($durationSeconds seconds). Maximum length is ${Environment.maxVideoLengthSeconds} seconds.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error validating video: $e');
+      // If we can't validate, allow the upload (validation will happen again in service)
+      return true;
+    }
+  }
+
+  void _showExternalImportOptions() {
+    final urlController = TextEditingController();
+    String? selectedPlatform;
+    PostType selectedType = PostType.image;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCardColor,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Import from External Platform',
+                style: kHeadingTextStyle.copyWith(fontSize: 18),
+              ),
+              SizedBox(height: 20),
+              
+              // Platform selection
+              Text('Platform:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedPlatform,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintText: 'Select platform',
+                ),
+                items: _contentService.getSupportedPlatforms().map((platform) {
+                  return DropdownMenuItem(
+                    value: platform.id,
+                    child: Row(
+                      children: [
+                        Text(platform.icon),
+                        SizedBox(width: 8),
+                        Text(platform.name),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setModalState(() {
+                    selectedPlatform = value;
+                  });
+                },
+              ),
+              SizedBox(height: 16),
+              
+              // Content type selection
+              Text('Content Type:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<PostType>(
+                      title: Text('Image'),
+                      value: PostType.image,
+                      groupValue: selectedType,
+                      onChanged: (value) {
+                        setModalState(() {
+                          selectedType = value!;
+                        });
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<PostType>(
+                      title: Text('Video'),
+                      value: PostType.video,
+                      groupValue: selectedType,
+                      onChanged: (value) {
+                        setModalState(() {
+                          selectedType = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              
+              // URL input
+              Text('Content URL:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              TextFormField(
+                controller: urlController,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  hintText: 'Paste the content URL here',
+                  prefixIcon: Icon(Icons.link),
+                ),
+                keyboardType: TextInputType.url,
+              ),
+              SizedBox(height: 24),
+              
+              // Import button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: (selectedPlatform != null && urlController.text.isNotEmpty)
+                      ? () => _importExternalContent(
+                            selectedPlatform!,
+                            urlController.text,
+                            selectedType,
+                          )
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Import Content',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importExternalContent(String platform, String url, PostType type) async {
+    Navigator.pop(context); // Close the modal
+    
+    try {
+      setState(() {
+        _isUploading = true;
+        _uploadStep = 'Importing content...';
+        _uploadProgress = 0.3;
+      });
+
+      // Import content using the service
+      final post = await _contentService.importExternalContent(
+        avatarId: _selectedAvatar!.id,
+        caption: _captionController.text.trim(),
+        sourceUrl: url,
+        sourcePlatform: platform,
+        type: type,
+        metadata: {
+          'imported_at': DateTime.now().toIso8601String(),
+        },
+      );
+
+      setState(() {
+        _selectedMedia = null; // Clear local file
+        _postType = type;
+        _uploadStep = 'Content imported successfully';
+        _uploadProgress = 1.0;
+      });
+
+      // Navigate back with the created post
+      Navigator.pop(context, post);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Content imported from $platform successfully! 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to import content: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+        _uploadStep = '';
+        _uploadProgress = 0.0;
+      });
     }
   }
 }

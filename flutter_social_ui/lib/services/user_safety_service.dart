@@ -576,7 +576,7 @@ class UserSafetyService {
         final rows = await _supabase
             .from(DbConfig.avatarsTable)
             .select('id')
-            .in_('owner_user_id', blockedUserIds);
+            .inFilter('owner_user_id', blockedUserIds);
         blockedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
       }
 
@@ -598,7 +598,7 @@ class UserSafetyService {
         final rows = await _supabase
             .from(DbConfig.avatarsTable)
             .select('id')
-            .in_('owner_user_id', mutedUserIds);
+            .inFilter('owner_user_id', mutedUserIds);
         mutedAvatarIds.addAll(rows.map<String>((r) => r['id'] as String));
       }
 

@@ -815,13 +815,9 @@ class EnhancedFeedsService {
 
   Future<void> _decrementCommentsCount(String postId) async {
     try {
-      await _supabase
-          .from(DbConfig.postsTable)
-          .update({
-            'comments_count': 'GREATEST(comments_count - 1, 0)',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', postId);
+      await _supabase.rpc('decrement_comments_count', params: {
+        'post_id': postId,
+      });
     } catch (e) {
       debugPrint('❌ Failed to decrement comments count: $e');
     }

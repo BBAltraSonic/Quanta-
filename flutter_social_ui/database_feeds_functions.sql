@@ -1,45 +1,17 @@
--- SQL functions for feeds functionality
--- These functions should be added to your Supabase database
+-- Deprecated in favor of JSON-returning, RLS-safe RPCs in database_rpc_functions.sql
+-- Keep this file for reference only. Do not deploy overlapping function names.
 
 -- Function to increment likes count
-CREATE OR REPLACE FUNCTION increment_likes_count(post_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE public.posts 
-  SET likes_count = likes_count + 1 
-  WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
+-- DO NOT DEPLOY: superseded by increment_likes_count(target_post_id UUID) returning JSON
 
 -- Function to decrement likes count
-CREATE OR REPLACE FUNCTION decrement_likes_count(post_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE public.posts 
-  SET likes_count = GREATEST(likes_count - 1, 0)
-  WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
+-- DO NOT DEPLOY: superseded by decrement_likes_count(target_post_id UUID) returning JSON
 
 -- Function to increment comments count
-CREATE OR REPLACE FUNCTION increment_comments_count(post_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE public.posts 
-  SET comments_count = comments_count + 1 
-  WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
+-- DO NOT DEPLOY: add JSON-returning version in database_comments_functions.sql
 
 -- Function to increment view count
-CREATE OR REPLACE FUNCTION increment_view_count(post_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE public.posts 
-  SET views_count = views_count + 1 
-  WHERE id = post_id;
-END;
-$$ LANGUAGE plpgsql;
+-- DO NOT DEPLOY: superseded by increment_view_count(target_post_id UUID) returning JSON
 
 -- Function to get trending posts (optional - can be called from Dart)
 CREATE OR REPLACE FUNCTION get_trending_posts(page_limit INTEGER DEFAULT 10, page_offset INTEGER DEFAULT 0)

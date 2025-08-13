@@ -1,8 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:video_compress/video_compress.dart';
+
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
-
+import '../config/db_config.dart';
+import '../utils/environment.dart';
 import 'auth_service.dart';
 
 
@@ -68,9 +74,11 @@ class ContentUploadService {
   }
 
   /// Upload media file and get URL
+  /// Note: avatarId-scoped paths are required by storage RLS policies.
+  /// Prefer using createPost/importExternalContent which handle this.
   Future<String> uploadMediaFile(File file, PostType type) async {
     try {
-      return _uploadMediaFileSupabase(file, type);
+      throw Exception('Use createPost() or importExternalContent(); avatarId is required for storage path.');
     } catch (e) {
       debugPrint('Error uploading media file: $e');
       rethrow;
@@ -183,12 +191,12 @@ class ContentUploadService {
   }
 
   /// Validate content before upload
-  ValidationResult validateContent({
+  Future<ValidationResult> validateContent({
     required String caption,
     File? mediaFile,
     String? externalUrl,
     required PostType type,
-  }) {
+  }) async {
     final errors = <String>[];
     
     // Caption validation
@@ -205,10 +213,12 @@ class ContentUploadService {
     
     if (mediaFile != null) {
       final fileSize = mediaFile.lengthSync();
-      final maxSize = type == PostType.video ? 100 * 1024 * 1024 : 10 * 1024 * 1024; // 100MB for video, 10MB for image
+      final maxSize = type == PostType.video 
+          ? Environment.maxVideoSizeMB * 1024 * 1024 
+          : Environment.maxImageSizeMB * 1024 * 1024;
       
       if (fileSize > maxSize) {
-        errors.add('File size exceeds limit (${type == PostType.video ? '100MB' : '10MB'})');
+        errors.add('File size exceeds limit (${type == PostType.video ? '${Environment.maxVideoSizeMB}MB' : '${Environment.maxImageSizeMB}MB'})');
       }
       
       final extension = mediaFile.path.split('.').last.toLowerCase();
@@ -218,6 +228,20 @@ class ContentUploadService {
       
       if (!validExtensions.contains(extension)) {
         errors.add('Invalid file type. Supported: ${validExtensions.join(', ')}');
+      }
+      
+      // Video duration validation
+      if (type == PostType.video) {
+        try {
+          final info = await VideoCompress.getMediaInfo(mediaFile.path);
+          final duration = info.duration;
+          if (duration != null && duration > Environment.maxVideoLengthSeconds * 1000) {
+            errors.add('Video duration exceeds ${Environment.maxVideoLengthSeconds} seconds');
+          }
+        } catch (e) {
+          debugPrint('Could not get video duration: $e');
+          // Don't add error for duration check failure, just log it
+        }
       }
     }
     
@@ -240,34 +264,200 @@ class ContentUploadService {
     PostType type = PostType.image,
     List<String>? hashtags,
   }) async {
-    // For now, create a mock post for testing purposes
-    // In production, this would upload to Supabase storage and create database record
-    final postId = DateTime.now().millisecondsSinceEpoch.toString();
-    
-    return PostModel(
-      id: postId,
-      avatarId: avatarId,
-      type: type,
-      caption: caption,
-      videoUrl: type == PostType.video ? (mediaFile?.path ?? externalMediaUrl) : null,
-      imageUrl: type == PostType.image ? (mediaFile?.path ?? externalMediaUrl) : null,
-      hashtags: hashtags ?? [],
-      likesCount: 0,
-      commentsCount: 0,
-      sharesCount: 0,
-      viewsCount: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      isActive: true,
-      status: PostStatus.published,
-    );
+    try {
+      final userId = _authService.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Validate content first
+      final validation = await validateContent(
+        caption: caption,
+        mediaFile: mediaFile,
+        externalUrl: externalMediaUrl,
+        type: type,
+      );
+
+      if (!validation.isValid) {
+        throw Exception('Content validation failed: ${validation.errors.join(', ')}');
+      }
+
+      String? mediaUrl;
+      String? thumbnailUrl;
+
+      // Upload media file if provided
+      if (mediaFile != null) {
+        mediaUrl = await _uploadMediaFileSupabase(
+          avatarId: avatarId,
+          file: mediaFile,
+          type: type,
+        );
+        
+        // Generate thumbnail for videos
+        if (type == PostType.video) {
+          thumbnailUrl = await _generateAndUploadThumbnail(mediaFile, avatarId);
+        }
+      } else if (externalMediaUrl != null) {
+        mediaUrl = externalMediaUrl;
+      }
+
+      if (mediaUrl == null) {
+        throw Exception('No media URL available');
+      }
+
+      // Create post record in database
+      const uuid = Uuid();
+      final postId = uuid.v4();
+      
+      final postData = {
+        'id': postId,
+        'avatar_id': avatarId,
+        'type': type == PostType.video ? DbConfig.videoType : DbConfig.imageType,
+        'status': DbConfig.publishedStatus,
+        'caption': caption,
+        'hashtags': hashtags ?? [],
+        'video_url': type == PostType.video ? mediaUrl : null,
+        'image_url': type == PostType.image ? mediaUrl : null,
+        'thumbnail_url': thumbnailUrl,
+        'views_count': 0,
+        'likes_count': 0,
+        'comments_count': 0,
+        'shares_count': 0,
+        'engagement_rate': 0.0,
+        'is_active': true,
+        'metadata': {
+          'uploaded_by': userId,
+          'original_filename': mediaFile?.path.split('/').last,
+        },
+      };
+
+      final response = await _authService.supabase
+          .from(DbConfig.postsTable)
+          .insert(postData)
+          .select()
+          .single();
+
+      // Convert response to PostModel
+      return PostModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error uploading content to Supabase: $e');
+      rethrow;
+    }
   }
 
-  Future<String> _uploadMediaFileSupabase(File file, PostType type) async {
-    throw Exception(
-      'Media file upload service is not yet fully implemented. '
-      'Please ensure Supabase storage is properly configured.'
-    );
+  /// Upload media file to Supabase storage and return public URL
+  Future<String> _uploadMediaFileSupabase({
+    required String avatarId,
+    required File file,
+    required PostType type,
+  }) async {
+    try {
+      final userId = _authService.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Generate unique filename
+      const uuid = Uuid();
+      final fileId = uuid.v4();
+      final extension = path.extension(file.path);
+      final fileName = '$fileId$extension';
+      final storagePath = '$avatarId/$fileName';
+
+      // Compress video if needed
+      File? processedFile;
+      if (type == PostType.video) {
+        processedFile = await _compressVideo(file);
+      } else {
+        processedFile = file;
+      }
+
+      // Upload to Supabase storage
+      final bytes = await processedFile.readAsBytes();
+      await _authService.supabase.storage
+          .from(DbConfig.postsBucket)
+          .uploadBinary(storagePath, bytes);
+
+      // Get public URL
+      final publicUrl = _authService.supabase.storage
+          .from(DbConfig.postsBucket)
+          .getPublicUrl(storagePath);
+
+      // Clean up compressed file if it was created
+      if (processedFile != file) {
+        try {
+          await processedFile.delete();
+        } catch (e) {
+          debugPrint('Failed to delete compressed file: $e');
+        }
+      }
+
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading media file: $e');
+      rethrow;
+    }
+  }
+
+  /// Generate and upload video thumbnail
+  Future<String?> _generateAndUploadThumbnail(File videoFile, String avatarId) async {
+    try {
+      final userId = _authService.currentUser?.id;
+      if (userId == null) return null;
+
+      // Generate thumbnail
+      final thumbnailBytes = await VideoThumbnail.thumbnailData(
+        video: videoFile.path,
+        imageFormat: ImageFormat.JPEG,
+        maxHeight: 720,
+        quality: 75,
+      );
+
+      if (thumbnailBytes == null) return null;
+
+      // Generate unique filename for thumbnail
+      const uuid = Uuid();
+      final fileId = uuid.v4();
+      final fileName = '${fileId}_thumbnail.jpg';
+      final storagePath = '$avatarId/$fileName';
+
+      // Upload thumbnail to storage
+      await _authService.supabase.storage
+          .from(DbConfig.postsBucket)
+          .uploadBinary(storagePath, thumbnailBytes);
+
+      // Get public URL
+      final publicUrl = _authService.supabase.storage
+          .from(DbConfig.postsBucket)
+          .getPublicUrl(storagePath);
+
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error generating/uploading thumbnail: $e');
+      return null;
+    }
+  }
+
+  /// Compress video file
+  Future<File> _compressVideo(File videoFile) async {
+    try {
+      final info = await VideoCompress.compressVideo(
+        videoFile.path,
+        quality: VideoQuality.MediumQuality,
+        deleteOrigin: false,
+        includeAudio: true,
+      );
+
+      if (info != null && info.file != null) {
+        return info.file!;
+      } else {
+        // If compression fails, return original
+        return videoFile;
+      }
+    } catch (e) {
+      debugPrint('Video compression failed, using original: $e');
+      return videoFile;
+    }
   }
 
   Future<PostModel> _importExternalContentSupabase({
@@ -278,10 +468,70 @@ class ContentUploadService {
     PostType type = PostType.image,
     Map<String, dynamic>? metadata,
   }) async {
-    throw Exception(
-      'External content import service is not yet fully implemented. '
-      'Please ensure external platform integrations are properly configured.'
-    );
+    try {
+      final userId = _authService.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Validate URL
+      final uri = Uri.tryParse(sourceUrl);
+      if (uri == null || !uri.isAbsolute) {
+        throw Exception('Invalid URL format');
+      }
+
+      // Validate platform support
+      final supportedPlatforms = getSupportedPlatforms();
+      final platform = supportedPlatforms.firstWhere(
+        (p) => p.id == sourcePlatform,
+        orElse: () => throw Exception('Unsupported platform: $sourcePlatform'),
+      );
+
+      if (!platform.supportedTypes.contains(type)) {
+        throw Exception('Platform $sourcePlatform does not support ${type.name} content');
+      }
+
+      // Create post record with external URL
+      const uuid = Uuid();
+      final postId = uuid.v4();
+      
+      final postData = {
+        'id': postId,
+        'avatar_id': avatarId,
+        'type': type == PostType.video ? DbConfig.videoType : DbConfig.imageType,
+        'status': DbConfig.publishedStatus,
+        'caption': caption,
+        'hashtags': extractHashtags(caption),
+        'video_url': type == PostType.video ? sourceUrl : null,
+        'image_url': type == PostType.image ? sourceUrl : null,
+        'thumbnail_url': null, // External content doesn't have thumbnails generated
+        'views_count': 0,
+        'likes_count': 0,
+        'comments_count': 0,
+        'shares_count': 0,
+        'engagement_rate': 0.0,
+        'is_active': true,
+        'metadata': {
+          'uploaded_by': userId,
+          'source_platform': sourcePlatform,
+          'source_url': sourceUrl,
+          'is_external': true,
+          ...?metadata,
+        },
+      };
+
+      final response = await _authService.supabase
+          .from(DbConfig.postsTable)
+          .insert(postData)
+          .select()
+          .single();
+
+      // Convert response to PostModel
+      return PostModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error importing external content: $e');
+      rethrow;
+    }
   }
 }
 
