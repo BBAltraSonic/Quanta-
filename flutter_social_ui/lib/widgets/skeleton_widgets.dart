@@ -501,6 +501,7 @@ class SkeletonLoader {
   static Widget videoFeed() {
     return Container(
       color: Colors.black,
+      height: 400, // Fixed height instead of infinite
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -510,7 +511,7 @@ class SkeletonLoader {
               highlightColor: Colors.grey[100]!,
               child: Container(
                 width: double.infinity,
-                height: double.infinity,
+                height: 200, // Fixed height instead of infinite
                 color: Colors.grey[300],
               ),
             ),

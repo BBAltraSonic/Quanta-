@@ -54,6 +54,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final int _postsPerPage = 20;
   Map<String, dynamic>? _comparisons;
   
+  // Pinned post and collaborations state
+  PostModel? _pinnedPost;
+  List<PostModel> _collaborationPosts = [];
+  bool _isPinnedPostLoading = false;
+  bool _isCollaborationsLoading = false;
+  
   @override
   void initState() {
     super.initState();
@@ -102,9 +108,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final currentUserId = _authService.currentUserId;
       if (currentUserId == null) {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
         return;
       }
       
@@ -120,20 +128,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await _checkFollowStatus(targetUserId);
       }
       
-      setState(() {
-        _user = profileData['user'] as UserModel;
-        _avatars = profileData['avatars'] as List<AvatarModel>;
-        _activeAvatar = profileData['active_avatar'] as AvatarModel?;
-        _stats = profileData['stats'] as Map<String, dynamic>;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _user = profileData['user'] as UserModel;
+          _avatars = profileData['avatars'] as List<AvatarModel>;
+          _activeAvatar = profileData['active_avatar'] as AvatarModel?;
+          _stats = profileData['stats'] as Map<String, dynamic>;
+          _isLoading = false;
+        });
+      }
       
       // Load user posts after profile data is loaded
       await _loadUserPosts();
+      
+      // Load pinned post and collaborations if active avatar exists
+      if (_activeAvatar != null) {
+        await _loadPinnedPost();
+        await _loadCollaborations();
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
   
@@ -566,6 +584,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+  
+  /// Load pinned post for the active avatar
+  Future<void> _loadPinnedPost() async {
+    if (_activeAvatar == null) return;
+    
+    setState(() {
+      _isPinnedPostLoading = true;
+    });
+    
+    try {
+      final pinnedPostData = await _profileService.getPinnedPost(_activeAvatar!.id);
+      
+      if (pinnedPostData != null) {
+        setState(() {
+          _pinnedPost = PostModel.fromJson(pinnedPostData);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading pinned post: $e');
+    } finally {
+      setState(() {
+        _isPinnedPostLoading = false;
+      });
+    }
+  }
+  
+  /// Load collaboration posts for the active avatar
+  Future<void> _loadCollaborations() async {
+    if (_activeAvatar == null) return;
+    
+    setState(() {
+      _isCollaborationsLoading = true;
+    });
+    
+    try {
+      final collaborationData = await _profileService.getCollaborationPosts(_activeAvatar!.id);
+      
+      setState(() {
+        _collaborationPosts = collaborationData
+            .map((data) => PostModel.fromJson(data))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('Error loading collaborations: $e');
+    } finally {
+      setState(() {
+        _isCollaborationsLoading = false;
+      });
+    }
+  }
 
   Widget _buildSkeletonLoading() {
     return Stack(
@@ -790,6 +858,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: _buildAvatarsSection(),
                   ),
                 ),
+                // Pinned Post Section
+                if (_pinnedPost != null || _isPinnedPostLoading)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildPinnedPostSection(),
+                    ),
+                  ),
+                // Collaborations Section
+                if (_collaborationPosts.isNotEmpty || _isCollaborationsLoading)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildCollaborationsSection(),
+                    ),
+                  ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
                   sliver: SliverToBoxAdapter(child: _userPostsMasonry()),
@@ -983,15 +1067,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    '📊 Analytics Insights',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                  const Expanded(
+                    child: Text(
+                      '📊 Analytics Insights',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
-                  _buildPeriodSelector(),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _buildPeriodSelector(),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1100,23 +1189,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: AnalyticsPeriod.values.take(4).map((period) {
           final isSelected = period == _selectedPeriod;
-          return GestureDetector(
-            onTap: () => _onPeriodChanged(period),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? kPrimaryColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                period.shortLabel,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => _onPeriodChanged(period),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? kPrimaryColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  period.shortLabel,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ),
             ),
@@ -1600,6 +1692,496 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+  
+  /// Build pinned post section
+  Widget _buildPinnedPostSection() {
+    if (_isPinnedPostLoading) {
+      return _buildPinnedPostSkeleton();
+    }
+    
+    if (_pinnedPost == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.push_pin, color: kPrimaryColor, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Pinned Post',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Spacer(),
+              if (_isOwnProfile)
+                IconButton(
+                  onPressed: () {
+                    // TODO: Implement unpin functionality
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Unpin post functionality coming soon!'),
+                        backgroundColor: kPrimaryColor,
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                  tooltip: 'Post options',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildPinnedPostCard(_pinnedPost!),
+        ],
+      ),
+    );
+  }
+  
+  /// Build pinned post skeleton loading
+  Widget _buildPinnedPostSkeleton() {
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonWidget(width: 20, height: 20, borderRadius: BorderRadius.circular(10)),
+              const SizedBox(width: 8),
+              SkeletonWidget(width: 100, height: 16),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                SkeletonWidget(
+                  width: 80,
+                  height: 120,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SkeletonWidget(width: double.infinity, height: 14),
+                      const SizedBox(height: 8),
+                      SkeletonWidget(width: 120, height: 12),
+                      const SizedBox(height: 8),
+                      SkeletonWidget(width: 80, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Build pinned post card
+  Widget _buildPinnedPostCard(PostModel post) {
+    final isVideo = post.type == PostType.video;
+    final imageUrl = post.thumbnailUrl ?? post.imageUrl;
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to post detail
+        Navigator.pushNamed(context, '/post_detail', arguments: post);
+      },
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            // Post image/thumbnail
+            Container(
+              width: 80,
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+                color: Colors.grey[800],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null)
+                    imageUrl.startsWith('assets/')
+                        ? Image.asset(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                          )
+                  else
+                    _buildFallbackImage(),
+                  if (isVideo)
+                    Center(
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          color: kPrimaryColor,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Post details
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.caption ?? 'No caption',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.favorite, color: Colors.red, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatNumber(post.likesCount ?? 0),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(Icons.comment, color: Colors.white70, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatNumber(post.commentsCount ?? 0),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      _formatPostDate(post.createdAt),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Build collaborations section
+  Widget _buildCollaborationsSection() {
+    if (_isCollaborationsLoading) {
+      return _buildCollaborationsSkeleton();
+    }
+    
+    if (_collaborationPosts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.handshake, color: Colors.amber, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Collaborations',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_collaborationPosts.length} posts',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _collaborationPosts.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final post = _collaborationPosts[index];
+                return _buildCollaborationPostCard(post);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Build collaborations skeleton loading
+  Widget _buildCollaborationsSkeleton() {
+    return _HeaderCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonWidget(width: 20, height: 20, borderRadius: BorderRadius.circular(10)),
+              const SizedBox(width: 8),
+              SkeletonWidget(width: 120, height: 16),
+              const Spacer(),
+              SkeletonWidget(width: 60, height: 12),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) => Container(
+                width: 110,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    SkeletonWidget(
+                      width: 110,
+                      height: 80,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        children: [
+                          SkeletonWidget(width: double.infinity, height: 12),
+                          const SizedBox(height: 4),
+                          SkeletonWidget(width: 60, height: 10),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Build collaboration post card
+  Widget _buildCollaborationPostCard(PostModel post) {
+    final isVideo = post.type == PostType.video;
+    final imageUrl = post.thumbnailUrl ?? post.imageUrl;
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to post detail
+        Navigator.pushNamed(context, '/post_detail', arguments: post);
+      },
+      child: Container(
+        width: 110,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Post image/thumbnail
+            Container(
+              width: 110,
+              height: 80,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                color: Colors.grey[800],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null)
+                    imageUrl.startsWith('assets/')
+                        ? Image.asset(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                          )
+                  else
+                    _buildFallbackImage(),
+                  // Collaboration badge
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'COLLAB',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (isVideo)
+                    Center(
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          color: kPrimaryColor,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Post details
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.caption ?? 'Collaboration post',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(Icons.favorite, color: Colors.red, size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          _formatNumber(post.likesCount ?? 0),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Format post date for display
+  String _formatPostDate(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 7) {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
   
   // Avatars section

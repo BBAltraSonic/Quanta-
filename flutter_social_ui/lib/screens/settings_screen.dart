@@ -3,6 +3,7 @@ import '../constants.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../screens/auth_wrapper.dart';
+import '../screens/analytics_settings_screen.dart';
 import '../widgets/skeleton_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -292,6 +293,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 const SizedBox(height: 32),
 
+                _buildSection('Analytics', [
+                  _buildActionTile(
+                    'My Analytics',
+                    'View detailed analytics and insights',
+                    Icons.analytics,
+                    _navigateToAnalytics,
+                  ),
+                  _buildActionTile(
+                    'Data Export',
+                    'Export your analytics data',
+                    Icons.file_download,
+                    () => _showComingSoon('Analytics Export'),
+                  ),
+                ]),
+
+                const SizedBox(height: 24),
+
                 _buildSection('Account', [
                   _buildActionTile(
                     'Change Password',
@@ -462,6 +480,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       trailing: Text(value, style: const TextStyle(color: kLightTextColor)),
     );
+  }
+
+  void _navigateToAnalytics() {
+    final userId = _authService.currentUserId;
+    if (userId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AnalyticsSettingsScreen(userId: userId),
+        ),
+      );
+    }
   }
 
   void _showComingSoon(String feature) {

@@ -50,7 +50,7 @@ class ProfileService {
             id: '',
             name: 'No Avatar',
             bio: 'Create your first avatar to get started!',
-            niche: 'other',
+            niche: AvatarNiche.other,
             personalityTraits: [],
             personalityPrompt: '',
             ownerUserId: userId,
@@ -226,6 +226,94 @@ class ProfileService {
           .eq('id', userId);
     } catch (e) {
       throw Exception('Error deleting account: $e');
+    }
+  }
+
+  /// Get pinned post for an avatar
+  Future<Map<String, dynamic>?> getPinnedPost(String avatarId) async {
+    try {
+      final avatarResponse = await _authService.supabase
+          .from('avatars')
+          .select('pinned_post_id')
+          .eq('id', avatarId)
+          .single();
+      
+      final pinnedPostId = avatarResponse['pinned_post_id'] as String?;
+      if (pinnedPostId == null) return null;
+      
+      final postResponse = await _authService.supabase
+          .from('posts')
+          .select('*')
+          .eq('id', pinnedPostId)
+          .eq('is_active', true)
+          .single();
+      
+      return postResponse;
+    } catch (e) {
+      debugPrint('Error loading pinned post: $e');
+      return null;
+    }
+  }
+
+  /// Set pinned post for an avatar
+  Future<void> setPinnedPost(String avatarId, String? postId) async {
+    try {
+      await _authService.supabase
+          .from('avatars')
+          .update({'pinned_post_id': postId})
+          .eq('id', avatarId);
+    } catch (e) {
+      throw Exception('Error setting pinned post: $e');
+    }
+  }
+
+  /// Get collaborations for an avatar
+  Future<List<Map<String, dynamic>>> getCollaborationPosts(String avatarId, {int limit = 10}) async {
+    try {
+      final response = await _authService.supabase
+          .from('post_collaborations')
+          .select('''
+            posts:post_id(
+              *,
+              avatars:avatar_id(id, name, avatar_image_url)
+            )
+          ''')
+          .eq('collaborator_avatar_id', avatarId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      
+      return response
+          .map<Map<String, dynamic>>((item) => item['posts'] as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      debugPrint('Error loading collaboration posts: $e');
+      return [];
+    }
+  }
+
+  /// Add collaboration to a post
+  Future<void> addCollaboration(String postId, String collaboratorAvatarId, String collaborationType) async {
+    try {
+      await _authService.supabase.from('post_collaborations').insert({
+        'post_id': postId,
+        'collaborator_avatar_id': collaboratorAvatarId,
+        'collaboration_type': collaborationType,
+      });
+    } catch (e) {
+      throw Exception('Error adding collaboration: $e');
+    }
+  }
+
+  /// Remove collaboration from a post
+  Future<void> removeCollaboration(String postId, String collaboratorAvatarId) async {
+    try {
+      await _authService.supabase
+          .from('post_collaborations')
+          .delete()
+          .eq('post_id', postId)
+          .eq('collaborator_avatar_id', collaboratorAvatarId);
+    } catch (e) {
+      throw Exception('Error removing collaboration: $e');
     }
   }
 
