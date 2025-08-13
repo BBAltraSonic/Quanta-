@@ -170,11 +170,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         // Cache avatars for loaded posts
         await _cacheAvatarsForPosts(posts);
         await _loadLikedAndFollowingStatus(posts);
+        
+        // Preload video controllers for better playback
+        await _preloadVideosForPosts(posts);
 
         setState(() {
           _posts = posts;
           _isLoading = false;
         });
+        
+        // Start playing the first video if it's a video post
+        if (posts.isNotEmpty && posts[0].type == PostType.video && posts[0].videoUrl != null) {
+          _playVideoForPost(posts[0]);
+        }
       } else {
         // No posts available from backend
         _setError('No posts available. Create some content to get started!');
@@ -210,6 +218,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (newPosts.isNotEmpty) {
         await _cacheAvatarsForPosts(newPosts);
         await _loadLikedAndFollowingStatus(newPosts);
+        
+        // Preload video controllers for new posts
+        await _preloadVideosForPosts(newPosts);
 
         setState(() {
           _posts.addAll(newPosts);
@@ -238,6 +249,61 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         } catch (e) {
           debugPrint('Error caching avatar $avatarId: $e');
         }
+      }
+    }
+  }
+
+  /// Preload video controllers for posts to ensure smooth playback
+  Future<void> _preloadVideosForPosts(List<PostModel> posts) async {
+    final videoTasks = <Future<void>>[];
+    
+    for (final post in posts) {
+      if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+        // Create video controller and initialize it
+        final task = () async {
+          try {
+            await _videoService.preloadVideo(post.videoUrl!);
+            debugPrint('✅ Preloaded video: ${post.videoUrl}');
+          } catch (e) {
+            debugPrint('❌ Failed to preload video ${post.videoUrl}: $e');
+          }
+        }();
+        videoTasks.add(task);
+      }
+    }
+    
+    // Wait for all video preloading tasks to complete (with timeout)
+    if (videoTasks.isNotEmpty) {
+      await Future.wait(videoTasks).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('Video preloading timeout - some videos may not be ready');
+          return <void>[];
+        },
+      );
+    }
+  }
+  
+  /// Play video for a specific post
+  Future<void> _playVideoForPost(PostModel post) async {
+    if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+      try {
+        await _videoService.playVideo(post.videoUrl!);
+        debugPrint('▶️ Playing video: ${post.videoUrl}');
+      } catch (e) {
+        debugPrint('❌ Failed to play video ${post.videoUrl}: $e');
+      }
+    }
+  }
+  
+  /// Pause video for a specific post
+  Future<void> _pauseVideoForPost(PostModel post) async {
+    if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+      try {
+        await _videoService.pauseVideo(post.videoUrl!);
+        debugPrint('⏸️ Paused video: ${post.videoUrl}');
+      } catch (e) {
+        debugPrint('❌ Failed to pause video ${post.videoUrl}: $e');
       }
     }
   }
@@ -886,14 +952,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   _loadMorePosts();
                 }
 
-                // Update view count for current post and track analytics
                 if (index < _posts.length) {
-                  _feedsService.incrementViewCount(_posts[index].id);
+                  final currentPost = _posts[index];
                   
-                  // Track post view analytics
-                  _trackAnalyticsEvent(_posts[index].id, 'post_view', {
-                    'post_type': _posts[index].type.toString(),
-                    'author_id': _posts[index].avatarId,
+                  // Handle video playback - pause previous, play current
+                  if (index > 0 && index - 1 < _posts.length) {
+                    _pauseVideoForPost(_posts[index - 1]);
+                  }
+                  if (index + 1 < _posts.length) {
+                    _pauseVideoForPost(_posts[index + 1]);
+                  }
+                  
+                  // Play current video if it's a video post
+                  if (currentPost.type == PostType.video) {
+                    _playVideoForPost(currentPost);
+                  }
+                  
+                  // Update view count and track analytics
+                  _feedsService.incrementViewCount(currentPost.id);
+                  
+                  _trackAnalyticsEvent(currentPost.id, 'post_view', {
+                    'post_type': currentPost.type.toString(),
+                    'author_id': currentPost.avatarId,
                     'page_index': index,
                     'view_method': 'swipe',
                   });

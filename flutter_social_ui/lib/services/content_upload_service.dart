@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:storage_client/storage_client.dart';
 
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';
@@ -344,46 +345,113 @@ class ContentUploadService {
         throw Exception('User not authenticated');
       }
 
+      debugPrint('Starting upload for ${type.name} file: ${file.path}');
+      debugPrint('File size: ${file.lengthSync()} bytes');
+
       // Generate unique filename
       const uuid = Uuid();
       final fileId = uuid.v4();
-      final extension = path.extension(file.path);
+      final extension = path.extension(file.path).toLowerCase();
       final fileName = '$fileId$extension';
       final storagePath = '$avatarId/$fileName';
 
-      // Upload to Supabase storage (no compression)
+      debugPrint('Upload path: $storagePath');
+
+      // Determine content type
+      String contentType;
+      if (type == PostType.video) {
+        switch (extension) {
+          case '.mp4':
+            contentType = 'video/mp4';
+            break;
+          case '.mov':
+            contentType = 'video/quicktime';
+            break;
+          case '.avi':
+            contentType = 'video/x-msvideo';
+            break;
+          case '.webm':
+            contentType = 'video/webm';
+            break;
+          default:
+            contentType = 'video/mp4';
+        }
+      } else {
+        switch (extension) {
+          case '.jpg':
+          case '.jpeg':
+            contentType = 'image/jpeg';
+            break;
+          case '.png':
+            contentType = 'image/png';
+            break;
+          case '.gif':
+            contentType = 'image/gif';
+            break;
+          case '.webp':
+            contentType = 'image/webp';
+            break;
+          default:
+            contentType = 'application/octet-stream';
+        }
+      }
+
+      // Upload to Supabase storage with proper content type
       final bytes = await file.readAsBytes();
+      debugPrint('Read ${bytes.length} bytes from file');
+      
       await _authService.supabase.storage
           .from(DbConfig.postsBucket)
-          .uploadBinary(storagePath, bytes);
+          .uploadBinary(
+            storagePath, 
+            bytes,
+            fileOptions: FileOptions(
+              contentType: contentType,
+              upsert: true, // Allow overwriting if needed
+            ),
+          );
 
       // Get public URL
       final publicUrl = _authService.supabase.storage
           .from(DbConfig.postsBucket)
           .getPublicUrl(storagePath);
 
+      debugPrint('Upload successful! Public URL: $publicUrl');
       return publicUrl;
     } catch (e) {
       debugPrint('Error uploading media file: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
 
-  /// Generate and upload video thumbnail
+  /// Generate and upload video thumbnail with better error handling
   Future<String?> _generateAndUploadThumbnail(File videoFile, String avatarId) async {
     try {
       final userId = _authService.currentUser?.id;
-      if (userId == null) return null;
+      if (userId == null) {
+        debugPrint('User not authenticated for thumbnail upload');
+        return null;
+      }
 
-      // Generate thumbnail
+      debugPrint('Generating thumbnail for video: ${videoFile.path}');
+      
+      // Generate thumbnail with error handling
       final thumbnailBytes = await VideoThumbnail.thumbnailData(
         video: videoFile.path,
         imageFormat: ImageFormat.JPEG,
         maxHeight: 720,
+        maxWidth: 405, // Match the log dimensions
         quality: 75,
+        timeMs: 1000, // Get thumbnail at 1 second
       );
 
-      if (thumbnailBytes == null) return null;
+      if (thumbnailBytes == null) {
+        debugPrint('Failed to generate thumbnail - thumbnailBytes is null');
+        return null;
+      }
+
+      debugPrint('Generated thumbnail: ${thumbnailBytes.length} bytes');
 
       // Generate unique filename for thumbnail
       const uuid = Uuid();
@@ -391,19 +459,34 @@ class ContentUploadService {
       final fileName = '${fileId}_thumbnail.jpg';
       final storagePath = '$avatarId/$fileName';
 
-      // Upload thumbnail to storage
-      await _authService.supabase.storage
-          .from(DbConfig.postsBucket)
-          .uploadBinary(storagePath, thumbnailBytes);
+      debugPrint('Uploading thumbnail to: $storagePath');
+
+      // Upload thumbnail to storage with retry
+      try {
+        await _authService.supabase.storage
+            .from(DbConfig.postsBucket)
+            .uploadBinary(storagePath, thumbnailBytes);
+      } catch (uploadError) {
+        debugPrint('Thumbnail upload failed: $uploadError');
+        // Try alternative upload method
+        await _authService.supabase.storage
+            .from(DbConfig.postsBucket)
+            .uploadBinary(storagePath, thumbnailBytes, fileOptions: FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ));
+      }
 
       // Get public URL
       final publicUrl = _authService.supabase.storage
           .from(DbConfig.postsBucket)
           .getPublicUrl(storagePath);
 
+      debugPrint('Thumbnail uploaded successfully: $publicUrl');
       return publicUrl;
     } catch (e) {
       debugPrint('Error generating/uploading thumbnail: $e');
+      debugPrint('Stack trace: ${StackTrace.current}');
       return null;
     }
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -60,8 +61,9 @@ class EnhancedVideoService {
       return _controllers[videoUrl]!;
     }
 
-    final controller = VideoPlayerController.network(
-      videoUrl,
+    // Use networkUrl with auto format detection for standard MP4/HLS/others
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(videoUrl),
       videoPlayerOptions: VideoPlayerOptions(
         mixWithOthers: true,
         allowBackgroundPlayback: false,
@@ -70,15 +72,40 @@ class EnhancedVideoService {
 
     _controllers[videoUrl] = controller;
     
+    // Initialize video in background to prevent UI blocking
+    _initializeControllerAsync(controller, videoUrl);
+    
+    return controller;
+  }
+  
+  /// Initialize controller asynchronously to prevent main thread blocking
+  Future<void> _initializeControllerAsync(VideoPlayerController controller, String videoUrl) async {
     try {
-      await controller.initialize();
-      await controller.setLooping(true);
-      await controller.setVolume(_isMuted ? 0.0 : _volume);
+      // Initialize controller with timeout to prevent hanging
+      await controller.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw TimeoutException('Video initialization timeout', const Duration(seconds: 10)),
+      );
       
-      // Restore last position if available
+      // Batch video configuration to reduce MediaCodec calls
+      await Future.wait([
+        controller.setLooping(true),
+        controller.setVolume(_isMuted ? 0.0 : _volume),
+      ]).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Video configuration timeout for $videoUrl');
+          return <void>[];
+        },
+      );
+      
+      // Only restore position if it's significant (> 1 second)
       final lastPosition = _lastPositions[videoUrl];
-      if (lastPosition != null && lastPosition > Duration.zero) {
-        await controller.seekTo(lastPosition);
+      if (lastPosition != null && lastPosition > const Duration(seconds: 1)) {
+        await controller.seekTo(lastPosition).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => debugPrint('Seek timeout for $videoUrl'),
+        );
       }
       
       _preloadedVideos[videoUrl] = true;
@@ -86,21 +113,22 @@ class EnhancedVideoService {
       debugPrint('Error initializing video controller: $e');
       _preloadedVideos[videoUrl] = false;
     }
-
-    return controller;
   }
 
-  /// Preload video for smooth playback
+  /// Preload video for smooth playback (non-blocking)
   Future<void> preloadVideo(String videoUrl) async {
     if (_preloadedVideos.containsKey(videoUrl)) return;
 
-    try {
-      await getController(videoUrl);
-      _preloadedVideos[videoUrl] = true;
-    } catch (e) {
-      debugPrint('Error preloading video: $e');
-      _preloadedVideos[videoUrl] = false;
-    }
+    // Preload in background to avoid blocking UI
+    Future.microtask(() async {
+      try {
+        await getController(videoUrl);
+        _preloadedVideos[videoUrl] = true;
+      } catch (e) {
+        debugPrint('Error preloading video: $e');
+        _preloadedVideos[videoUrl] = false;
+      }
+    });
   }
 
   /// Play video with analytics

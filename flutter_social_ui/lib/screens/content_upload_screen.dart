@@ -454,6 +454,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
 
   Widget _buildMediaPreview() {
     if (_postType == PostType.video && _videoController != null) {
+      final initialized = _videoController!.value.isInitialized;
       return Stack(
         children: [
           ClipRRect(
@@ -462,20 +463,24 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               color: Colors.black,
               width: double.infinity,
               height: 300,
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: _videoController!.value.size.width,
-                  height: _videoController!.value.size.height,
-                  child: AspectRatio(
-                    aspectRatio: _videoController!.value.aspectRatio,
-                    child: VideoPlayer(_videoController!),
-                  ),
-                ),
-              ),
+              child: initialized
+                  ? AspectRatio(
+                      aspectRatio: _videoController!.value.aspectRatio,
+                      child: VideoPlayer(_videoController!),
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          CircularProgressIndicator(color: Colors.white),
+                          SizedBox(height: 8),
+                          Text('Loading video preview…', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
             ),
           ),
-          if (_videoDurationSeconds != null || _mediaSizeLabelMB != null)
+          if ((_videoDurationSeconds != null || _mediaSizeLabelMB != null) && initialized)
             Positioned(
               top: 12,
               left: 12,
@@ -487,34 +492,35 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                 ),
                 child: Text(
                   '${_videoDurationSeconds != null ? '${_videoDurationSeconds}s' : ''}${_videoDurationSeconds != null && _mediaSizeLabelMB != null ? ' • ' : ''}${_mediaSizeLabelMB ?? ''}',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: Semantics(
-              button: true,
-              label: 'Play or pause video',
-              child: FloatingActionButton.small(
-                onPressed: () {
-                  setState(() {
+          if (initialized)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: Semantics(
+                button: true,
+                label: 'Play or pause video',
+                child: FloatingActionButton.small(
+                  onPressed: () {
+                    setState(() {
+                      _videoController!.value.isPlaying
+                          ? _videoController!.pause()
+                          : _videoController!.play();
+                    });
+                  },
+                  backgroundColor: Colors.black54,
+                  child: Icon(
                     _videoController!.value.isPlaying
-                        ? _videoController!.pause()
-                        : _videoController!.play();
-                  });
-                },
-                backgroundColor: Colors.black54,
-                child: Icon(
-                  _videoController!.value.isPlaying
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                  color: Colors.white,
+                        ? Icons.pause
+                        : Icons.play_arrow,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       );
     } else if (_postType == PostType.image) {
@@ -646,10 +652,15 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
 
         if (_postType == PostType.video) {
           _videoController?.dispose();
-          _videoController = VideoPlayerController.file(_selectedMedia!)
-            ..initialize().then((_) async {
-              setState(() {});
-            });
+          _videoController = VideoPlayerController.file(_selectedMedia!);
+          try {
+            await _videoController!.initialize();
+            // Capture duration once initialized
+            _videoDurationSeconds = _videoController!.value.duration.inSeconds;
+          } catch (e) {
+            debugPrint('Error initializing video controller: $e');
+          }
+          if (mounted) setState(() {});
         }
       }
     } catch (e) {
@@ -719,7 +730,22 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       _uploadProgress = 0.1;
     });
 
+    // Add debugging information
+    debugPrint('🎬 Starting video upload process');
+    debugPrint('👤 Selected avatar: ${_selectedAvatar?.id}');
+    debugPrint('📹 Post type: $_postType');
+    debugPrint('📄 Caption length: ${_captionController.text.trim().length}');
+    if (_selectedMedia != null) {
+      debugPrint('📁 Media file: ${_selectedMedia!.path}');
+      debugPrint('📏 File size: ${(_selectedMedia!.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB');
+    }
+
     try {
+      // Pause preview to reduce GPU load during upload
+      if (_videoController != null && _videoController!.value.isPlaying) {
+        _videoController!.pause();
+      }
+
       // Step 1: Validate content
       final validation = await _contentService.validateContent(
         caption: _captionController.text.trim(),
@@ -779,11 +805,22 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       });
 
       if (post != null) {
-        Navigator.pop(context, post); // Return the created post
+        // Navigate to home screen (index 0) with success message
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        
+        // Show success feedback
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Post shared successfully! 🎉'),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Post shared successfully! 🎉'),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -1031,14 +1068,22 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         _uploadProgress = 1.0;
       });
 
-      // Navigate back with the created post
-      Navigator.pop(context, post);
+      // Navigate to home screen with success message
+      Navigator.of(context).popUntil((route) => route.isFirst);
       
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Content imported from $platform successfully! 🎉'),
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Content imported from $platform successfully! 🎉'),
+            ],
+          ),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
         ),
       );
       

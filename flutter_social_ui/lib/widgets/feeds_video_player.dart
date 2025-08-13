@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../services/enhanced_video_service.dart';
+import '../services/ui_performance_service.dart';
 
 class FeedsVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -84,46 +85,69 @@ class _FeedsVideoPlayerState extends State<FeedsVideoPlayer>
       _hasError = false;
     });
 
-    try {
-      _controller = await _videoService.getController(widget.videoUrl);
-      
-      if (mounted) {
-        // Listen to player state changes
-        _controller!.addListener(_onVideoPlayerUpdate);
+    // Initialize video asynchronously to prevent UI blocking
+    await UIPerformanceService.executeAsync(() async {
+      try {
+        _controller = await _videoService.getController(widget.videoUrl);
         
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          // Listen to player state changes
+          _controller!.addListener(_onVideoPlayerUpdate);
+          
+          // Use scheduleNextFrame to prevent blocking current frame
+          UIPerformanceService.scheduleNextFrame(() {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
 
-        // Auto-play if active and enabled
-        if (widget.isActive && widget.autoPlay) {
-          await _playVideo();
+              // Auto-play if active and enabled
+              if (widget.isActive && widget.autoPlay) {
+                _playVideo();
+              }
+            }
+          });
         }
+      } catch (e) {
+        if (mounted) {
+          UIPerformanceService.scheduleNextFrame(() {
+            setState(() {
+              _isLoading = false;
+              _hasError = true;
+            });
+          });
+        }
+        debugPrint('Error initializing video: $e');
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-      debugPrint('Error initializing video: $e');
-    }
+    });
   }
 
   void _onVideoPlayerUpdate() {
     if (!mounted || _controller == null) return;
     
-    final isPlaying = _controller!.value.isPlaying;
-    if (_isPlaying != isPlaying) {
-      setState(() {
-        _isPlaying = isPlaying;
-      });
-      widget.onPlayStateChanged?.call(isPlaying);
-    }
+    // Throttle updates to prevent excessive rebuilds (increased interval)
+    UIPerformanceService.throttle(() {
+      final isPlaying = _controller!.value.isPlaying;
+      if (_isPlaying != isPlaying) {
+        UIPerformanceService.scheduleNextFrame(() {
+          if (mounted) {
+            setState(() {
+              _isPlaying = isPlaying;
+            });
+            widget.onPlayStateChanged?.call(isPlaying);
+          }
+        });
+      }
 
-    // Report position changes
-    widget.onPositionChanged?.call(_controller!.value.position);
+      // Report position changes less frequently
+      if (widget.onPositionChanged != null) {
+        UIPerformanceService.debounce(() {
+          if (mounted && _controller != null) {
+            widget.onPositionChanged?.call(_controller!.value.position);
+          }
+        }, delay: const Duration(milliseconds: 500));
+      }
+    }, interval: const Duration(milliseconds: 200));
   }
 
   void _handleActiveStateChange() {
