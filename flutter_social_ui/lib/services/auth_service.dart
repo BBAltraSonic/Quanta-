@@ -332,4 +332,18 @@ class AuthService {
       print('Failed to mark onboarding as completed: $e');
     }
   }
+  
+  // Get current user asynchronously (refreshes from database)
+  Future<UserModel?> getCurrentUser() async {
+    if (_currentUser == null) return null;
+    
+    try {
+      // Refresh user data from database
+      await _loadUserProfile(_currentUser!.id);
+      return _currentUser;
+    } catch (e) {
+      print('Failed to refresh current user: $e');
+      return _currentUser; // Return cached user if refresh fails
+    }
+  }
 }

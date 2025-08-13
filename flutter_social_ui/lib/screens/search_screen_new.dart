@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/services/search_service_wrapper.dart';
+import 'package:flutter_social_ui/services/enhanced_search_service.dart';
 import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
+import 'package:flutter_social_ui/screens/enhanced_post_detail_screen.dart';
 import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 import 'dart:async';
 
@@ -18,18 +19,21 @@ class SearchScreenNew extends StatefulWidget {
 class _SearchScreenNewState extends State<SearchScreenNew>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  final SearchService _searchService = SearchService();
+  final EnhancedSearchService _enhancedSearchService = EnhancedSearchService();
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   late TabController _tabController;
 
   List<AvatarModel> _avatarResults = [];
   List<PostModel> _postResults = [];
-  List<String> _hashtagResults = [];
+  List<Map<String, dynamic>> _hashtagResults = [];
   List<String> _trendingHashtags = [];
+  List<String> _popularSearches = [];
+  List<String> _recentSearches = [];
 
   bool _isSearching = false;
   bool _hasSearched = false;
   String _currentQuery = '';
+  String? _searchError;
   Timer? _debounceTimer;
 
   @override
@@ -329,7 +333,41 @@ class _SearchScreenNewState extends State<SearchScreenNew>
                       color: kBackgroundColor,
                     ),
                     child: post.hasMedia
-                        ? Image.network(post.mediaUrl, fit: BoxFit.cover)
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                post.type == PostType.video && post.thumbnailUrl != null
+                                    ? post.thumbnailUrl!
+                                    : post.mediaUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Icon(
+                                      Icons.broken_image,
+                                      color: kLightTextColor,
+                                      size: 48,
+                                    ),
+                                  );
+                                },
+                              ),
+                              if (post.type == PostType.video)
+                                Center(
+                                  child: Container(
+                                    padding: EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
                         : Center(
                             child: Icon(
                               Icons.image,
@@ -386,7 +424,10 @@ class _SearchScreenNewState extends State<SearchScreenNew>
       padding: EdgeInsets.all(16),
       itemCount: _hashtagResults.length,
       itemBuilder: (context, index) {
-        final hashtag = _hashtagResults[index];
+        final hashtagData = _hashtagResults[index];
+        final hashtag = hashtagData['hashtag'] as String;
+        final count = hashtagData['count'] as int? ?? 0;
+        
         return Container(
           margin: EdgeInsets.only(bottom: 8),
           child: ListTile(
@@ -401,7 +442,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
             ),
             title: Text(hashtag, style: kBodyTextStyle),
             subtitle: Text(
-              'Trending hashtag',
+              count > 1 ? '$count posts' : '$count post',
               style: kCaptionTextStyle.copyWith(color: kLightTextColor),
             ),
             trailing: Icon(
@@ -474,34 +515,73 @@ class _SearchScreenNewState extends State<SearchScreenNew>
             ),
           ],
 
-          // Popular search suggestions
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Text(
-              'Popular Searches',
-              style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          ...[
-            'AI avatars',
-            'Technology',
-            'Travel',
-            'Fitness',
-            'Cooking',
-            'Art',
-            'Music',
-          ].map(
-            (suggestion) => ListTile(
-              leading: Icon(Icons.trending_up, color: kPrimaryColor),
-              title: Text(suggestion, style: kBodyTextStyle),
-              trailing: Icon(
-                Icons.arrow_forward_ios,
-                color: kLightTextColor,
-                size: 16,
+          // Recent searches (if any)
+          if (_recentSearches.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent Searches',
+                    style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: _clearRecentSearches,
+                    child: Text(
+                      'Clear',
+                      style: TextStyle(color: kPrimaryColor, fontSize: 12),
+                    ),
+                  ),
+                ],
               ),
-              onTap: () => _performSearch(suggestion),
             ),
-          ),
+            ..._recentSearches.take(5).map(
+              (recentQuery) => ListTile(
+                leading: Icon(Icons.history, color: kLightTextColor),
+                title: Text(recentQuery, style: kBodyTextStyle),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.close, color: kLightTextColor, size: 16),
+                      onPressed: () => _removeRecentSearch(recentQuery),
+                      padding: EdgeInsets.all(4),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: kLightTextColor,
+                      size: 16,
+                    ),
+                  ],
+                ),
+                onTap: () => _performSearch(recentQuery),
+              ),
+            ),
+          ],
+
+          // Popular search suggestions
+          if (_popularSearches.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Text(
+                'Popular Searches',
+                style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ..._popularSearches.map(
+              (suggestion) => ListTile(
+                leading: Icon(Icons.trending_up, color: kPrimaryColor),
+                title: Text(suggestion, style: kBodyTextStyle),
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  color: kLightTextColor,
+                  size: 16,
+                ),
+                onTap: () => _performSearch(suggestion),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -528,20 +608,31 @@ class _SearchScreenNewState extends State<SearchScreenNew>
 
   Future<void> _loadTrendingContent() async {
     try {
-      // Since getTrendingHashtags is not yet implemented in EnhancedFeedsService,
-      // use fallback hashtags for now
+      // Load trending hashtags, popular searches, and recent searches from enhanced service
+      final results = await Future.wait([
+        _enhancedSearchService.getTrendingHashtags(limit: 20),
+        _enhancedSearchService.getPopularSearches(limit: 8),
+        _enhancedSearchService.getRecentSearches(limit: 5),
+      ]);
+      
       setState(() {
-        _trendingHashtags = ['#ai', '#avatar', '#tech', '#creative', '#viral'];
+        _trendingHashtags = results[0] as List<String>;
+        _popularSearches = results[1] as List<String>;
+        _recentSearches = results[2] as List<String>;
       });
     } catch (e) {
-      // Use fallback hashtags
+      debugPrint('Error loading trending content: $e');
+      // No fallback content for production - show empty states
       setState(() {
-        _trendingHashtags = ['#ai', '#avatar', '#tech', '#creative', '#viral'];
+        _trendingHashtags = [];
+        _popularSearches = [];
+        _recentSearches = [];
       });
     }
   }
 
   void _onSearchChanged(String query) {
+    setState(() {}); // Trigger rebuild to update clear icon visibility
     _debounceTimer?.cancel();
     _debounceTimer = Timer(Duration(milliseconds: 500), () {
       if (query.trim().isNotEmpty) {
@@ -558,28 +649,48 @@ class _SearchScreenNewState extends State<SearchScreenNew>
       _hasSearched = true;
       _currentQuery = query;
       _searchController.text = query;
+      _searchError = null;
     });
 
     try {
-      final results = await Future.wait([
-        _searchService.searchAvatars(query: query, limit: 20),
-        _searchService.searchPosts(query: query, limit: 20),
-        _searchService.searchHashtags(query: query, limit: 20),
-      ]);
+      // Use enhanced search service with automatic tracking
+      final searchResults = await _enhancedSearchService.performSearch(
+        query,
+        limit: 20,
+        trackQuery: true,
+      );
 
       setState(() {
-        _avatarResults = results[0] as List<AvatarModel>;
-        _postResults = results[1] as List<PostModel>;
-        _hashtagResults = results[2] as List<String>;
+        _avatarResults = searchResults.avatars;
+        _postResults = searchResults.posts;
+        _hashtagResults = searchResults.hashtagsWithCounts;
         _isSearching = false;
+        _searchError = searchResults.hasError ? searchResults.error : null;
       });
+
+      // Show user-friendly error if search failed but we got results
+      if (searchResults.hasError && searchResults.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(searchResults.error!),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
         _isSearching = false;
+        _searchError = 'Search failed. Please try again.';
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Search error: $e')));
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Search failed. Please try again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -598,6 +709,36 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     _performSearch(hashtag);
   }
 
+  /// Clear all recent searches
+  Future<void> _clearRecentSearches() async {
+    try {
+      await _enhancedSearchService.clearRecentSearches();
+      setState(() {
+        _recentSearches.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Recent searches cleared'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error clearing recent searches: $e');
+    }
+  }
+
+  /// Remove a specific recent search
+  Future<void> _removeRecentSearch(String query) async {
+    try {
+      await _enhancedSearchService.removeRecentSearch(query);
+      setState(() {
+        _recentSearches.remove(query);
+      });
+    } catch (e) {
+      debugPrint('Error removing recent search: $e');
+    }
+  }
+
   void _navigateToChat(AvatarModel avatar) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -611,10 +752,11 @@ class _SearchScreenNewState extends State<SearchScreenNew>
   }
 
   void _viewPost(PostModel post) {
-    // For now, just show a snackbar - could navigate to post detail
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Viewing post: ${post.caption.substring(0, 30)}...'),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EnhancedPostDetailScreen(
+          postId: post.id,
+        ),
       ),
     );
   }
@@ -624,4 +766,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     if (count < 1000000) return '${(count / 1000).toStringAsFixed(1)}k';
     return '${(count / 1000000).toStringAsFixed(1)}M';
   }
+
+  // This method is no longer needed as we use the enhanced search service directly
+  // It's kept for backward compatibility but the enhanced service handles hashtag counts
 }

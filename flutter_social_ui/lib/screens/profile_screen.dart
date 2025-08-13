@@ -4,10 +4,12 @@ import 'package:flutter_social_ui/constants.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
+import '../models/analytics_insight_model.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/follow_service.dart';
 import '../services/enhanced_feeds_service.dart';
+import '../services/analytics_insights_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
@@ -26,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
   final FollowService _followService = FollowService();
+  final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
   
   UserModel? _user;
   List<AvatarModel> _avatars = [];
@@ -49,6 +52,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<PostModel> _collaborationPosts = [];
   bool _isPinnedPostLoading = false;
   bool _isCollaborationsLoading = false;
+  
+  // Analytics state
+  List<AnalyticsInsight> _insights = [];
+  List<AnalyticsMetric> _detailedMetrics = [];
+  AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.month;
   
   @override
   void initState() {
@@ -135,6 +143,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (_activeAvatar != null) {
         await _loadPinnedPost();
         await _loadCollaborations();
+      }
+      
+      // Load analytics data if it's the user's own profile
+      if (_isOwnProfile) {
+        await _loadAnalyticsData();
       }
     } catch (e) {
       if (mounted) {
@@ -311,6 +324,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+  
+  /// Load analytics data for the user's profile
+  Future<void> _loadAnalyticsData() async {
+    if (_user == null) return;
+    
+    try {
+      final analyticsData = await _analyticsService.getProfileAnalytics(
+        userId: _user!.id,
+        period: _selectedPeriod,
+        includeComparisons: true,
+      );
+      
+      setState(() {
+        _detailedMetrics = analyticsData['metrics'] as List<AnalyticsMetric>;
+        _insights = analyticsData['insights'] as List<AnalyticsInsight>;
+        _comparisons = analyticsData['comparisons'] as Map<String, dynamic>?;
+      });
+    } catch (e) {
+      debugPrint('Error loading analytics data: $e');
+      // Set empty analytics data on error
+      setState(() {
+        _detailedMetrics = [];
+        _insights = [];
+        _comparisons = null;
+      });
+    }
+  }
+  
+  /// Handle period change in analytics
+  void _onPeriodChanged(AnalyticsPeriod period) {
+    if (_selectedPeriod != period) {
+      setState(() {
+        _selectedPeriod = period;
+      });
+      
+      // Reload analytics data for the new period
+      if (_isOwnProfile && _user != null) {
+        _loadAnalyticsData();
+      }
+    }
+  }
+  
+  /// Format metric value based on its type
+  String _formatMetricValue(AnalyticsMetric metric) {
+    switch (metric.type) {
+      case MetricType.percentage:
+        return '${metric.value.toStringAsFixed(1)}${metric.unit}';
+      case MetricType.count:
+        return _formatNumber((metric.value as num).toInt());
+      case MetricType.currency:
+        return '\$${metric.value.toStringAsFixed(2)}';
+      case MetricType.duration:
+        final seconds = (metric.value as num).toInt();
+        if (seconds >= 60) {
+          final minutes = seconds ~/ 60;
+          final remainingSeconds = seconds % 60;
+          return '${minutes}m ${remainingSeconds}s';
+        }
+        return '${seconds}s';
+      case MetricType.rate:
+        return '${metric.value.toStringAsFixed(2)}/min';
+      default:
+        return metric.value.toString();
+    }
+  }
+  
+  /// Handle insight action button press
+  void _handleInsightAction(AnalyticsInsight insight) {
+    final actionType = insight.actionData?['type'] as String?;
+    
+    switch (actionType) {
+      case 'engagement_tips':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Engagement tips: Post consistently, use trending hashtags, engage with your audience!'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        break;
+      case 'growth_strategy':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Growth tips: Collaborate with others, post at peak times, create shareable content!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        break;
+      case 'reach_optimization':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reach tips: Use relevant hashtags, post when your audience is active, create engaging content!'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        break;
+      case 'post_scheduling':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Schedule your posts for 6-8 PM on weekdays for maximum engagement!'),
+            backgroundColor: Colors.purple,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Learn more about: ${insight.title}'),
+            backgroundColor: kPrimaryColor,
+          ),
+        );
+        break;
+    }
   }
   
   
@@ -1448,15 +1578,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const Spacer(),
               if (_isOwnProfile)
                 IconButton(
-                  onPressed: () {
-                    // TODO: Implement unpin functionality
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Unpin post functionality coming soon!'),
-                        backgroundColor: kPrimaryColor,
-                      ),
-                    );
-                  },
+                  onPressed: _unpinPost,
                   icon: Icon(
                     Icons.more_vert,
                     color: Colors.white70,
@@ -2385,6 +2507,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+  
+  /// Unpin the currently pinned post
+  Future<void> _unpinPost() async {
+    if (_pinnedPost == null || _activeAvatar == null) return;
+    
+    try {
+      await _profileService.unpinPost(_activeAvatar!.id, _pinnedPost!.id);
+      
+      setState(() {
+        _pinnedPost = null;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post unpinned successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to unpin post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 

@@ -716,11 +716,8 @@ class SearchService {
           .toList();
     } catch (e) {
       debugPrint('❌ Error searching hashtags: $e');
-      // Fallback: return some common hashtags
-      final fallback = ['#ai', '#avatar', '#tech', '#creative', '#viral', '#trending']
-          .where((tag) => tag.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-      return fallback.take(limit).toList();
+      // Return empty list - no fallback data for production
+      return [];
     }
   }
 }
