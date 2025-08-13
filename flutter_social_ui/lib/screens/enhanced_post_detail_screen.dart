@@ -592,12 +592,18 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   }
 
   Future<void> _reportPost(PostModel post) async {
+    // TODO: Implement proper report dialog
     showDialog(
       context: context,
-      builder: (context) => ReportContentDialog(
-        contentId: post.id,
-        contentType: ContentType.post,
-        reportedUserId: post.avatarId, // Use avatar ID as the reported user ID
+      builder: (context) => AlertDialog(
+        title: const Text('Report Post'),
+        content: const Text('Report functionality is coming soon. Thank you for helping keep our community safe.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }
