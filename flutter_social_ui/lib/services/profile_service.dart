@@ -15,10 +15,10 @@ class ProfileService {
   // Get user profile with avatars
   Future<Map<String, dynamic>> getUserProfileData(String userId) async {
     try {
-      // Get user data from Supabase
+      // Get user data from Supabase (including active_avatar_id)
       final userResponse = await _authService.supabase
           .from('users')
-          .select()
+          .select('*, active_avatar_id')
           .eq('id', userId)
           .single();
 
@@ -26,7 +26,8 @@ class ProfileService {
       final avatarsResponse = await _authService.supabase
           .from('avatars')
           .select()
-          .eq('owner_user_id', userId);
+          .eq('owner_user_id', userId)
+          .order('created_at', ascending: true);
 
       // Get user stats (following count)
       final followsResponse = await _authService.supabase
@@ -36,11 +37,41 @@ class ProfileService {
       
       final followingCount = (followsResponse as List).length;
 
+      List<AvatarModel> avatars = (avatarsResponse as List)
+          .map((avatar) => AvatarModel.fromJson(avatar))
+          .toList();
+
+      // Find the active avatar or use the first one
+      AvatarModel? activeAvatar;
+      if (userResponse['active_avatar_id'] != null) {
+        activeAvatar = avatars.firstWhere(
+          (avatar) => avatar.id == userResponse['active_avatar_id'],
+          orElse: () => avatars.isNotEmpty ? avatars.first : AvatarModel(
+            id: '',
+            name: 'No Avatar',
+            bio: 'Create your first avatar to get started!',
+            niche: 'other',
+            personalityTraits: [],
+            personalityPrompt: '',
+            ownerUserId: userId,
+            followersCount: 0,
+            likesCount: 0,
+            postsCount: 0,
+            engagementRate: 0.0,
+            isActive: true,
+            allowAutonomousPosting: false,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+      } else if (avatars.isNotEmpty) {
+        activeAvatar = avatars.first;
+      }
+
       return {
         'user': UserModel.fromJson(userResponse),
-        'avatars': (avatarsResponse as List)
-            .map((avatar) => AvatarModel.fromJson(avatar))
-            .toList(),
+        'avatars': avatars,
+        'active_avatar': activeAvatar,
         'stats': {
           'following_count': followingCount,
           'followers_count': userResponse['followers_count'] ?? 0,
@@ -144,6 +175,38 @@ class ProfileService {
           .eq('id', userId);
     } catch (e) {
       throw Exception('Error updating preferences: $e');
+    }
+  }
+
+  // Get user stats
+  Future<Map<String, dynamic>> getUserStats(String userId) async {
+    try {
+      final userResponse = await _authService.supabase
+          .from('users')
+          .select('followers_count, posts_count')
+          .eq('id', userId)
+          .single();
+
+      // Get following count
+      final followsResponse = await _authService.supabase
+          .from('follows')
+          .select('avatar_id')
+          .eq('user_id', userId);
+      
+      final followingCount = (followsResponse as List).length;
+
+      return {
+        'following_count': followingCount,
+        'followers_count': userResponse['followers_count'] ?? 0,
+        'posts_count': userResponse['posts_count'] ?? 0,
+      };
+    } catch (e) {
+      debugPrint('Error loading user stats: $e');
+      return {
+        'following_count': 0,
+        'followers_count': 0,
+        'posts_count': 0,
+      };
     }
   }
 

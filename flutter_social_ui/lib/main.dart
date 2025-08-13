@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/screens/auth_wrapper.dart';
+import 'package:flutter_social_ui/screens/post_detail_screen.dart';
+import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/services/performance_service.dart';
 import 'package:flutter_social_ui/services/theme_service.dart';
@@ -52,8 +54,24 @@ class MyApp extends StatelessWidget {
           title: 'Quanta - AI Avatar Platform',
           debugShowCheckedModeBanner: false,
           onGenerateRoute: (settings) {
-            // Handle any route generation issues
-            return MaterialPageRoute(builder: (context) => const AuthWrapper());
+            // Handle specific routes
+            switch (settings.name) {
+              case '/post_detail':
+                final post = settings.arguments as PostModel?;
+                if (post != null) {
+                  return MaterialPageRoute(
+                    builder: (context) => PostDetailScreen(initialPost: post),
+                  );
+                } else {
+                  // Fallback to general post detail screen
+                  return MaterialPageRoute(
+                    builder: (context) => const PostDetailScreen(),
+                  );
+                }
+              default:
+                // Default to AuthWrapper for all other routes
+                return MaterialPageRoute(builder: (context) => const AuthWrapper());
+            }
           },
           theme: themeService.lightTheme,
           darkTheme: themeService.darkTheme,

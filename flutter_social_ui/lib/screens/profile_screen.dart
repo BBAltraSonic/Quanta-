@@ -3,15 +3,22 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_social_ui/constants.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
+import '../models/post_model.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
+import '../services/follow_service.dart';
+import '../services/analytics_insights_service.dart';
+import '../services/enhanced_feeds_service.dart';
+import '../models/analytics_insight_model.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
+import '../screens/chat_screen.dart';
 import '../widgets/skeleton_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final String? userId; // null means current user's profile
+  const ProfileScreen({super.key, this.userId});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -20,11 +27,32 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileService _profileService = ProfileService();
   final AuthService _authService = AuthService();
+  final FollowService _followService = FollowService();
+  final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
   
   UserModel? _user;
   List<AvatarModel> _avatars = [];
+  AvatarModel? _activeAvatar;
   Map<String, dynamic> _stats = {};
   bool _isLoading = true;
+  bool _isOwnProfile = true;
+  bool _isFollowing = false;
+  bool _isFollowLoading = false;
+  
+  // Enhanced analytics state
+  AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.month;
+  List<AnalyticsMetric> _detailedMetrics = [];
+  List<AnalyticsInsight> _insights = [];
+  bool _isAnalyticsLoading = true;
+  bool _analyticsLoading = true;
+  
+  // Posts content state
+  List<PostModel> _userPosts = [];
+  bool _isPostsLoading = false;
+  bool _hasMorePosts = true;
+  int _postsPage = 1;
+  final int _postsPerPage = 20;
+  Map<String, dynamic>? _comparisons;
   
   @override
   void initState() {
@@ -32,22 +60,156 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
   
+  /// Load user posts from database
+  Future<void> _loadUserPosts({bool loadMore = false}) async {
+    if (_isPostsLoading || (_userPosts.isNotEmpty && !loadMore && !_hasMorePosts)) return;
+    
+    if (_user == null) return;
+    
+    setState(() {
+      _isPostsLoading = true;
+    });
+    
+    try {
+      // Use EnhancedFeedsService to get posts for this user
+      final feedsService = EnhancedFeedsService();
+      final posts = await feedsService.getUserPosts(
+        userId: _user!.id,
+        page: loadMore ? _postsPage + 1 : 1,
+        limit: _postsPerPage,
+      );
+      
+      setState(() {
+        if (loadMore) {
+          _userPosts.addAll(posts);
+          _postsPage++;
+        } else {
+          _userPosts = posts;
+          _postsPage = 1;
+        }
+        _hasMorePosts = posts.length == _postsPerPage;
+        _isPostsLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isPostsLoading = false;
+      });
+      debugPrint('Error loading user posts: $e');
+    }
+  }
+  
   Future<void> _loadProfileData() async {
     try {
-      final userId = _authService.currentUserId;
-      if (userId != null) {
-        final profileData = await _profileService.getUserProfileData(userId);
+      final currentUserId = _authService.currentUserId;
+      if (currentUserId == null) {
         setState(() {
-          _user = profileData['user'] as UserModel;
-          _avatars = profileData['avatars'] as List<AvatarModel>;
-          _stats = profileData['stats'] as Map<String, dynamic>;
           _isLoading = false;
         });
+        return;
       }
+      
+      // Determine if we're viewing our own profile or someone else's
+      final targetUserId = widget.userId ?? currentUserId;
+      _isOwnProfile = targetUserId == currentUserId;
+      
+      // Load the profile data
+      final profileData = await _profileService.getUserProfileData(targetUserId);
+      
+      // If viewing another user's profile, check follow status
+      if (!_isOwnProfile && _activeAvatar != null) {
+        await _checkFollowStatus(targetUserId);
+      }
+      
+      setState(() {
+        _user = profileData['user'] as UserModel;
+        _avatars = profileData['avatars'] as List<AvatarModel>;
+        _activeAvatar = profileData['active_avatar'] as AvatarModel?;
+        _stats = profileData['stats'] as Map<String, dynamic>;
+        _isLoading = false;
+      });
+      
+      // Load user posts after profile data is loaded
+      await _loadUserPosts();
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+  
+  Future<void> _checkFollowStatus(String targetUserId) async {
+    try {
+      setState(() {
+        _isFollowLoading = true;
+      });
+      
+      if (_activeAvatar != null) {
+        // Check if current user is following the target user's active avatar
+        final isFollowing = await _followService.isFollowing(_activeAvatar!.id);
+        
+        setState(() {
+          _isFollowing = isFollowing;
+          _isFollowLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isFollowLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _toggleFollow() async {
+    if (_user == null || _activeAvatar == null) return;
+    
+    try {
+      setState(() {
+        _isFollowLoading = true;
+      });
+      
+      // Toggle follow status for the target user's active avatar
+      final newFollowStatus = await _followService.toggleFollow(_activeAvatar!.id);
+      
+      setState(() {
+        _isFollowing = newFollowStatus;
+      });
+      
+      // Refresh follower count
+      await _refreshFollowerCount();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFollowing 
+              ? 'Now following ${_user!.displayName ?? _user!.username}!' 
+              : 'Unfollowed ${_user!.displayName ?? _user!.username}'),
+          backgroundColor: kPrimaryColor,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isFollowLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _refreshFollowerCount() async {
+    if (_user == null) return;
+    
+    try {
+      final updatedStats = await _profileService.getUserStats(_user!.id);
+      setState(() {
+        _stats = updatedStats;
+      });
+    } catch (e) {
+      // Silently fail, as this is just a refresh
     }
   }
   
@@ -86,6 +248,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   
+  void _navigateToChat() {
+    if (_activeAvatar == null && _avatars.isEmpty) {
+      // Show tooltip or guide to create avatar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please create an avatar first to start chatting!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    final chatAvatar = _activeAvatar ?? _avatars.first;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          name: chatAvatar.name,
+          avatar: chatAvatar.avatarImageUrl ?? 'assets/images/p.jpg',
+          avatarId: chatAvatar.id,
+        ),
+      ),
+    );
+  }
+  
+  void _shareProfile() {
+    // Simple share profile functionality - shows profile URL
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Profile shared! Link: quanta.app/profile/${_user?.username ?? 'user'}'),
+        backgroundColor: kPrimaryColor,
+        action: SnackBarAction(
+          label: 'COPY',
+          textColor: Colors.white,
+          onPressed: () {
+            // In a real app, this would copy to clipboard
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile link copied to clipboard!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+  
   String _formatNumber(int number) {
     if (number >= 1000000) {
       return '${(number / 1000000).toStringAsFixed(1)}M';
@@ -93,6 +303,268 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+  
+  String _formatMetricValue(AnalyticsMetric metric) {
+    switch (metric.type) {
+      case MetricType.percentage:
+        return '${metric.value.toStringAsFixed(1)}%';
+      case MetricType.duration:
+        return '${metric.value.toStringAsFixed(0)}${metric.unit}';
+      case MetricType.currency:
+        return '\$${metric.value.toStringAsFixed(0)}';
+      case MetricType.rate:
+        return '${metric.value.toStringAsFixed(2)}${metric.unit}';
+      case MetricType.count:
+      default:
+        final intValue = metric.value.toInt();
+        return _formatNumber(intValue);
+    }
+  }
+  
+  void _onPeriodChanged(AnalyticsPeriod period) async {
+    if (period == _selectedPeriod) return;
+    
+    setState(() {
+      _selectedPeriod = period;
+      _analyticsLoading = true;
+    });
+    
+    await _loadEnhancedAnalytics();
+  }
+  
+  Future<void> _loadEnhancedAnalytics() async {
+    if (_user == null) return;
+    
+    try {
+      final analyticsData = await _analyticsService.getProfileAnalytics(
+        userId: _user!.id,
+        period: _selectedPeriod,
+        includeComparisons: true,
+      );
+      
+      setState(() {
+        _detailedMetrics = analyticsData['metrics'] as List<AnalyticsMetric>;
+        _insights = analyticsData['insights'] as List<AnalyticsInsight>;
+        _comparisons = analyticsData['comparisons'] as Map<String, dynamic>?;
+        _analyticsLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _analyticsLoading = false;
+      });
+    }
+  }
+  
+  void _handleInsightAction(AnalyticsInsight insight) {
+    // Handle insight action based on action type
+    final actionType = insight.actionData?['type'] as String?;
+    
+    switch (actionType) {
+      case 'engagement_tips':
+        _showEngagementTips();
+        break;
+      case 'growth_strategy':
+        _showGrowthStrategy();
+        break;
+      case 'reach_optimization':
+        _showReachOptimization();
+        break;
+      case 'post_scheduling':
+        _showPostScheduling();
+        break;
+      default:
+        _showGenericInsightDetails(insight);
+    }
+  }
+  
+  void _showEngagementTips() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Row(
+          children: [
+            Icon(Icons.tips_and_updates, color: kPrimaryColor),
+            const SizedBox(width: 8),
+            const Text(
+              'Engagement Tips',
+              style: TextStyle(color: kTextColor),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '• Post interactive content like polls and Q&As\n'
+              '• Respond to comments within the first hour\n'
+              '• Share behind-the-scenes content\n'
+              '• Use trending hashtags relevant to your niche\n'
+              '• Collaborate with other creators',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Got it!', style: TextStyle(color: kPrimaryColor)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showGrowthStrategy() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Row(
+          children: [
+            Icon(Icons.trending_up, color: Colors.green),
+            const SizedBox(width: 8),
+            const Text(
+              'Growth Strategy',
+              style: TextStyle(color: kTextColor),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your growth is accelerating! To maintain momentum:\n\n'
+              '• Keep your posting schedule consistent\n'
+              '• Analyze what content performed best\n'
+              '• Engage with your new followers\n'
+              '• Consider expanding to new content formats\n'
+              '• Cross-promote on other platforms',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Thanks!', style: TextStyle(color: kPrimaryColor)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showReachOptimization() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Row(
+          children: [
+            Icon(Icons.visibility, color: Colors.orange),
+            const SizedBox(width: 8),
+            const Text(
+              'Improve Your Reach',
+              style: TextStyle(color: kTextColor),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'To improve your content reach:\n\n'
+              '• Post when your audience is most active\n'
+              '• Use a mix of content types (photos, videos, stories)\n'
+              '• Engage with trending topics in your niche\n'
+              '• Optimize your hashtag strategy\n'
+              '• Create shareable, valuable content',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Apply Tips', style: TextStyle(color: kPrimaryColor)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPostScheduling() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Row(
+          children: [
+            Icon(Icons.schedule, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Text(
+              'Optimal Posting Times',
+              style: TextStyle(color: kTextColor),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Based on your audience activity:\n\n'
+              '📅 Best Days: Monday - Thursday\n'
+              '🕕 Peak Hours: 6-8 PM\n'
+              '🕙 Secondary Peak: 10-11 AM\n\n'
+              'Try scheduling your content during these times for maximum engagement!',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Schedule Now', style: TextStyle(color: kPrimaryColor)),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showGenericInsightDetails(AnalyticsInsight insight) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Row(
+          children: [
+            Icon(insight.type.icon, color: insight.type.color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                insight.title,
+                style: const TextStyle(color: kTextColor),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          insight.description,
+          style: const TextStyle(color: kLightTextColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: TextStyle(color: kPrimaryColor)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSkeletonLoading() {
@@ -386,15 +858,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _StatColumn(
-              value: _formatNumber(_stats['total_posts'] ?? 0),
+              value: _formatNumber(_stats['posts_count'] ?? 0),
               label: 'Posts',
             ),
             _StatColumn(
-              value: _formatNumber(_stats['total_followers'] ?? 0),
+              value: _formatNumber(_stats['followers_count'] ?? 0),
               label: 'Followers',
             ),
             _StatColumn(
-              value: _formatNumber(_stats['total_following'] ?? 0),
+              value: _formatNumber(_stats['following_count'] ?? 0),
               label: 'Following',
             ),
           ],
@@ -403,50 +875,167 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Primary actions
         Row(
           children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            if (_isOwnProfile) ...{
+              // Own profile: Show Share and Chat buttons
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _shareProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Follow',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {},
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.white24, width: 1.2),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                  child: const Text(
+                    'Share Profile',
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                child: const Text(
-                  'Message',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _navigateToChat,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white24, width: 1.2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Chat with me',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
-            ),
+            } else ...[
+              // Other user's profile: Show Follow and Message buttons
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isFollowLoading ? null : _toggleFollow,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isFollowing ? Colors.grey[700] : kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isFollowLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          _isFollowing ? 'Following' : 'Follow',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _navigateToChat,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white24, width: 1.2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Message',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ],
     );
   }
   
-  // Analytics section
+  // Enhanced Analytics section - Phase 3
   Widget _buildAnalyticsSection() {
+    // Only show enhanced analytics for own profile
+    if (!_isOwnProfile) {
+      return _buildBasicAnalyticsSection();
+    }
+
+    return Column(
+      children: [
+        // Analytics Header with Period Selector
+        _HeaderCard(
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '📊 Analytics Insights',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  _buildPeriodSelector(),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildEnhancedMetricsGrid(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        // Insights Section
+        if (_insights.isNotEmpty)
+          _HeaderCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.lightbulb, color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Key Insights',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ..._insights.take(3).map((insight) => _buildInsightCard(insight)),
+              ],
+            ),
+          ),
+        if (_insights.isNotEmpty) const SizedBox(height: 14),
+        // Benchmarks and Comparisons
+        if (_comparisons != null)
+          _HeaderCard(
+            child: _buildBenchmarksSection(),
+          ),
+      ],
+    );
+  }
+  
+  Widget _buildBasicAnalyticsSection() {
     return _HeaderCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,16 +1049,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
-          // Performance metrics row
           Row(
             children: [
               Expanded(
                 child: _buildAnalyticsCard(
-                  title: 'Total Views',
-                  value: _formatNumber(_stats['total_views'] ?? 0),
-                  subtitle: '+12% this week',
-                  icon: Icons.visibility,
+                  title: 'Posts',
+                  value: _formatNumber(_stats['posts_count'] ?? 0),
+                  subtitle: 'Total content',
+                  icon: Icons.grid_view,
                   color: Colors.blue,
                   isPositive: true,
                 ),
@@ -477,52 +1064,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildAnalyticsCard(
-                  title: 'Engagement',
-                  value: '${((_stats['engagement_rate'] ?? 0.0) * 100).toStringAsFixed(1)}%',
-                  subtitle: '+3.2% this week',
-                  icon: Icons.favorite,
-                  color: Colors.red,
-                  isPositive: true,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // Revenue and growth metrics row
-          Row(
-            children: [
-              Expanded(
-                child: _buildAnalyticsCard(
-                  title: 'Revenue',
-                  value: '\$${_formatNumber(_stats['total_revenue'] ?? 0)}',
-                  subtitle: '+8.5% this month',
-                  icon: Icons.attach_money,
+                  title: 'Followers',
+                  value: _formatNumber(_stats['followers_count'] ?? 0),
+                  subtitle: 'Total followers',
+                  icon: Icons.people,
                   color: Colors.green,
                   isPositive: true,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildAnalyticsCard(
-                  title: 'Growth Rate',
-                  value: '+${(_stats['growth_rate'] ?? 0.0).toStringAsFixed(1)}%',
-                  subtitle: 'Follower growth',
-                  icon: Icons.trending_up,
-                  color: Colors.purple,
-                  isPositive: true,
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 16),
-          
-          // Top performing avatar
           if (_avatars.isNotEmpty) ...[
+            const SizedBox(height: 16),
             const Text(
               'Top Performing Avatar',
               style: TextStyle(
-                color: Colors.black87,
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -532,6 +1089,377 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ],
       ),
+    );
+  }
+  
+  Widget _buildPeriodSelector() {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: AnalyticsPeriod.values.take(4).map((period) {
+          final isSelected = period == _selectedPeriod;
+          return GestureDetector(
+            onTap: () => _onPeriodChanged(period),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? kPrimaryColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                period.shortLabel,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white70,
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+  
+  Widget _buildEnhancedMetricsGrid() {
+    if (_detailedMetrics.isEmpty) {
+      return _buildBasicMetricsGrid();
+    }
+    
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
+                (m) => m.key == 'engagement_rate',
+                orElse: () => AnalyticsMetric(
+                  key: 'engagement_rate',
+                  label: 'Engagement',
+                  value: 0.0,
+                  type: MetricType.percentage,
+                ),
+              )),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
+                (m) => m.key == 'reach',
+                orElse: () => AnalyticsMetric(
+                  key: 'reach',
+                  label: 'Reach',
+                  value: 0,
+                  type: MetricType.count,
+                ),
+              )),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
+                (m) => m.key == 'profile_views',
+                orElse: () => AnalyticsMetric(
+                  key: 'profile_views',
+                  label: 'Profile Views',
+                  value: 0,
+                  type: MetricType.count,
+                ),
+              )),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
+                (m) => m.key == 'follower_growth',
+                orElse: () => AnalyticsMetric(
+                  key: 'follower_growth',
+                  label: 'New Followers',
+                  value: 0,
+                  type: MetricType.count,
+                ),
+              )),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildBasicMetricsGrid() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildAnalyticsCard(
+            title: 'Posts',
+            value: _formatNumber(_stats['posts_count'] ?? 0),
+            subtitle: 'Total content',
+            icon: Icons.grid_view,
+            color: Colors.blue,
+            isPositive: true,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildAnalyticsCard(
+            title: 'Followers',
+            value: _formatNumber(_stats['followers_count'] ?? 0),
+            subtitle: 'Total followers',
+            icon: Icons.people,
+            color: Colors.green,
+            isPositive: true,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildDetailedMetricCard(AnalyticsMetric metric) {
+    final hasChange = metric.changePercentage != null;
+    final isPositive = metric.isPositiveChange;
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            metric.label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  _formatMetricValue(metric),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (hasChange)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                        color: isPositive ? Colors.green : Colors.red,
+                        size: 10,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        metric.changeText!,
+                        style: TextStyle(
+                          color: isPositive ? Colors.green : Colors.red,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildInsightCard(AnalyticsInsight insight) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: insight.type.color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: insight.type.color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                insight.type.icon,
+                color: insight.type.color,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  insight.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              if (insight.priority == InsightPriority.high ||
+                  insight.priority == InsightPriority.critical)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: insight.priority.color,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    insight.priority == InsightPriority.high ? 'HIGH' : 'URGENT',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            insight.description,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          if (insight.isActionable) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => _handleInsightAction(insight),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  backgroundColor: insight.type.color.withOpacity(0.1),
+                ),
+                child: Text(
+                  insight.actionLabel ?? 'Learn More',
+                  style: TextStyle(
+                    color: insight.type.color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildBenchmarksSection() {
+    final category = _comparisons!['category'] as String;
+    final percentile = _comparisons!['user_percentile'] as int;
+    final message = _comparisons!['benchmark_message'] as String;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Performance Benchmark',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const Text(
+                        'Creator Category',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${percentile}th percentile',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
   
@@ -777,179 +1705,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Masonry-like grid of user's posts (uses variable images)
+  /// Database-backed posts grid - Phase 4
   Widget _userPostsMasonry() {
-    // Rotate through a few different images for visual variety.
-    // Ensure these exist in assets/images and are declared in pubspec.yaml.
-    const images = <String>['assets/images/We.jpg', 'assets/images/p.jpg'];
-    int idx = 0;
-
-    String nextImg() {
-      final path = images[idx % images.length];
-      idx++;
-      return path;
+    // Show loading state while posts are loading
+    if (_isPostsLoading && _userPosts.isEmpty) {
+      return _buildPostsLoadingGrid();
     }
-
-    Widget tile({
-      required double h,
-      bool play = false,
-      String? badge,
-      double radius = 18,
-      String? image,
-    }) {
-      final imgPath = image ?? nextImg();
-      return Container(
-        height: h,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(radius),
-          image: DecorationImage(image: AssetImage(imgPath), fit: BoxFit.cover),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            // subtle gradient for text legibility
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (play)
-              Center(
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.play_arrow_rounded,
-                    color: kPrimaryColor,
-                    size: 34,
-                  ),
-                ),
-              ),
-            if (badge != null)
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
+    
+    // Show empty state if no posts
+    if (_userPosts.isEmpty) {
+      return _buildEmptyPostsState();
     }
-
+    
+    // Show posts in masonry layout
+    return _buildDatabasePostsGrid();
+  }
+  
+  /// Build loading skeleton for posts
+  Widget _buildPostsLoadingGrid() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalW = constraints.maxWidth;
         const gap = 12.0;
-
-        // Two bespoke columns: left thin, right wide
         final leftColW = (totalW - gap) * 0.35;
         final rightColW = totalW - leftColW - gap;
-
-        const leftTopH = 120.0;
-        const leftBottomH = 120.0;
-
-        const rightTopH = 180.0;
-        const rightBottomH = 120.0;
-
+        
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left column
+            // Left column skeleton
             SizedBox(
               width: leftColW,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
+                  SkeletonWidget(
+                    width: leftColW,
+                    height: 120,
                     borderRadius: BorderRadius.circular(18),
-                    child: tile(h: leftTopH, badge: '5/7', radius: 18),
                   ),
                   const SizedBox(height: 12),
-                  ClipRRect(
+                  SkeletonWidget(
+                    width: leftColW,
+                    height: 120,
                     borderRadius: BorderRadius.circular(18),
-                    child: tile(h: leftBottomH, radius: 18),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            // Right column
+            // Right column skeleton
             SizedBox(
               width: rightColW,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
+                  SkeletonWidget(
+                    width: rightColW,
+                    height: 180,
                     borderRadius: BorderRadius.circular(22),
-                    child: tile(
-                      h: rightTopH,
-                      play: true,
-                      badge: '1/3',
-                      radius: 22,
-                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
-                        child: ClipRRect(
+                        child: SkeletonWidget(
+                          width: (rightColW - 12) / 2,
+                          height: 120,
                           borderRadius: BorderRadius.circular(18),
-                          child: tile(h: rightBottomH, radius: 18),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: ClipRRect(
+                        child: SkeletonWidget(
+                          width: (rightColW - 12) / 2,
+                          height: 120,
                           borderRadius: BorderRadius.circular(18),
-                          child: tile(
-                            h: rightBottomH,
-                            badge: '1/3',
-                            radius: 18,
-                          ),
                         ),
                       ),
                     ],
@@ -960,6 +1789,294 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         );
       },
+    );
+  }
+  
+  /// Build empty posts state
+  Widget _buildEmptyPostsState() {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.grid_view,
+            size: 64,
+            color: Colors.white30,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _isOwnProfile ? 'No posts yet' : 'No posts to show',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _isOwnProfile 
+                ? 'Share your first moment to get started!' 
+                : 'This user hasn\'t posted anything yet.',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (_isOwnProfile) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to post creation
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Post creation coming soon!'),
+                    backgroundColor: kPrimaryColor,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Create Post'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  /// Build the actual database posts grid
+  Widget _buildDatabasePostsGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalW = constraints.maxWidth;
+        const gap = 12.0;
+        final leftColW = (totalW - gap) * 0.35;
+        final rightColW = totalW - leftColW - gap;
+        
+        // Distribute posts between left and right columns
+        final leftPosts = <PostModel>[];
+        final rightPosts = <PostModel>[];
+        
+        for (int i = 0; i < _userPosts.length; i++) {
+          if (i % 3 == 0) {
+            leftPosts.add(_userPosts[i]);
+          } else {
+            rightPosts.add(_userPosts[i]);
+          }
+        }
+        
+        return Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left column
+                SizedBox(
+                  width: leftColW,
+                  child: Column(
+                    children: leftPosts.map((post) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildPostTile(
+                        post: post,
+                        height: 120,
+                        width: leftColW,
+                        radius: 18,
+                      ),
+                    )).toList(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Right column
+                SizedBox(
+                  width: rightColW,
+                  child: Column(
+                    children: rightPosts.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final post = entry.value;
+                      final isFirst = index == 0;
+                      final height = isFirst ? 180.0 : 120.0;
+                      final radius = isFirst ? 22.0 : 18.0;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildPostTile(
+                          post: post,
+                          height: height,
+                          width: rightColW,
+                          radius: radius,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+            // Load more indicator
+            if (_isPostsLoading)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                ),
+              ),
+            // Load more button
+            if (_hasMorePosts && !_isPostsLoading)
+              Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: OutlinedButton(
+                  onPressed: () => _loadUserPosts(loadMore: true),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white30),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Load More'),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+  
+  /// Build individual post tile from database data
+  Widget _buildPostTile({
+    required PostModel post,
+    required double height,
+    required double width,
+    required double radius,
+  }) {
+    final isVideo = post.type == PostType.video;
+    final imageUrl = post.thumbnailUrl ?? post.imageUrl;
+    
+    return GestureDetector(
+      onTap: () {
+        // Navigate to post detail
+        Navigator.pushNamed(context, '/post_detail', arguments: post);
+      },
+      child: Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          color: Colors.grey[800], // Fallback color
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Image or thumbnail
+            if (imageUrl != null)
+              imageUrl.startsWith('assets/')
+                  ? Image.asset(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                    )
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                    )
+            else
+              _buildFallbackImage(),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            // Video play button
+            if (isVideo)
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    color: kPrimaryColor,
+                    size: 28,
+                  ),
+                ),
+              ),
+            // Stats badge
+            Positioned(
+              right: 8,
+              top: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatNumber(post.likesCount ?? 0),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Build fallback image for posts without images
+  Widget _buildFallbackImage() {
+    return Container(
+      color: Colors.grey[800],
+      child: const Center(
+        child: Icon(
+          Icons.image,
+          color: Colors.white30,
+          size: 32,
+        ),
+      ),
     );
   }
 }

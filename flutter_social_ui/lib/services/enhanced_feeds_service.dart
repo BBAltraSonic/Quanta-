@@ -66,6 +66,41 @@ class EnhancedFeedsService {
     }
   }
 
+  /// Get posts for a specific user
+  Future<List<PostModel>> getUserPosts({
+    required String userId,
+    int page = 1,
+    int limit = 20,
+    bool applySafetyFiltering = false,
+  }) async {
+    try {
+      // Calculate offset for pagination
+      final offset = (page - 1) * limit;
+      
+      final response = await _supabase
+          .from(DbConfig.postsTable)
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .eq('status', DbConfig.publishedStatus)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      var posts = response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
+
+      // Apply safety filtering if requested
+      if (applySafetyFiltering) {
+        posts = await UserSafetyService().filterContent(posts);
+      }
+      
+      debugPrint('📱 Retrieved ${posts.length} posts for user $userId (page $page)');
+      return posts;
+    } catch (e) {
+      debugPrint('❌ Failed to get user posts: $e');
+      return [];
+    }
+  }
+
   /// Get a specific post by ID
   Future<PostModel?> getPostById(String postId) async {
     try {
