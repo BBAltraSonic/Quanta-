@@ -2514,7 +2514,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_pinnedPost == null || _activeAvatar == null) return;
     
     try {
-      await _profileService.unpinPost(_activeAvatar!.id, _pinnedPost!.id);
+      await _profileService.unpinPost(_activeAvatar!.id);
       
       setState(() {
         _pinnedPost = null;

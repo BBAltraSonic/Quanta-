@@ -8,6 +8,9 @@ class UserModel {
   final String username;
   final String? displayName;
   final String? profileImageUrl;
+  final String? bio;
+  final String? firstName;
+  final String? lastName;
   final UserRole role;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,6 +22,9 @@ class UserModel {
     required this.username,
     this.displayName,
     this.profileImageUrl,
+    this.bio,
+    this.firstName,
+    this.lastName,
     this.role = UserRole.creator,
     required this.createdAt,
     required this.updatedAt,
@@ -31,6 +37,9 @@ class UserModel {
     required String username,
     String? displayName,
     String? profileImageUrl,
+    String? bio,
+    String? firstName,
+    String? lastName,
     UserRole role = UserRole.creator,
     Map<String, dynamic>? metadata,
   }) {
@@ -41,6 +50,9 @@ class UserModel {
       username: username,
       displayName: displayName,
       profileImageUrl: profileImageUrl,
+      bio: bio,
+      firstName: firstName,
+      lastName: lastName,
       role: role,
       createdAt: now,
       updatedAt: now,
@@ -56,6 +68,9 @@ class UserModel {
       username: json['username']?.toString() ?? '',
       displayName: json['display_name']?.toString(),
       profileImageUrl: json['profile_image_url']?.toString(),
+      bio: json['bio']?.toString(),
+      firstName: json['first_name']?.toString(),
+      lastName: json['last_name']?.toString(),
       role: UserRole.values.firstWhere(
         (e) =>
             e.toString().split('.').last ==
@@ -80,6 +95,9 @@ class UserModel {
       'username': username,
       'display_name': displayName,
       'profile_image_url': profileImageUrl,
+      'bio': bio,
+      'first_name': firstName,
+      'last_name': lastName,
       'role': role.toString().split('.').last,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -93,6 +111,9 @@ class UserModel {
     String? username,
     String? displayName,
     String? profileImageUrl,
+    String? bio,
+    String? firstName,
+    String? lastName,
     UserRole? role,
     Map<String, dynamic>? metadata,
   }) {
@@ -102,6 +123,9 @@ class UserModel {
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      bio: bio ?? this.bio,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       role: role ?? this.role,
       createdAt: createdAt,
       updatedAt: DateTime.now(),

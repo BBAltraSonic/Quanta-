@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/user_safety_service.dart';
 import '../services/analytics_service.dart';
 import '../config/db_config.dart';
+import '../services/notification_service.dart' as notification_service;
 
 /// Enhanced feeds service with comprehensive post interaction functionality
 class EnhancedFeedsService {
@@ -17,6 +18,7 @@ class EnhancedFeedsService {
 
   final AuthService _authService = AuthService();
   final AnalyticsService _analyticsService = AnalyticsService();
+  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
   SupabaseClient get _supabase => Supabase.instance.client;
   
   // Realtime subscriptions

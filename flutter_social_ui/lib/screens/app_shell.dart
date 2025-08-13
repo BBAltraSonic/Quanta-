@@ -8,6 +8,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_social_ui/screens/search_screen_new.dart';
 import 'package:flutter_social_ui/screens/notifications_screen_new.dart';
 import 'package:flutter_social_ui/services/analytics_service.dart';
+import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -18,6 +19,9 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  int _unreadCount = 0;
+  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
+  Stream<List<notification_service.NotificationModel>>? _notificationStream;
 
   // Navigation tabs with enhanced PostDetailScreen as home:
   // [PostDetail (Home), Search (left of center), Create (center), Notifications (right of center), Profile]
@@ -28,6 +32,45 @@ class _AppShellState extends State<AppShell> {
     const NotificationsScreenNew(), // Right of center
     const ProfileScreen(), // Far right
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeNotifications();
+  }
+  
+  void _initializeNotifications() async {
+    try {
+      // Initialize notification service
+      await _notificationService.initialize();
+      
+      // Get initial unread count
+      final count = await _notificationService.getUnreadCount();
+      setState(() {
+        _unreadCount = count;
+      });
+      
+      // Set up real-time subscription for badge updates
+      _notificationStream = _notificationService.getNotificationStream();
+      if (_notificationStream != null) {
+        _notificationStream!.listen(
+          (notifications) {
+            if (mounted) {
+              final unreadCount = notifications.where((n) => !n.isRead).length;
+              setState(() {
+                _unreadCount = unreadCount;
+              });
+            }
+          },
+          onError: (error) {
+            debugPrint('Notification stream error in AppShell: $error');
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('Error initializing notifications in AppShell: $e');
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -70,13 +113,48 @@ class _AppShellState extends State<AppShell> {
           _shadowedSvg('assets/icons/magnifer-svgrepo-com.svg', size: 26),
           // Center: Create (unchanged)
           _shadowedSvg('assets/icons/add-square-svgrepo-com.svg', size: 30),
-          // Right of center: Notifications (heart)
-          _shadowedSvg('assets/icons/heart-svgrepo-com.svg', size: 26),
+          // Right of center: Notifications (heart) with badge
+          _buildNotificationIconWithBadge(),
           // Far right: Profile (existing)
           _shadowedSvg('assets/icons/user-rounded-svgrepo-com.svg', size: 26),
         ],
         onTap: _onItemTapped,
       ),
+    );
+  }
+
+  // Notification icon with unread count badge
+  Widget _buildNotificationIconWithBadge() {
+    return Stack(
+      children: [
+        _shadowedSvg('assets/icons/heart-svgrepo-com.svg', size: 26),
+        if (_unreadCount > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: kPrimaryColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              constraints: BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                _unreadCount > 99 ? '99+' : _unreadCount.toString(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

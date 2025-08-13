@@ -92,13 +92,50 @@ class ProfileService {
     String? username,
     String? email,
     String? profileImageUrl,
+    String? bio,
+    String? firstName,
+    String? lastName,
   }) async {
     try {
+      // Validate inputs
+      if (username != null && username.trim().isEmpty) {
+        throw Exception('Username cannot be empty');
+      }
+      
+      if (email != null && !_isValidEmail(email)) {
+        throw Exception('Please enter a valid email address');
+      }
+      
+      if (bio != null && bio.length > 160) {
+        throw Exception('Bio cannot exceed 160 characters');
+      }
+      
+      // Check username uniqueness if username is being updated
+      if (username != null) {
+        final existingUser = await _checkUsernameExists(username, userId);
+        if (existingUser) {
+          throw Exception('Username is already taken');
+        }
+      }
+      
+      // Check email uniqueness if email is being updated
+      if (email != null) {
+        final existingUser = await _checkEmailExists(email, userId);
+        if (existingUser) {
+          throw Exception('Email is already registered');
+        }
+      }
+
       final updateData = <String, dynamic>{};
-      if (displayName != null) updateData['display_name'] = displayName;
-      if (username != null) updateData['username'] = username;
-      if (email != null) updateData['email'] = email;
+      if (displayName != null) updateData['display_name'] = displayName.trim().isEmpty ? null : displayName.trim();
+      if (username != null) updateData['username'] = username.trim();
+      if (email != null) updateData['email'] = email.trim().toLowerCase();
       if (profileImageUrl != null) updateData['profile_image_url'] = profileImageUrl;
+      if (bio != null) updateData['bio'] = bio.trim().isEmpty ? null : bio.trim();
+      if (firstName != null) updateData['first_name'] = firstName.trim().isEmpty ? null : firstName.trim();
+      if (lastName != null) updateData['last_name'] = lastName.trim().isEmpty ? null : lastName.trim();
+      
+      updateData['updated_at'] = DateTime.now().toIso8601String();
 
       final response = await _authService.supabase
           .from('users')
@@ -109,6 +146,15 @@ class ProfileService {
 
       return UserModel.fromJson(response);
     } catch (e) {
+      // More specific error messages
+      String errorMessage = e.toString();
+      if (errorMessage.contains('duplicate key value violates unique constraint "users_username_key"')) {
+        throw Exception('Username is already taken');
+      } else if (errorMessage.contains('duplicate key value violates unique constraint "users_email_key"')) {
+        throw Exception('Email is already registered');
+      } else if (errorMessage.contains('Error updating profile:')) {
+        rethrow;
+      }
       throw Exception('Error updating profile: $e');
     }
   }
@@ -267,6 +313,18 @@ class ProfileService {
     }
   }
 
+  /// Remove pinned post for an avatar
+  Future<void> unpinPost(String avatarId) async {
+    try {
+      await _authService.supabase
+          .from('avatars')
+          .update({'pinned_post_id': null})
+          .eq('id', avatarId);
+    } catch (e) {
+      throw Exception('Error unpinning post: $e');
+    }
+  }
+
   /// Get collaborations for an avatar
   Future<List<Map<String, dynamic>>> getCollaborationPosts(String avatarId, {int limit = 10}) async {
     try {
@@ -317,5 +375,56 @@ class ProfileService {
     }
   }
 
+  /// Validate email format
+  bool _isValidEmail(String email) {
+    return RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    ).hasMatch(email);
+  }
 
+  /// Check if username already exists (excluding current user)
+  Future<bool> _checkUsernameExists(String username, String currentUserId) async {
+    try {
+      final response = await _authService.supabase
+          .from('users')
+          .select('id')
+          .eq('username', username.trim())
+          .neq('id', currentUserId)
+          .limit(1);
+      
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking username existence: $e');
+      return false;
+    }
+  }
+
+  /// Check if email already exists (excluding current user)
+  Future<bool> _checkEmailExists(String email, String currentUserId) async {
+    try {
+      final response = await _authService.supabase
+          .from('users')
+          .select('id')
+          .eq('email', email.trim().toLowerCase())
+          .neq('id', currentUserId)
+          .limit(1);
+      
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking email existence: $e');
+      return false;
+    }
+  }
+
+  /// Validate name (only letters, spaces, hyphens, apostrophes)
+  bool _isValidName(String name) {
+    return RegExp(r"^[a-zA-Z\s\-\']+$").hasMatch(name);
+  }
+
+  /// Validate username (alphanumeric, underscore, dot, hyphen)
+  bool _isValidUsername(String username) {
+    return RegExp(r'^[a-zA-Z0-9_.\-]+$').hasMatch(username) && 
+           username.length >= 3 && 
+           username.length <= 30;
+  }
 }

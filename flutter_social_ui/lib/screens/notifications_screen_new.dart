@@ -6,7 +6,10 @@ import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
 import 'package:flutter_social_ui/screens/chat_screen.dart';
+import 'package:flutter_social_ui/screens/post_detail_screen.dart';
+import 'package:flutter_social_ui/screens/profile_screen.dart';
 import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 enum NotificationType {
@@ -45,23 +48,8 @@ class NotificationItem {
     this.metadata,
   });
 
-  factory NotificationItem.fromJson(Map<String, dynamic> json) {
-    return NotificationItem(
-      id: json['id'],
-      type: NotificationType.values.firstWhere(
-        (e) => e.toString().split('.').last == json['type'],
-        orElse: () => NotificationType.systemUpdate,
-      ),
-      title: json['title'],
-      message: json['message'],
-      avatarId: json['avatar_id'],
-      postId: json['post_id'],
-      userId: json['user_id'],
-      timestamp: DateTime.parse(json['timestamp']),
-      isRead: json['is_read'] ?? false,
-      metadata: json['metadata'],
-    );
-  }
+  // Note: fromJson method removed as it was unused
+  // All data conversion is done directly from NotificationModel in the service
 }
 
 class NotificationsScreenNew extends StatefulWidget {
@@ -85,6 +73,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
   bool _isLoading = true;
   bool _isRefreshing = false;
+  
+  // Real-time subscription
+  Stream<List<notification_service.NotificationModel>>? _notificationStream;
 
   @override
   void initState() {
@@ -95,12 +86,53 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
   Future<void> _initializeServices() async {
     try {
-      // Initialize any required services here if needed
-      _loadNotifications();
+      await _notificationService.initialize();
+      await _loadNotifications();
+      _setupRealtimeSubscription();
     } catch (e) {
       debugPrint('Error initializing services: $e');
       _loadNotifications();
     }
+  }
+  
+  void _setupRealtimeSubscription() {
+    try {
+      _notificationStream = _notificationService.getNotificationStream();
+      
+      if (_notificationStream != null) {
+        _notificationStream!.listen(
+          (notifications) {
+            if (mounted) {
+              _updateNotificationsFromStream(notifications);
+            }
+          },
+          onError: (error) {
+            debugPrint('Real-time notification error: $error');
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('Error setting up real-time notifications: $e');
+    }
+  }
+  
+  void _updateNotificationsFromStream(List<notification_service.NotificationModel> notifications) {
+    final notificationItems = notifications.map((n) => NotificationItem(
+      id: n.id,
+      type: _mapNotificationType(n.type),
+      title: n.title,
+      message: n.message,
+      isRead: n.isRead,
+      timestamp: n.createdAt,
+      avatarId: n.relatedAvatarId,
+      postId: n.relatedPostId,
+      userId: n.relatedUserId,
+    )).toList();
+    
+    setState(() {
+      _allNotifications = notificationItems;
+      _unreadNotifications = notificationItems.where((n) => !n.isRead).toList();
+    });
   }
 
   @override
@@ -266,16 +298,90 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                 ),
               ),
 
-              // Unread indicator
-              if (!notification.isRead)
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: kPrimaryColor,
-                    shape: BoxShape.circle,
+              // Unread indicator and action menu
+              Column(
+                children: [
+                  if (!notification.isRead)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  SizedBox(height: 4),
+                  // Action menu button
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: kLightTextColor,
+                      size: 20,
+                    ),
+                    color: kCardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    itemBuilder: (context) => [
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (notification.isRead)
+                        PopupMenuItem<String>(
+                          value: 'mark_unread',
+                          child: Row(
+                            children: [
+                              Icon(Icons.mark_email_unread_outlined, color: kLightTextColor, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Mark as unread',
+                                style: TextStyle(color: kLightTextColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      PopupMenuItem<String>(
+                        value: 'mute_type',
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications_off_outlined, color: kLightTextColor, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Mute this type',
+                              style: TextStyle(color: kLightTextColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'copy_link',
+                        child: Row(
+                          children: [
+                            Icon(Icons.copy, color: kLightTextColor, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Copy link',
+                              style: TextStyle(color: kLightTextColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) => _handleNotificationAction(notification, value),
                   ),
-                ),
+                ],
+              ),
             ],
           ),
         ),
@@ -363,6 +469,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         timestamp: n.createdAt,
         avatarId: n.relatedAvatarId,
         postId: n.relatedPostId,
+        userId: n.relatedUserId, // Fix: Add missing relatedUserId mapping
       )).toList();
 
       setState(() {
@@ -393,7 +500,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       case notification_service.NotificationType.mention:
         return NotificationType.mention;
       case notification_service.NotificationType.system:
-        return NotificationType.postFeatured; // Default mapping
+        return NotificationType.systemUpdate; // Correct system mapping
     }
   }
 
@@ -416,10 +523,12 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       case NotificationType.like:
       case NotificationType.comment:
       case NotificationType.postFeatured:
-        // Navigate to post detail (would need post ID)
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Navigate to post: ${notification.postId}')),
-        );
+        // Navigate to post detail with real navigation
+        if (notification.postId != null) {
+          _navigateToPostDetail(notification.postId!);
+        } else {
+          _showErrorMessage('Post not found');
+        }
         break;
 
       case NotificationType.chatMessage:
@@ -432,12 +541,12 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
       case NotificationType.follow:
       case NotificationType.mention:
-        // Navigate to profile or relevant screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Navigate to profile: ${notification.userId}'),
-          ),
-        );
+        // Navigate to profile with real navigation
+        if (notification.userId != null) {
+          _navigateToProfile(notification.userId!);
+        } else {
+          _showErrorMessage('User profile not found');
+        }
         break;
 
       case NotificationType.systemUpdate:
@@ -447,9 +556,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     }
   }
 
-  void _markAsRead(NotificationItem notification) {
+  void _markAsRead(NotificationItem notification) async {
+    // Optimistically update UI first
     setState(() {
-      // Update the notification
       final index = _allNotifications.indexWhere(
         (n) => n.id == notification.id,
       );
@@ -467,13 +576,51 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           metadata: notification.metadata,
         );
       }
-
-      // Update unread list
       _unreadNotifications = _allNotifications.where((n) => !n.isRead).toList();
     });
+
+    // Persist to database
+    try {
+      await _notificationService.markAsRead(notification.id);
+    } catch (e) {
+      debugPrint('Failed to mark notification as read: $e');
+      // Revert optimistic update on error
+      setState(() {
+        final index = _allNotifications.indexWhere(
+          (n) => n.id == notification.id,
+        );
+        if (index != -1) {
+          _allNotifications[index] = NotificationItem(
+            id: notification.id,
+            type: notification.type,
+            title: notification.title,
+            message: notification.message,
+            avatarId: notification.avatarId,
+            postId: notification.postId,
+            userId: notification.userId,
+            timestamp: notification.timestamp,
+            isRead: false,
+            metadata: notification.metadata,
+          );
+        }
+        _unreadNotifications = _allNotifications.where((n) => !n.isRead).toList();
+      });
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to mark notification as read')),
+        );
+      }
+    }
   }
 
-  void _markAllAsRead() {
+  void _markAllAsRead() async {
+    // Store original state for rollback
+    final originalNotifications = List<NotificationItem>.from(_allNotifications);
+    final originalUnreadNotifications = List<NotificationItem>.from(_unreadNotifications);
+    
+    // Optimistically update UI first
     setState(() {
       _allNotifications = _allNotifications.map((notification) {
         return NotificationItem(
@@ -489,9 +636,28 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           metadata: notification.metadata,
         );
       }).toList();
-
       _unreadNotifications.clear();
     });
+
+    // Persist to database
+    try {
+      await _notificationService.markAllAsRead();
+    } catch (e) {
+      debugPrint('Failed to mark all notifications as read: $e');
+      
+      // Revert optimistic update on error
+      setState(() {
+        _allNotifications = originalNotifications;
+        _unreadNotifications = originalUnreadNotifications;
+      });
+      
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to mark all notifications as read')),
+        );
+      }
+    }
   }
 
   void _navigateToAvatarChat(String avatarId) async {
@@ -533,5 +699,430 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         ],
       ),
     );
+  }
+
+  // Navigate to PostDetailScreen with postId
+  void _navigateToPostDetail(String postId) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: kCardColor,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: kPrimaryColor),
+              SizedBox(height: 16),
+              Text(
+                'Loading post...',
+                style: kBodyTextStyle,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Try to fetch the post first to validate it exists
+      final post = await _feedsService.getPostById(postId);
+      
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+      
+      if (post != null) {
+        // Navigate with the post data
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(initialPost: post),
+          ),
+        );
+      } else {
+        // Post not found, try navigating with just the ID
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(postId: postId),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      debugPrint('Error navigating to post detail: $e');
+      _showErrorMessage('Unable to open post. Please try again.');
+    }
+  }
+
+  // Navigate to ProfileScreen with userId
+  void _navigateToProfile(String userId) async {
+    try {
+      // Navigate directly to profile screen with userId
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ProfileScreen(userId: userId),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error navigating to profile: $e');
+      _showErrorMessage('Unable to open profile. Please try again.');
+    }
+  }
+
+  // Show error message with retry option
+  void _showErrorMessage(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red[700],
+        duration: Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        action: SnackBarAction(
+          label: 'RETRY',
+          textColor: Colors.white,
+          onPressed: () {
+            // Refresh notifications to retry
+            _refreshNotifications();
+          },
+        ),
+      ),
+    );
+  }
+
+  // Handle notification action menu selections
+  void _handleNotificationAction(NotificationItem notification, String action) {
+    switch (action) {
+      case 'delete':
+        _deleteNotification(notification);
+        break;
+      case 'mark_unread':
+        _markAsUnread(notification);
+        break;
+      case 'mute_type':
+        _muteNotificationType(notification.type);
+        break;
+      case 'copy_link':
+        _copyNotificationLink(notification);
+        break;
+    }
+  }
+
+  // Delete notification with confirmation
+  void _deleteNotification(NotificationItem notification) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Text(
+          'Delete Notification',
+          style: kHeadingTextStyle.copyWith(fontSize: 18),
+        ),
+        content: Text(
+          'Are you sure you want to delete this notification?',
+          style: kBodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _performDeleteNotification(notification);
+            },
+            child: Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Perform actual notification deletion
+  Future<void> _performDeleteNotification(NotificationItem notification) async {
+    // Optimistically remove from UI
+    final originalAllNotifications = List<NotificationItem>.from(_allNotifications);
+    final originalUnreadNotifications = List<NotificationItem>.from(_unreadNotifications);
+    
+    setState(() {
+      _allNotifications.removeWhere((n) => n.id == notification.id);
+      _unreadNotifications.removeWhere((n) => n.id == notification.id);
+    });
+
+    try {
+      await _notificationService.deleteNotification(notification.id);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Notification deleted',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green[700],
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to delete notification: $e');
+      
+      // Revert optimistic update
+      setState(() {
+        _allNotifications = originalAllNotifications;
+        _unreadNotifications = originalUnreadNotifications;
+      });
+      
+      _showErrorMessage('Failed to delete notification. Please try again.');
+    }
+  }
+
+  // Mark notification as unread
+  void _markAsUnread(NotificationItem notification) async {
+    // Optimistically update UI first
+    setState(() {
+      final index = _allNotifications.indexWhere((n) => n.id == notification.id);
+      if (index != -1) {
+        _allNotifications[index] = NotificationItem(
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          avatarId: notification.avatarId,
+          postId: notification.postId,
+          userId: notification.userId,
+          timestamp: notification.timestamp,
+          isRead: false,
+          metadata: notification.metadata,
+        );
+        _unreadNotifications.add(_allNotifications[index]);
+      }
+    });
+
+    // Note: There's no markAsUnread method in the notification service
+    // For now, we'll show a message that this feature is coming soon
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Marked as unread (feature coming soon)',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.blue[700],
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  // Mute notification type
+  void _muteNotificationType(NotificationType type) {
+    final typeDisplayName = _getNotificationTypeDisplayName(type);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: Text(
+          'Mute ${typeDisplayName} Notifications',
+          style: kHeadingTextStyle.copyWith(fontSize: 18),
+        ),
+        content: Text(
+          'You won\'t receive ${typeDisplayName.toLowerCase()} notifications anymore. You can change this in settings.',
+          style: kBodyTextStyle,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: kLightTextColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _performMuteNotificationType(type, typeDisplayName);
+            },
+            child: Text(
+              'Mute',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Perform actual muting (placeholder implementation)
+  void _performMuteNotificationType(NotificationType type, String displayName) {
+    // For now, just show a success message
+    // In a real implementation, this would update user preferences
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.notifications_off, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${displayName} notifications muted',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange[700],
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${displayName} notifications unmuted'),
+                backgroundColor: Colors.green[700],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // Copy notification link to clipboard
+  void _copyNotificationLink(NotificationItem notification) async {
+    String linkText = '';
+    
+    // Generate appropriate link based on notification type
+    switch (notification.type) {
+      case NotificationType.like:
+      case NotificationType.comment:
+      case NotificationType.postFeatured:
+        if (notification.postId != null) {
+          linkText = 'quanta.app/post/${notification.postId}';
+        }
+        break;
+      case NotificationType.follow:
+      case NotificationType.mention:
+        if (notification.userId != null) {
+          linkText = 'quanta.app/profile/${notification.userId}';
+        }
+        break;
+      case NotificationType.chatMessage:
+      case NotificationType.avatarReply:
+        if (notification.avatarId != null) {
+          linkText = 'quanta.app/chat/${notification.avatarId}';
+        }
+        break;
+      default:
+        linkText = 'quanta.app/notifications';
+    }
+
+    if (linkText.isNotEmpty) {
+      try {
+        await Clipboard.setData(ClipboardData(text: linkText));
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.copy, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Link copied to clipboard',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.blue[700],
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Failed to copy to clipboard: $e');
+        _showErrorMessage('Failed to copy link');
+      }
+    } else {
+      _showErrorMessage('No link available for this notification');
+    }
+  }
+
+  // Get display name for notification type
+  String _getNotificationTypeDisplayName(NotificationType type) {
+    switch (type) {
+      case NotificationType.like:
+        return 'Like';
+      case NotificationType.comment:
+        return 'Comment';
+      case NotificationType.follow:
+        return 'Follow';
+      case NotificationType.mention:
+        return 'Mention';
+      case NotificationType.chatMessage:
+        return 'Chat Message';
+      case NotificationType.avatarReply:
+        return 'Avatar Reply';
+      case NotificationType.postFeatured:
+        return 'Post Featured';
+      case NotificationType.systemUpdate:
+        return 'System Update';
+    }
   }
 }

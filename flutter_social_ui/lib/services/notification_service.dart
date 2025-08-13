@@ -21,7 +21,12 @@ extension NotificationTypeExtension on NotificationType {
   }
 
   String get value {
-    return toString().split('.').last;
+    switch (this) {
+      case NotificationType.mention:
+        return 'avatar_mention'; // Match database constraint
+      default:
+        return toString().split('.').last;
+    }
   }
 }
 
