@@ -3,7 +3,6 @@ import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
 import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/services/enhanced_search_service.dart';
-import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
 import 'package:flutter_social_ui/screens/enhanced_post_detail_screen.dart';
 import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
@@ -13,14 +12,13 @@ class SearchScreenNew extends StatefulWidget {
   const SearchScreenNew({super.key});
 
   @override
-  _SearchScreenNewState createState() => _SearchScreenNewState();
+  State<SearchScreenNew> createState() => _SearchScreenNewState();
 }
 
 class _SearchScreenNewState extends State<SearchScreenNew>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final EnhancedSearchService _enhancedSearchService = EnhancedSearchService();
-  final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   late TabController _tabController;
 
   List<AvatarModel> _avatarResults = [];
@@ -32,8 +30,6 @@ class _SearchScreenNewState extends State<SearchScreenNew>
 
   bool _isSearching = false;
   bool _hasSearched = false;
-  String _currentQuery = '';
-  String? _searchError;
   Timer? _debounceTimer;
 
   @override
@@ -80,15 +76,20 @@ class _SearchScreenNewState extends State<SearchScreenNew>
                             Icons.search,
                             color: kLightTextColor,
                           ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
-                                    color: kLightTextColor,
-                                  ),
-                                  onPressed: _clearSearch,
-                                )
-                              : null,
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, value, child) {
+                              return value.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: kLightTextColor,
+                                      ),
+                                      onPressed: _clearSearch,
+                                    )
+                                  : const SizedBox.shrink();
+                            },
+                          ),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: 16,
@@ -250,10 +251,10 @@ class _SearchScreenNewState extends State<SearchScreenNew>
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundImage: avatar.imageUrl != null
-                    ? NetworkImage(avatar.imageUrl!)
+                backgroundImage: avatar.avatarImageUrl != null
+                    ? NetworkImage(avatar.avatarImageUrl!)
                     : null,
-                child: avatar.imageUrl == null
+                child: avatar.avatarImageUrl == null
                     ? Icon(Icons.person, color: kLightTextColor)
                     : null,
               ),
@@ -435,7 +436,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: kPrimaryColor.withOpacity(0.2),
+                color: kPrimaryColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(Icons.tag, color: kPrimaryColor),
@@ -616,9 +617,9 @@ class _SearchScreenNewState extends State<SearchScreenNew>
       ]);
       
       setState(() {
-        _trendingHashtags = results[0] as List<String>;
-        _popularSearches = results[1] as List<String>;
-        _recentSearches = results[2] as List<String>;
+        _trendingHashtags = results[0];
+        _popularSearches = results[1];
+        _recentSearches = results[2];
       });
     } catch (e) {
       debugPrint('Error loading trending content: $e');
@@ -632,7 +633,6 @@ class _SearchScreenNewState extends State<SearchScreenNew>
   }
 
   void _onSearchChanged(String query) {
-    setState(() {}); // Trigger rebuild to update clear icon visibility
     _debounceTimer?.cancel();
     _debounceTimer = Timer(Duration(milliseconds: 500), () {
       if (query.trim().isNotEmpty) {
@@ -647,9 +647,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     setState(() {
       _isSearching = true;
       _hasSearched = true;
-      _currentQuery = query;
       _searchController.text = query;
-      _searchError = null;
     });
 
     try {
@@ -665,11 +663,10 @@ class _SearchScreenNewState extends State<SearchScreenNew>
         _postResults = searchResults.posts;
         _hashtagResults = searchResults.hashtagsWithCounts;
         _isSearching = false;
-        _searchError = searchResults.hasError ? searchResults.error : null;
       });
 
       // Show user-friendly error if search failed but we got results
-      if (searchResults.hasError && searchResults.error != null) {
+      if (searchResults.hasError && searchResults.error != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(searchResults.error!),
@@ -681,16 +678,17 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     } catch (e) {
       setState(() {
         _isSearching = false;
-        _searchError = 'Search failed. Please try again.';
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Search failed. Please try again.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Search failed. Please try again.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -698,7 +696,6 @@ class _SearchScreenNewState extends State<SearchScreenNew>
     setState(() {
       _searchController.clear();
       _hasSearched = false;
-      _currentQuery = '';
       _avatarResults.clear();
       _postResults.clear();
       _hashtagResults.clear();
@@ -716,12 +713,14 @@ class _SearchScreenNewState extends State<SearchScreenNew>
       setState(() {
         _recentSearches.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Recent searches cleared'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Recent searches cleared'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error clearing recent searches: $e');
     }
@@ -744,7 +743,7 @@ class _SearchScreenNewState extends State<SearchScreenNew>
       MaterialPageRoute(
         builder: (context) => ChatScreen(
           name: avatar.name,
-          avatar: avatar.imageUrl ?? 'assets/images/p.jpg',
+          avatar: avatar.avatarImageUrl ?? 'assets/images/p.jpg',
           avatarId: avatar.id,
         ),
       ),

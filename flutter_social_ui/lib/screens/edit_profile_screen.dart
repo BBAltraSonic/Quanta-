@@ -1,14 +1,11 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 import '../constants.dart';
 import '../models/user_model.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service.dart';
 import '../services/validation_service.dart';
-import '../services/enhanced_image_service.dart';
-import '../widgets/custom_text_field.dart';
 import '../widgets/validated_text_field.dart';
 import '../widgets/enhanced_image_picker.dart';
 import '../widgets/custom_button.dart';
@@ -25,9 +22,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final ProfileService _profileService = ProfileService();
-  final AuthService _authService = AuthService();
   final ValidationService _validationService = ValidationService();
-  final EnhancedImageService _imageService = EnhancedImageService();
 
   late TextEditingController _displayNameController;
   late TextEditingController _usernameController;
@@ -41,12 +36,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final bool _isLoading = false;
   bool _isSaving = false;
   bool _isUploadingImage = false;
-  double _uploadProgress = 0.0;
+  final double _uploadProgress = 0.0;
   StreamController<double>? _progressController;
+  
+  // Track form changes for unsaved warning
+  bool _hasUnsavedChanges = false;
+  Map<String, String> _originalValues = {};
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize controllers
     _displayNameController = TextEditingController(
       text: widget.user.displayName ?? '',
     );
@@ -56,19 +57,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _firstNameController = TextEditingController(text: widget.user.firstName ?? '');
     _lastNameController = TextEditingController(text: widget.user.lastName ?? '');
     _currentImageUrl = widget.user.profileImageUrl;
+    
+    // Store original values for change detection
+    _originalValues = {
+      'displayName': widget.user.displayName ?? '',
+      'username': widget.user.username,
+      'email': widget.user.email,
+      'bio': widget.user.bio ?? '',
+      'firstName': widget.user.firstName ?? '',
+      'lastName': widget.user.lastName ?? '',
+    };
+    
+    // Setup change listeners
+    _displayNameController.addListener(_trackChanges);
+    _usernameController.addListener(_trackChanges);
+    _emailController.addListener(_trackChanges);
+    _bioController.addListener(_trackChanges);
+    _firstNameController.addListener(_trackChanges);
+    _lastNameController.addListener(_trackChanges);
   }
 
   @override
   void dispose() {
+    // Remove listeners
+    _displayNameController.removeListener(_trackChanges);
+    _usernameController.removeListener(_trackChanges);
+    _emailController.removeListener(_trackChanges);
+    _bioController.removeListener(_trackChanges);
+    _firstNameController.removeListener(_trackChanges);
+    _lastNameController.removeListener(_trackChanges);
+    
+    // Dispose controllers
     _displayNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
     _bioController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
+    
+    // Dispose progress controller
+    _progressController?.close();
+    
     super.dispose();
   }
 
+  // Track changes for unsaved warning
+  void _trackChanges() {
+    final hasChanges = _displayNameController.text != _originalValues['displayName'] ||
+        _usernameController.text != _originalValues['username'] ||
+        _emailController.text != _originalValues['email'] ||
+        _bioController.text != _originalValues['bio'] ||
+        _firstNameController.text != _originalValues['firstName'] ||
+        _lastNameController.text != _originalValues['lastName'] ||
+        _selectedImage != null;
+    
+    if (_hasUnsavedChanges != hasChanges) {
+      setState(() {
+        _hasUnsavedChanges = hasChanges;
+      });
+    }
+  }
+  
   Future<void> _pickImage() async {
     try {
       final result = await EnhancedImagePicker.showImagePicker(
@@ -81,13 +130,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _selectedImage = result.file;
         });
         
-        // Show compression info if image was compressed
-        if (result.wasCompressed) {
+        // Track this as a change
+        _trackChanges();
+        
+        // Show compression info with enhanced styling
+        if (result.wasCompressed && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Image optimized: ${result.compressionInfo}'),
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Image optimized: ${result.compressionInfo}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
               backgroundColor: kPrimaryColor,
               duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
         }
@@ -100,6 +165,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    // Show loading with haptic feedback
+    HapticFeedback.lightImpact();
+    
     setState(() {
       _isSaving = true;
     });
@@ -119,18 +187,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Check if all validations passed
       if (!_validationService.allValidationsPassed(validations)) {
         final errorMessage = _validationService.getValidationErrorsString(validations);
-        _showError(errorMessage);
+        _showEnhancedError(errorMessage);
         return;
       }
 
       String? imageUrl = _currentImageUrl;
 
-      // Upload new image if selected
+      // Upload new image if selected with progress tracking
       if (_selectedImage != null) {
-        imageUrl = await _profileService.uploadProfileImage(
-          _selectedImage!,
-          widget.user.id,
-        );
+        setState(() {
+          _isUploadingImage = true;
+        });
+        
+        try {
+          imageUrl = await _profileService.uploadProfileImage(
+            _selectedImage!,
+            widget.user.id,
+          );
+        } finally {
+          setState(() {
+            _isUploadingImage = false;
+          });
+        }
       }
 
       // Update profile
@@ -154,16 +232,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: kPrimaryColor,
-          ),
-        );
+        // Show enhanced success message
+        _showSuccessMessage();
+        
+        // Reset unsaved changes flag
+        _hasUnsavedChanges = false;
+        
+        // Navigate back with result
         Navigator.pop(context, updatedUser);
       }
     } catch (e) {
-      _showError('Failed to update profile: $e');
+      _showEnhancedError('Failed to update profile: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -180,12 +259,153 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
     }
   }
+  
+  void _showEnhancedError(String message) {
+    if (mounted) {
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          action: SnackBarAction(
+            label: 'DISMISS',
+            textColor: Colors.white,
+            onPressed: () {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
+    }
+  }
+  
+  void _showSuccessMessage() {
+    if (mounted) {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              const Text(
+                'Profile updated successfully',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          backgroundColor: kPrimaryColor,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
 
   void _navigateToAvatarManagement() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const AvatarManagementScreen(),
+      ),
+    );
+  }
+  
+  Future<void> _handleBackPress() async {
+    if (_hasUnsavedChanges) {
+      final shouldLeave = await _showUnsavedChangesDialog();
+      if (shouldLeave == true && mounted) {
+        Navigator.pop(context);
+      }
+    } else {
+      Navigator.pop(context);
+    }
+  }
+  
+  Future<void> _handleCancel() async {
+    if (_hasUnsavedChanges) {
+      final shouldLeave = await _showUnsavedChangesDialog();
+      if (shouldLeave == true && mounted) {
+        Navigator.pop(context);
+      }
+    } else {
+      Navigator.pop(context);
+    }
+  }
+  
+  Future<bool?> _showUnsavedChangesDialog() async {
+    HapticFeedback.mediumImpact();
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+            const SizedBox(width: 12),
+            const Text(
+              'Unsaved Changes',
+              style: TextStyle(
+                color: kTextColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'You have unsaved changes. Are you sure you want to leave without saving?',
+          style: TextStyle(
+            color: kLightTextColor,
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Keep Editing',
+              style: TextStyle(
+                color: kLightTextColor,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.red.withValues(alpha: 0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: const Text(
+              'Leave',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -197,12 +417,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         backgroundColor: kCardColor,
         elevation: 0,
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w600),
+        title: Row(
+          children: [
+            const Text(
+              'Edit Profile',
+              style: TextStyle(color: kTextColor, fontWeight: FontWeight.w600),
+            ),
+            if (_hasUnsavedChanges) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: kPrimaryColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
         ),
         leading: IconButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => _handleBackPress(),
           icon: const Icon(Icons.arrow_back, color: kTextColor),
         ),
         actions: [
@@ -219,13 +454,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             )
           else
-            TextButton(
-              onPressed: _saveProfile,
-              child: const Text(
-                'Save',
-                style: TextStyle(
-                  color: kPrimaryColor,
-                  fontWeight: FontWeight.w600,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              child: TextButton(
+                onPressed: _hasUnsavedChanges ? _saveProfile : null,
+                child: Text(
+                  'Save',
+                  style: TextStyle(
+                    color: _hasUnsavedChanges ? kPrimaryColor : kLightTextColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -446,7 +684,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             text: 'Manage Avatars',
                             onPressed: _navigateToAvatarManagement,
                             icon: Icons.person_add,
-                            backgroundColor: kPrimaryColor.withOpacity(0.1),
+                            backgroundColor: kPrimaryColor.withValues(alpha: 0.1),
                             textColor: kPrimaryColor,
                           ),
                         ),
@@ -459,10 +697,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   // Save Button
                   SizedBox(
                     width: double.infinity,
-                    child: CustomButton(
-                      text: _isSaving ? 'Saving...' : 'Save Changes',
-                      onPressed: _isSaving ? null : _saveProfile,
-                      icon: _isSaving ? null : Icons.save,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      child: CustomButton(
+                        text: _isSaving 
+                            ? 'Saving...' 
+                            : (_hasUnsavedChanges ? 'Save Changes' : 'No Changes'),
+                        onPressed: (_isSaving || !_hasUnsavedChanges) ? null : _saveProfile,
+                        icon: _isSaving 
+                            ? null 
+                            : (_hasUnsavedChanges ? Icons.save : Icons.check),
+                        backgroundColor: _hasUnsavedChanges 
+                            ? null 
+                            : kLightTextColor.withValues(alpha: 0.3),
+                      ),
                     ),
                   ),
 
@@ -473,7 +721,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: double.infinity,
                     child: CustomButton(
                       text: 'Cancel',
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _handleCancel,
                       isOutlined: true,
                       backgroundColor: kLightTextColor,
                     ),
