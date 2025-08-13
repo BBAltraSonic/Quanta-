@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 // Colors
-const kPrimaryColor = Color(0xFFFF2E2E); // Primary red tuned to plan
-const kBackgroundColor = Color(0xFF0F0F0F); // Dark background per plan 0E-11
-const kCardColor = Color(0xFF2C2C2C); // Darker gray for cards/elements
+const kPrimaryColor = Color(0xFF1B8989); // Primary teal-ish replacing previous primary
+const kBackgroundColor = Color(0xFF002B36); // Dark blue-gray background replacing black
+const kCardColor = Color(0xFF073642); // Darker blue-gray for cards/elements based on new theme
 const kTextColor = Colors.white; // Colors.white is already a const
 const kLightTextColor = Color(0xFFB0B0B0); // Lighter gray for secondary text
 

@@ -102,7 +102,7 @@ class _AppShellState extends State<AppShell> {
       child: CurvedNavigationBar(
         height: 62,
         backgroundColor: Colors.transparent,
-        color: Colors.black,
+        color: Color(0xFF002B36),
         buttonBackgroundColor: kPrimaryColor, // red accent bubble
         animationDuration: const Duration(milliseconds: 280),
         index: _selectedIndex,
@@ -172,7 +172,7 @@ class _AppShellState extends State<AppShell> {
               width: size + 2,
               height: size + 2,
               colorFilter: const ColorFilter.mode(
-                Colors.black,
+                Color(0xFF002B36),
                 BlendMode.srcIn,
               ),
             ),

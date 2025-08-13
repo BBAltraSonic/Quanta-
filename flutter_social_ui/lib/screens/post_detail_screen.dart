@@ -838,14 +838,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: SkeletonLoader.videoFeed(),
       );
     }
 
     if (_hasError) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -875,7 +875,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     if (_posts.isEmpty && !_isLoading && !_hasError) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

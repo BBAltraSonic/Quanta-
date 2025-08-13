@@ -340,7 +340,7 @@ class _FeedsScreenState extends State<FeedsScreen>
     super.build(context);
     
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Color(0xFF002B36),
       body: _buildBody(),
     );
   }

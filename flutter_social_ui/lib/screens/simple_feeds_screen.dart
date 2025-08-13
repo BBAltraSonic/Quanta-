@@ -60,9 +60,9 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Color(0xFF002B36),
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         elevation: 0,
         title: const Text(
           'Quanta',

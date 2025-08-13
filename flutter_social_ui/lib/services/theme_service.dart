@@ -529,8 +529,8 @@ class ThemeService extends ChangeNotifier {
 }
 
 // Dark theme constants (add these to constants.dart)
-const Color kDarkBackgroundColor = Color(0xFF121212);
-const Color kDarkCardColor = Color(0xFF1E1E1E);
+const Color kDarkBackgroundColor = Color(0xFF002B36); // Updated to match new theme
+const Color kDarkCardColor = Color(0xFF073642); // Updated to match new theme
 const Color kDarkTextColor = Color(0xFFE0E0E0);
 const Color kDarkLightTextColor = Color(0xFF9E9E9E);
 

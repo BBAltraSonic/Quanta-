@@ -299,9 +299,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         appBar: AppBar(
-          backgroundColor: Colors.black,
+          backgroundColor: Color(0xFF002B36),
           elevation: 0,
           leading: GestureDetector(
             onTap: () => Navigator.pop(context),
@@ -363,9 +363,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // Changed to black
+      backgroundColor: Color(0xFF002B36), // Updated to new theme color
       appBar: AppBar(
-        backgroundColor: Colors.black, // Changed to black
+        backgroundColor: Color(0xFF002B36), // Updated to new theme color
         elevation: 0,
         leading: GestureDetector(
           onTap: () {
@@ -511,7 +511,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         width: 34,
                         height: 34,
                         decoration: const BoxDecoration(
-                          color: Color(0xFFFF2E2E),
+                          color: Color(0xFF1B8989),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(

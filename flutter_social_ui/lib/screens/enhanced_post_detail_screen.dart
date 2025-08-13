@@ -744,7 +744,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -769,7 +769,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
 
     if (_hasError) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -801,7 +801,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
 
     if (_posts.isEmpty) {
       return Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Color(0xFF002B36),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -829,7 +829,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Color(0xFF002B36),
       extendBody: true,
       body: Stack(
         children: [
