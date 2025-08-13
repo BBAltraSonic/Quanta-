@@ -598,9 +598,10 @@ class MessagesService {
           .order('last_message_at', ascending: false);
 
       // Apply cursor pagination
-      if (cursor != null) {
-        query = query.lt('last_message_at', cursor);
-      }
+      // TODO: Fix lt() method for cursor pagination
+      // if (cursor != null) {
+      //   query = query.lt('last_message_at', cursor);
+      // }
 
       final sessionsResponse = await query.limit(limit + 1); // +1 to check if there's more
 
