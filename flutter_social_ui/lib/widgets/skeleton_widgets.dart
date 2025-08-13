@@ -627,4 +627,357 @@ class SkeletonLoader {
       ),
     );
   }
+  
+  // Additional skeleton widgets for different screens
+  
+  static Widget authForm() {
+    return Shimmer.fromColors(
+      baseColor: kCardColor,
+      highlightColor: kCardColor.withOpacity(0.3),
+      child: Container(
+        padding: EdgeInsets.all(kDefaultPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Logo placeholder
+            Center(
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: kCardColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+            SizedBox(height: 24),
+            // Title placeholders
+            Container(
+              height: 28,
+              width: 200,
+              color: kCardColor,
+            ),
+            SizedBox(height: 8),
+            Container(
+              height: 16,
+              width: 150,
+              color: kCardColor,
+            ),
+            SizedBox(height: 48),
+            // Form fields
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: kCardColor,
+                borderRadius: BorderRadius.circular(kDefaultBorderRadius),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: kCardColor,
+                borderRadius: BorderRadius.circular(kDefaultBorderRadius),
+              ),
+            ),
+            SizedBox(height: 24),
+            // Button placeholder
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: kCardColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  static Widget avatarCreationForm() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Progress indicator
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          SizedBox(height: 32),
+          // Form title
+          SkeletonWidget(width: 200, height: 24),
+          SizedBox(height: 16),
+          SkeletonWidget(width: 300, height: 16),
+          SizedBox(height: 32),
+          // Form fields
+          ...List.generate(3, (index) => Column(
+            children: [
+              Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: kCardColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+          )),
+          // Button
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  static Widget settingsScreen() {
+    return ListView.separated(
+      padding: EdgeInsets.all(16),
+      itemCount: 8,
+      separatorBuilder: (context, index) => SizedBox(height: 8),
+      itemBuilder: (context, index) => Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            SkeletonWidget(
+              width: 24,
+              height: 24,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonWidget(width: 150, height: 16),
+                  SizedBox(height: 4),
+                  SkeletonWidget(width: 200, height: 12),
+                ],
+              ),
+            ),
+            SkeletonWidget(width: 24, height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  static Widget editProfileForm() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Profile picture placeholder
+          SkeletonWidget(
+            width: 120,
+            height: 120,
+            borderRadius: BorderRadius.circular(60),
+          ),
+          SizedBox(height: 24),
+          // Form fields
+          ...List.generate(5, (index) => Column(
+            children: [
+              Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: kCardColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+          )),
+          // Save button
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  static Widget onboardingScreen() {
+    return Container(
+      padding: EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Onboarding illustration placeholder
+          Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(100),
+            ),
+          ),
+          SizedBox(height: 48),
+          // Title
+          SkeletonWidget(width: 250, height: 28),
+          SizedBox(height: 16),
+          // Subtitle
+          SkeletonWidget(width: 300, height: 16),
+          SizedBox(height: 8),
+          SkeletonWidget(width: 280, height: 16),
+          SizedBox(height: 48),
+          // Buttons
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+          SizedBox(height: 16),
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  static Widget contentUploadForm() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Media upload area
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            ),
+            child: Center(
+              child: SkeletonWidget(
+                width: 80,
+                height: 80,
+                borderRadius: BorderRadius.circular(40),
+              ),
+            ),
+          ),
+          SizedBox(height: 24),
+          // Caption field
+          Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          SizedBox(height: 16),
+          // Tags field
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          SizedBox(height: 24),
+          // Upload button
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  static Widget avatarManagementGrid({int itemCount = 6}) {
+    return GridView.builder(
+      padding: EdgeInsets.all(16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: itemCount,
+      itemBuilder: (context, index) => Container(
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Container(
+                margin: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonWidget(width: double.infinity, height: 16),
+                  SizedBox(height: 8),
+                  SkeletonWidget(width: 100, height: 12),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[700],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[700],
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

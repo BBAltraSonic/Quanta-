@@ -4,6 +4,7 @@ import '../models/avatar_model.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/skeleton_widgets.dart';
 import '../screens/avatar_creation_wizard.dart';
 
 class AvatarManagementScreen extends StatefulWidget {
@@ -272,9 +273,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: kPrimaryColor),
-            )
+          ? SkeletonLoader.avatarManagementGrid(itemCount: 4)
           : _avatars.isEmpty
               ? _buildEmptyState()
               : ListView.builder(

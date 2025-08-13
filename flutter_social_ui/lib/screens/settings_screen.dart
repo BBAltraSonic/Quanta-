@@ -3,6 +3,7 @@ import '../constants.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../screens/auth_wrapper.dart';
+import '../widgets/skeleton_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -220,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+          ? SkeletonLoader.settingsScreen()
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [

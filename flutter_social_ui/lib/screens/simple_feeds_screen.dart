@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/post_model.dart';
-
+import '../widgets/skeleton_widgets.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../constants.dart';
 
@@ -80,11 +80,7 @@ class _SimpleFeedsScreenState extends State<SimpleFeedsScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
-        ),
-      );
+      return SkeletonLoader.postFeed(itemCount: 5);
     }
 
     if (_hasError) {

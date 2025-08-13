@@ -196,8 +196,22 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                   ),
                 if (_currentStep == 3)
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isCreating ? null : _createAvatar,
+                    child: _isCreating
+                        ? Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: kCardColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: kPrimaryColor,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          )
+                        : ElevatedButton(
+                            onPressed: _createAvatar,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kPrimaryColor,
                         padding: EdgeInsets.symmetric(vertical: 16),

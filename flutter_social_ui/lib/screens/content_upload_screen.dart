@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../utils/environment.dart';
+import '../widgets/skeleton_widgets.dart';
 
 class ContentUploadScreen extends StatefulWidget {
   const ContentUploadScreen({super.key});
@@ -25,6 +26,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
   final ContentModerationService _moderationService = ContentModerationService();
+
+  static const int _captionMaxLength = 2000;
 
   List<AvatarModel> _userAvatars = [];
   AvatarModel? _selectedAvatar;
@@ -88,71 +91,31 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
           title: Text('Create Post'),
           backgroundColor: kBackgroundColor,
         ),
-        body: Center(child: CircularProgressIndicator(color: kPrimaryColor)),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: SkeletonLoader.contentUploadForm(),
+        ),
       );
     }
 
-    if (_userAvatars.isEmpty) {
-      return Scaffold(
-        backgroundColor: kBackgroundColor,
-        appBar: AppBar(
-          title: Text('Create Post'),
-          backgroundColor: kBackgroundColor,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.person_add, size: 64, color: kLightTextColor),
-              SizedBox(height: 16),
-              Text(
-                'No Avatars Found',
-                style: kHeadingTextStyle.copyWith(fontSize: 20),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Create an avatar first to start posting content',
-                style: kBodyTextStyle.copyWith(color: kLightTextColor),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () async {
-                  // Navigate to avatar creation
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AvatarCreationWizard(),
-                    ),
-                  );
-                  
-                  // Reload avatars after creation
-                  if (result != null) {
-                    await _loadUserAvatars();
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
-                child: Text('Create Avatar'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    // Always show the upload interface, even if no avatars exist
 
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      appBar: AppBar(
+appBar: AppBar(
         title: Text('Create Post'),
         backgroundColor: kBackgroundColor,
         actions: [
-          TextButton(
-            onPressed: _canUpload() ? _uploadContent : null,
-            child: Text(
-              'Share',
-              style: TextStyle(
-                color: _canUpload() ? kPrimaryColor : kLightTextColor,
-                fontWeight: FontWeight.bold,
+          Tooltip(
+            message: _canUpload() ? 'Share your post' : 'Complete all fields to share',
+            child: TextButton(
+              onPressed: _canUpload() ? _uploadContent : null,
+              child: Text(
+                'Share',
+                style: TextStyle(
+                  color: _canUpload() ? kPrimaryColor : kLightTextColor,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -178,60 +141,115 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+children: [
+            // Readiness checklist
+            _buildReadinessChecklist(),
+            SizedBox(height: 16),
+
             // Avatar selection
-            Text(
-              'Post as:',
-              style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Post as:',
+                  style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                ),
+                if (_userAvatars.isEmpty)
+                  TextButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AvatarCreationWizard(),
+                        ),
+                      );
+                      
+                      if (result != null) {
+                        await _loadUserAvatars();
+                      }
+                    },
+                    child: Text(
+                      'Create Avatar',
+                      style: TextStyle(color: kPrimaryColor),
+                    ),
+                  ),
+              ],
             ),
             SizedBox(height: 8),
             Container(
               width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: kCardColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<AvatarModel>(
-                  value: _selectedAvatar,
-                  dropdownColor: kCardColor,
-                  items: _userAvatars.map((avatar) {
-                    return DropdownMenuItem(
-                      value: avatar,
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundImage: avatar.imageUrl != null
-                                ? NetworkImage(avatar.imageUrl!)
-                                : null,
-                            child: avatar.imageUrl == null
-                                ? Icon(Icons.person, size: 16)
-                                : null,
-                          ),
-                          SizedBox(width: 12),
-                          Column(
+              child: _userAvatars.isEmpty
+                  ? Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: kLightTextColor,
+                          child: Icon(Icons.person_add, size: 16, color: kBackgroundColor),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(avatar.name, style: kBodyTextStyle),
                               Text(
-                                avatar.niche.displayName,
-                                style: kCaptionTextStyle.copyWith(
-                                  color: kLightTextColor,
-                                ),
+                                'No avatar selected',
+                                style: kBodyTextStyle.copyWith(color: kLightTextColor),
+                              ),
+                              Text(
+                                'Create an avatar to post content',
+                                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
                               ),
                             ],
                           ),
-                        ],
+                        ),
+                      ],
+                    )
+                  : DropdownButtonHideUnderline(
+                      child: DropdownButton<AvatarModel>(
+                        value: _selectedAvatar,
+                        dropdownColor: kCardColor,
+                        isExpanded: true,
+                        items: _userAvatars.map((avatar) {
+                          return DropdownMenuItem(
+                            value: avatar,
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundImage: avatar.imageUrl != null
+                                      ? NetworkImage(avatar.imageUrl!)
+                                      : null,
+                                  child: avatar.imageUrl == null
+                                      ? Icon(Icons.person, size: 16)
+                                      : null,
+                                ),
+                                SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(avatar.name, style: kBodyTextStyle),
+                                    Text(
+                                      avatar.niche.displayName,
+                                      style: kCaptionTextStyle.copyWith(
+                                        color: kLightTextColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (avatar) {
+                          setState(() => _selectedAvatar = avatar);
+                        },
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (avatar) {
-                    setState(() => _selectedAvatar = avatar);
-                  },
-                ),
-              ),
+                    ),
             ),
 
             SizedBox(height: 24),
@@ -243,65 +261,78 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             ),
             SizedBox(height: 8),
 
-            // Media preview or picker
+// Media preview or picker
             GestureDetector(
               onTap: _pickMedia,
-              child: Container(
-                width: double.infinity,
-                height: _selectedMedia != null ? 300 : 200,
-                decoration: BoxDecoration(
-                  color: kCardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kPrimaryColor.withOpacity(0.3)),
-                ),
-                child: _selectedMedia != null
-                    ? _buildMediaPreview()
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            size: 48,
-                            color: kPrimaryColor,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'Tap to add photo or video',
-                            style: kBodyTextStyle.copyWith(
+              child: Semantics(
+                button: true,
+                label: _selectedMedia != null ? 'Change selected media' : 'Add photo or video',
+                child: Container(
+                  width: double.infinity,
+                  height: _selectedMedia != null ? 300 : 210,
+                  decoration: BoxDecoration(
+                    color: kCardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPrimaryColor.withOpacity(0.3), style: BorderStyle.solid),
+                  ),
+                  child: _selectedMedia != null
+                      ? _buildMediaPreview()
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 48,
                               color: kPrimaryColor,
                             ),
-                          ),
-                          SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _MediaTypeButton(
-                                icon: Icons.photo,
-                                label: 'Photo',
-                                onTap: () => _pickMedia(
-                                  source: ImageSource.gallery,
-                                  isVideo: false,
+                            SizedBox(height: 12),
+                            Text(
+                              'Tap to add photo or video',
+                              style: kBodyTextStyle.copyWith(
+                                color: kPrimaryColor,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _MediaTypeButton(
+                                  icon: Icons.photo,
+                                  label: 'Photo',
+                                  onTap: () => _pickMedia(
+                                    source: ImageSource.gallery,
+                                    isVideo: false,
+                                  ),
                                 ),
-                              ),
-                              SizedBox(width: 16),
-                              _MediaTypeButton(
-                                icon: Icons.videocam,
-                                label: 'Video',
-                                onTap: () => _pickMedia(
-                                  source: ImageSource.gallery,
-                                  isVideo: true,
+                                SizedBox(width: 16),
+                                _MediaTypeButton(
+                                  icon: Icons.videocam,
+                                  label: 'Video',
+                                  onTap: () => _pickMedia(
+                                    source: ImageSource.gallery,
+                                    isVideo: true,
+                                  ),
                                 ),
+                                SizedBox(width: 16),
+                                _MediaTypeButton(
+                                  icon: Icons.camera_alt,
+                                  label: 'Camera',
+                                  onTap: () => _showCameraOptions(),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: Text(
+                                'Recommended: JPG/PNG up to 10MB • Videos up to ${Environment.maxVideoSizeMB}MB',
+                                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                                textAlign: TextAlign.center,
                               ),
-                              SizedBox(width: 16),
-                              _MediaTypeButton(
-                                icon: Icons.camera_alt,
-                                label: 'Camera',
-                                onTap: () => _showCameraOptions(),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                          ],
+                        ),
+                ),
               ),
             ),
 
@@ -340,7 +371,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
               style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-            TextField(
+TextField(
               controller: _captionController,
               style: kBodyTextStyle,
               maxLines: 4,
@@ -353,9 +384,31 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                counterText: '${_captionController.text.length}/2000',
+                helperText: _captionController.text.trim().isEmpty
+                    ? 'Add a short caption to describe your post'
+                    : null,
+                helperStyle: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                counter: LayoutBuilder(
+                  builder: (context, _) {
+                    final len = _captionController.text.length;
+                    final ratio = len / _captionMaxLength;
+                    Color color = kLightTextColor;
+                    if (ratio > 0.9) {
+                      color = Colors.redAccent;
+                    } else if (ratio > 0.75) {
+                      color = kPrimaryColor;
+                    }
+                    return Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '$len/$_captionMaxLength',
+                        style: kCaptionTextStyle.copyWith(color: color),
+                      ),
+                    );
+                  },
+                ),
               ),
-              maxLength: 2000,
+              maxLength: _captionMaxLength,
               onChanged: (text) {
                 setState(() {
                   _extractedHashtags = PostModel.extractHashtags(text);
@@ -426,9 +479,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             SizedBox(height: 32),
 
             // Upload button (no spinner)
-            SizedBox(
+SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: _canUpload() ? _uploadContent : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
@@ -437,7 +490,8 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                icon: Icon(_isUploading ? Icons.hourglass_top : Icons.send, color: Colors.white),
+                label: Text(
                   _isUploading ? 'Sharing…' : 'Share Post',
                   style: TextStyle(
                     fontSize: 16,
@@ -448,6 +502,42 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReadinessChecklist() {
+    final items = <_ChecklistItem>[
+      _ChecklistItem(
+        label: 'Avatar',
+        isDone: _selectedAvatar != null,
+        onTap: () {},
+      ),
+      _ChecklistItem(
+        label: 'Media',
+        isDone: _selectedMedia != null,
+        onTap: _pickMedia,
+      ),
+      _ChecklistItem(
+        label: 'Caption',
+        isDone: _captionController.text.trim().isNotEmpty,
+        onTap: () {},
+      ),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: items
+            .map((i) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _ChecklistChip(
+                    label: i.label,
+                    isDone: i.isDone,
+                    onTap: i.onTap,
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
@@ -1101,6 +1191,47 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
         _uploadProgress = 0.0;
       });
     }
+  }
+}
+
+class _ChecklistItem {
+  final String label;
+  final bool isDone;
+  final VoidCallback onTap;
+  _ChecklistItem({required this.label, required this.isDone, required this.onTap});
+}
+
+class _ChecklistChip extends StatelessWidget {
+  final String label;
+  final bool isDone;
+  final VoidCallback onTap;
+  const _ChecklistChip({super.key, required this.label, required this.isDone, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDone ? Colors.green.withOpacity(0.15) : kCardColor;
+    final fg = isDone ? Colors.green : kLightTextColor;
+    final icon = isDone ? Icons.check_circle : Icons.radio_button_unchecked;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: fg.withOpacity(0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: 6),
+            Text(label, style: kCaptionTextStyle.copyWith(color: fg)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
