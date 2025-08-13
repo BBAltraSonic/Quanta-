@@ -6,6 +6,7 @@ import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service_wrapper.dart';
 import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
 import 'package:flutter_social_ui/screens/chat_screen.dart';
+import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 enum NotificationType {
@@ -175,19 +176,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: kPrimaryColor),
-          SizedBox(height: 16),
-          Text(
-            'Loading notifications...',
-            style: kBodyTextStyle.copyWith(color: kLightTextColor),
-          ),
-        ],
-      ),
-    );
+    return SkeletonLoader.notificationList(itemCount: 8);
   }
 
   Widget _buildNotificationsList(List<NotificationItem> notifications) {

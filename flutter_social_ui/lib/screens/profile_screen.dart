@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
+import '../widgets/skeleton_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -94,6 +95,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return number.toString();
   }
 
+  Widget _buildSkeletonLoading() {
+    return Stack(
+      children: [
+        // Background with shimmer
+        Positioned.fill(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(
+                color: Colors.grey[800],
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.65),
+                      Colors.black.withOpacity(0.88),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
+                sliver: SliverToBoxAdapter(
+                  child: _HeaderCard(
+                    child: SkeletonProfileHeader(),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                sliver: SliverToBoxAdapter(
+                  child: SkeletonLoader.profileAnalytics(),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                sliver: SliverToBoxAdapter(
+                  child: _HeaderCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            SkeletonWidget(width: 100, height: 18),
+                            SkeletonWidget(width: 60, height: 16),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 120,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 3,
+                            separatorBuilder: (context, index) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) => Container(
+                              width: 90,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SkeletonWidget(
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SkeletonWidget(width: 60, height: 12),
+                                  const SizedBox(height: 4),
+                                  SkeletonWidget(width: 40, height: 10),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,7 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+          ? _buildSkeletonLoading()
           : Stack(
         children: [
           // Fullscreen profile photo background with dark + red overlays

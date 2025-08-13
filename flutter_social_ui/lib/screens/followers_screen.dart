@@ -4,6 +4,7 @@ import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../services/follow_service.dart';
 import '../widgets/follow_button.dart';
+import '../widgets/skeleton_widgets.dart';
 import '../screens/chat_screen.dart';
 
 enum FollowersScreenType { followers, following, recommended, trending }
@@ -214,11 +215,16 @@ class _FollowersScreenState extends State<FollowersScreen>
     );
   }
 
+  Widget _buildSkeletonLoading() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: SkeletonLoader.followersList(itemCount: 8),
+    );
+  }
+
   Widget _buildMainContent() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: kPrimaryColor),
-      );
+      return _buildSkeletonLoading();
     }
 
     if (_error != null) {
@@ -275,9 +281,7 @@ class _FollowersScreenState extends State<FollowersScreen>
       future: _followService.getTrendingAvatars(limit: 20),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: kPrimaryColor),
-          );
+          return _buildSkeletonLoading();
         }
 
         if (snapshot.hasError) {

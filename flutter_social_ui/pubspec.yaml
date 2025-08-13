@@ -62,6 +62,7 @@ dependencies:
   # Additional packages for Feeds functionality
   share_plus: ^7.2.1
   pull_to_refresh: ^2.0.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

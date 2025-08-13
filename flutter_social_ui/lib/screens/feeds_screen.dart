@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
 import '../widgets/video_feed_item.dart';
+import '../widgets/skeleton_widgets.dart';
 
 /// @deprecated This feed screen is deprecated. 
 /// Use PostDetailScreen instead, which now has feature parity and is the default home screen.
@@ -346,11 +347,7 @@ class _FeedsScreenState extends State<FeedsScreen>
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-        ),
-      );
+      return SkeletonLoader.videoFeed();
     }
 
     if (_hasError) {

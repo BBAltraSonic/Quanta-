@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import '../constants.dart';
 
 class SkeletonWidget extends StatefulWidget {
@@ -493,6 +494,136 @@ class SkeletonLoader {
       itemCount: itemCount,
       itemBuilder: (context, index) => SkeletonChatMessage(
         isMe: index % 3 == 0, // Mix of user and avatar messages
+      ),
+    );
+  }
+
+  static Widget videoFeed() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.grey[300],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget profileAnalytics() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonWidget(width: 150, height: 18),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonWidget(width: 80, height: 12),
+                      SizedBox(height: 4),
+                      SkeletonWidget(width: 60, height: 16),
+                      SizedBox(height: 2),
+                      SkeletonWidget(width: 100, height: 10),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonWidget(width: 80, height: 12),
+                      SizedBox(height: 4),
+                      SkeletonWidget(width: 60, height: 16),
+                      SizedBox(height: 2),
+                      SkeletonWidget(width: 100, height: 10),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget followersList({int itemCount = 5}) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: itemCount,
+      itemBuilder: (context, index) => Container(
+        margin: EdgeInsets.only(bottom: 12),
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            SkeletonWidget(
+              width: 56,
+              height: 56,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonWidget(width: 120, height: 16),
+                  SizedBox(height: 8),
+                  SkeletonWidget(width: 200, height: 14),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      SkeletonWidget(width: 60, height: 20),
+                      SizedBox(width: 8),
+                      SkeletonWidget(width: 100, height: 12),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SkeletonWidget(width: 80, height: 36),
+          ],
+        ),
       ),
     );
   }

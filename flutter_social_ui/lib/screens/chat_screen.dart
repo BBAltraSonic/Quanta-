@@ -6,6 +6,7 @@ import 'package:flutter_social_ui/services/chat_service.dart';
 import 'package:flutter_social_ui/services/avatar_service.dart';
 import 'package:flutter_social_ui/services/auth_service.dart';
 import 'package:flutter_social_ui/models/avatar_model.dart';
+import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 import '../constants.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -306,23 +307,57 @@ class _ChatScreenState extends State<ChatScreen> {
             onTap: () => Navigator.pop(context),
             child: Icon(Icons.arrow_back, color: kTextColor),
           ),
-          title: Text(
-            widget.name,
-            style: TextStyle(color: Colors.white, fontSize: 16),
-          ),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          title: Row(
             children: [
-              CircularProgressIndicator(color: kPrimaryColor),
-              SizedBox(height: 16),
-              Text(
-                'Connecting to ${widget.name}...',
-                style: TextStyle(color: Colors.white70),
+              SkeletonWidget(
+                width: 36,
+                height: 36,
+                borderRadius: BorderRadius.circular(18),
               ),
+              const SizedBox(width: 8),
+              SkeletonWidget(width: 80, height: 16),
             ],
           ),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SkeletonLoader.chatMessages(itemCount: 8),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      SkeletonWidget(
+                        width: 26,
+                        height: 26,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SkeletonWidget(width: double.infinity, height: 16),
+                      ),
+                      const SizedBox(width: 8),
+                      SkeletonWidget(
+                        width: 34,
+                        height: 34,
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

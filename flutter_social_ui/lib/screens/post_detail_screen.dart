@@ -14,6 +14,7 @@ import 'package:flutter_social_ui/services/user_safety_service.dart';
 import 'package:flutter_social_ui/services/chat_validation_service.dart';
 import 'package:flutter_social_ui/widgets/report_content_dialog.dart';
 import 'package:flutter_social_ui/services/analytics_service.dart';
+import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 
 
 
@@ -838,19 +839,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(
-                'Loading your feed...',
-                style: TextStyle(color: Colors.white),
-              ),
-            ],
-          ),
-        ),
+        body: SkeletonLoader.videoFeed(),
       );
     }
 

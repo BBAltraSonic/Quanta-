@@ -5,6 +5,7 @@ import 'package:flutter_social_ui/models/post_model.dart';
 import 'package:flutter_social_ui/services/search_service_wrapper.dart';
 import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
 import 'package:flutter_social_ui/screens/chat_screen.dart';
+import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
 import 'dart:async';
 
 class SearchScreenNew extends StatefulWidget {
@@ -140,18 +141,74 @@ class _SearchScreenNewState extends State<SearchScreenNew>
 
   Widget _buildSearchResults() {
     if (_isSearching) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: kPrimaryColor),
-            SizedBox(height: 16),
-            Text(
-              'Searching...',
-              style: kBodyTextStyle.copyWith(color: kLightTextColor),
+      return TabBarView(
+        controller: _tabController,
+        children: [
+          SkeletonLoader.searchResults(itemCount: 6),
+          Container(
+            padding: EdgeInsets.all(16),
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: 6,
+              itemBuilder: (context, index) => Container(
+                decoration: BoxDecoration(
+                  color: kCardColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SkeletonWidget(
+                        width: double.infinity,
+                        height: double.infinity,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonWidget(width: double.infinity, height: 14),
+                          SizedBox(height: 4),
+                          SkeletonWidget(width: 80, height: 12),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: List.generate(
+                6,
+                (index) => Container(
+                  margin: EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: SkeletonWidget(
+                      width: 40,
+                      height: 40,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    title: SkeletonWidget(width: 120, height: 16),
+                    subtitle: SkeletonWidget(width: 80, height: 12),
+                    trailing: SkeletonWidget(width: 16, height: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
