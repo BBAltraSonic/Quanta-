@@ -7,6 +7,7 @@ import '../models/comment.dart';
 import '../services/auth_service.dart';
 import '../services/user_safety_service.dart';
 import '../services/analytics_service.dart';
+import '../services/database_error_recovery_service.dart';
 import '../config/db_config.dart';
 import '../services/notification_service.dart' as notification_service;
 
@@ -19,6 +20,7 @@ class EnhancedFeedsService {
   final AuthService _authService = AuthService();
   final AnalyticsService _analyticsService = AnalyticsService();
   final notification_service.NotificationService _notificationService = notification_service.NotificationService();
+  final DatabaseErrorRecoveryService _dbErrorRecovery = DatabaseErrorRecoveryService();
   SupabaseClient get _supabase => Supabase.instance.client;
   
   // Realtime subscriptions
@@ -161,9 +163,11 @@ class EnhancedFeedsService {
     }
 
     try {
-      // First check current status using RPC function
-      final statusResult = await _supabase.rpc('get_post_interaction_status', params: {
-        'target_post_id': postId,
+      // First check current status using RPC function with error recovery
+      final statusResult = await _dbErrorRecovery.executeWithRetry(() async {
+        return _supabase.rpc('get_post_interaction_status', params: {
+          'target_post_id': postId,
+        });
       });
 
       if (!statusResult['success']) {
@@ -173,9 +177,11 @@ class EnhancedFeedsService {
       final isCurrentlyLiked = statusResult['data']['user_liked'] as bool;
 
       if (isCurrentlyLiked) {
-        // Unlike using RPC function
-        final result = await _supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': postId,
+        // Unlike using RPC function with error recovery
+        final result = await _dbErrorRecovery.executeWithRetry(() async {
+          return _supabase.rpc('decrement_likes_count', params: {
+            'target_post_id': postId,
+          });
         });
 
         if (!result['success']) {
@@ -187,9 +193,11 @@ class EnhancedFeedsService {
 
         return false;
       } else {
-        // Like using RPC function
-        final result = await _supabase.rpc('increment_likes_count', params: {
-          'target_post_id': postId,
+        // Like using RPC function with error recovery
+        final result = await _dbErrorRecovery.executeWithRetry(() async {
+          return _supabase.rpc('increment_likes_count', params: {
+            'target_post_id': postId,
+          });
         });
 
         if (!result['success']) {
@@ -216,8 +224,10 @@ class EnhancedFeedsService {
     if (userId == null) return false;
 
     try {
-      final result = await _supabase.rpc('get_post_interaction_status', params: {
-        'target_post_id': postId,
+      final result = await _dbErrorRecovery.executeWithRetry(() async {
+        return _supabase.rpc('get_post_interaction_status', params: {
+          'target_post_id': postId,
+        });
       });
 
       if (!result['success']) {
@@ -749,8 +759,10 @@ class EnhancedFeedsService {
   /// Update view count for a post using secure RPC function
   Future<void> incrementViewCount(String postId) async {
     try {
-      final result = await _supabase.rpc('increment_view_count', params: {
-        'target_post_id': postId,
+      final result = await _dbErrorRecovery.executeWithRetry(() async {
+        return _supabase.rpc('increment_view_count', params: {
+          'target_post_id': postId,
+        });
       });
 
       if (!result['success']) {

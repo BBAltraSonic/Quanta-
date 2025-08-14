@@ -13,14 +13,14 @@ class ChatScreen extends StatefulWidget {
   final String name;
   final String avatar;
   final bool isGroup;
-  final String? avatarId; // Added for backend integration
+  final String avatarId; // Required for proper backend integration
 
   const ChatScreen({
     super.key,
     required this.name,
     required this.avatar,
+    required this.avatarId, // Now required
     this.isGroup = false,
-    this.avatarId,
   });
 
   @override
@@ -56,26 +56,20 @@ class _ChatScreenState extends State<ChatScreen> {
         _hasError = false;
       });
 
-      // Find avatar by name if ID not provided
-      if (widget.avatarId != null) {
-        _actualAvatarId = widget.avatarId;
-      } else {
-        // Search for avatar by name (fallback for existing UI)
-        _actualAvatarId = await _findAvatarByName(widget.name);
+      // Use provided avatarId directly
+      _actualAvatarId = widget.avatarId;
+
+      // Load avatar details
+      _avatar = await _avatarService.getAvatar(widget.avatarId);
+      if (_avatar == null) {
+        throw Exception('Avatar with ID "${widget.avatarId}" not found in database.');
       }
 
-      if (_actualAvatarId != null) {
-        // Load avatar details
-        _avatar = await _avatarService.getAvatar(_actualAvatarId!);
+      // Create or get existing chat session
+      await _loadOrCreateChatSession();
 
-        // Create or get existing chat session
-        await _loadOrCreateChatSession();
-
-        // Load existing messages
-        await _loadChatHistory();
-      } else {
-        throw Exception('Avatar not found. Please ensure the avatar exists in the database.');
-      }
+      // Load existing messages
+      await _loadChatHistory();
 
       setState(() {
         _isLoading = false;
@@ -89,14 +83,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<String?> _findAvatarByName(String name) async {
-    try {
-      final avatars = await _avatarService.searchAvatars(query: name, limit: 1);
-      return avatars.isNotEmpty ? avatars.first.id : null;
-    } catch (e) {
-      return null;
-    }
-  }
 
   Future<void> _loadOrCreateChatSession() async {
     if (_actualAvatarId == null) return;

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_social_ui/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_social_ui/screens/chat_screen.dart';
-// import removed: legacy player replaced by EnhancedVideoPlayer
 import 'package:video_player/video_player.dart';
-import 'package:flutter_social_ui/services/enhanced_video_service.dart';
+import '../widgets/enhanced_video_player.dart';
+import '../services/enhanced_video_service.dart';
 
 
 class PostItem extends StatelessWidget {
@@ -156,25 +155,36 @@ class PostItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap:
-                        onAvatarTap ??
-                        () {
-                          // Fallback when no proper avatar tap handler is provided
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(Icons.info_outline, color: Colors.white, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Chat not available - avatar data unavailable'),
-                                ],
-                              ),
-                              backgroundColor: Colors.grey[800],
-                              duration: Duration(seconds: 3),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
+                    onTap: onAvatarTap != null
+                        ? onAvatarTap!
+                        : () {
+                            // Show error dialog instead of fallback behavior
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  backgroundColor: Colors.grey[900],
+                                  title: const Text(
+                                    'Chat Unavailable',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  content: const Text(
+                                    'Chat functionality requires valid avatar data. Please ensure the avatar is properly configured.',
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: const Text(
+                                        'OK',
+                                        style: TextStyle(color: kPrimaryColor),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                     child: Stack(
                       children: [
                         CircleAvatar(
