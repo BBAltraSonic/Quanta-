@@ -121,17 +121,21 @@ class AuthService {
         throw Exception('Failed to create user account');
       }
       
-      // Create user profile
-      final user = UserModel.create(
+      // Create user profile with the same ID as Supabase Auth user
+      final user = UserModel(
+        id: response.user!.id, // Use Supabase Auth user ID
         email: email,
         username: username,
         displayName: displayName,
+        role: UserRole.creator, // Everyone is a creator by default
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       
       // Save user profile to database
       // NOTE: Temporarily removing display_name from initial insert due to Supabase schema cache issue
       await _supabase.from('users').insert({
-        'id': response.user!.id,
+        'id': response.user!.id,  // Ensure consistent ID
         'email': user.email,
         'username': user.username,
         'role': user.role.toString().split('.').last,

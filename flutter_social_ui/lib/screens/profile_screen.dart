@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../services/follow_service.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/analytics_insights_service.dart';
+import '../services/user_role_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
@@ -30,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
   final FollowService _followService = FollowService();
   final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
+  final UserRoleService _roleService = UserRoleService();
   
   UserModel? _user;
   List<AvatarModel> _avatars = [];
@@ -39,6 +41,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isOwnProfile = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
+  
+  // Activity-based UI state (for display only, not restrictions)
+  bool _isCreator = false;
+  bool _isFan = false;
+  UserRole _userRole = UserRole.creator;
   
   // Posts content state
   List<PostModel> _userPosts = [];
@@ -136,6 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading = false;
         });
       }
+      
+      // Load role information for the target user
+      await _loadUserRoles(targetUserId);
       
       // Load user posts after profile data is loaded
       await _loadUserPosts();
@@ -398,6 +408,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return '${metric.value.toStringAsFixed(2)}/min';
       default:
         return metric.value.toString();
+    }
+  }
+  
+  /// Load user role information
+  Future<void> _loadUserRoles(String userId) async {
+    try {
+      final isCreator = await _roleService.isCreator(userId);
+      final isFan = await _roleService.isFan(userId);
+      final userRole = await _roleService.getUserRole(userId);
+      
+      if (mounted) {
+        setState(() {
+          _isCreator = isCreator;
+          _isFan = isFan;
+          _userRole = userRole;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user roles: $e');
+      // Set default values on error
+      if (mounted) {
+        setState(() {
+          _isCreator = false;
+          _isFan = false;
+          _userRole = UserRole.creator;
+        });
+      }
     }
   }
   
@@ -836,6 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           activeAvatar?.bio ?? 'Virtual influencer creator',
           style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.35),
         ),
+        // Note: Role badges removed - everyone is a creator in this simplified social media model
         const SizedBox(height: 14),
         // Stats row (Posts • Followers • Following)
         Row(
@@ -2123,6 +2161,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Avatars section
   Widget _buildAvatarsSection() {
     if (_avatars.isEmpty) {
+      // Show empty state only when viewing your own profile (creator view)
+      if (_isOwnProfile) {
+        return _buildEmptyAvatarsState();
+      }
+      // Hide section when viewing others with no avatars (fan view)
       return const SizedBox.shrink();
     }
     
@@ -2133,9 +2176,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'My Avatars',
-                style: TextStyle(
+              Text(
+                _isOwnProfile ? 'My Avatars' : '${_user?.displayName ?? 'User'}\'s Avatars',
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -2348,6 +2391,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _navigateToCreatePost,
               icon: const Icon(Icons.add),
               label: const Text('Create Post'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  /// Build empty avatars state
+  Widget _buildEmptyAvatarsState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person_outline,
+            size: 64,
+            color: Colors.white30,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _isOwnProfile ? 'No avatars yet' : 'No avatars to show',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _isOwnProfile 
+                ? 'Create your first avatar to get started!' 
+                : 'This user hasn\'t created any avatars yet.',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (_isOwnProfile) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _navigateToAvatarManagement,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Create Avatar'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,

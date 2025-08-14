@@ -70,7 +70,7 @@ class EnhancedFeedsService {
     }
   }
 
-  /// Get posts for a specific user
+  /// Get posts for a specific user (via their avatars)
   Future<List<PostModel>> getUserPosts({
     required String userId,
     int page = 1,
@@ -81,10 +81,24 @@ class EnhancedFeedsService {
       // Calculate offset for pagination
       final offset = (page - 1) * limit;
       
+      // First get user's avatar IDs
+      final avatarResponse = await _supabase
+          .from('avatars')
+          .select('id')
+          .eq('owner_user_id', userId);
+      
+      if (avatarResponse.isEmpty) {
+        debugPrint('📱 No avatars found for user $userId');
+        return [];
+      }
+      
+      final avatarIds = (avatarResponse as List).map((avatar) => avatar['id'] as String).toList();
+      
+      // Now get posts for these avatars
       final response = await _supabase
           .from(DbConfig.postsTable)
           .select('*')
-          .eq('user_id', userId)
+          .filter('avatar_id', 'in', '(${avatarIds.join(",")})')
           .eq('is_active', true)
           .eq('status', DbConfig.publishedStatus)
           .order('created_at', ascending: false)
@@ -97,7 +111,7 @@ class EnhancedFeedsService {
         posts = await UserSafetyService().filterContent(posts);
       }
       
-      debugPrint('📱 Retrieved ${posts.length} posts for user $userId (page $page)');
+      debugPrint('📱 Retrieved ${posts.length} posts for user $userId via ${avatarIds.length} avatars (page $page)');
       return posts;
     } catch (e) {
       debugPrint('❌ Failed to get user posts: $e');

@@ -1,6 +1,10 @@
 import 'package:uuid/uuid.dart';
 
-enum UserRole { creator, viewer, admin }
+enum UserRole { creator, admin }
+
+// Note: Everyone is a creator by default in this social platform.
+// The role field is mainly kept for admin privileges.
+// Content permissions are based on ownership (_isOwnProfile), not roles.
 
 class UserModel {
   final String id;
