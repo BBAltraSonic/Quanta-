@@ -14,6 +14,7 @@ import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
 import '../screens/chat_screen.dart';
+import '../screens/create_post_screen.dart';
 import '../widgets/skeleton_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -265,6 +266,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => const AvatarManagementScreen(),
+      ),
+    );
+  }
+  
+  void _navigateToCreatePost() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CreatePostScreen(),
       ),
     );
   }
@@ -624,22 +634,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: IconButton(
-              onPressed: _navigateToEditProfile,
-              icon: SvgPicture.asset(
-                'assets/icons/pen-new-square-svgrepo-com.svg',
-                width: 22,
-                height: 22,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
+          if (_isOwnProfile) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                onPressed: _navigateToCreatePost,
+                icon: SvgPicture.asset(
+                  'assets/icons/add-square-svgrepo-com.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
                 ),
+                tooltip: 'Create post',
               ),
-              tooltip: 'Edit profile',
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: IconButton(
+                onPressed: _navigateToEditProfile,
+                icon: SvgPicture.asset(
+                  'assets/icons/pen-new-square-svgrepo-com.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                tooltip: 'Edit profile',
+              ),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: IconButton(
+                onPressed: _navigateToEditProfile,
+                icon: SvgPicture.asset(
+                  'assets/icons/pen-new-square-svgrepo-com.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                tooltip: 'Edit profile',
+              ),
+            ),
+          ],
         ],
       ),
       body: _isLoading 
@@ -2031,6 +2076,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
   
+  /// Build fallback image for posts
+  Widget _buildFallbackImage() {
+    return Container(
+      color: Colors.grey[800],
+      child: Center(
+        child: Icon(
+          Icons.image,
+          color: Colors.white54,
+          size: 32,
+        ),
+      ),
+    );
+  }
+  
+  /// Unpin post from avatar
+  Future<void> _unpinPost() async {
+    if (_activeAvatar == null) return;
+    
+    try {
+      await _profileService.unpinPost(_activeAvatar!.id);
+      setState(() {
+        _pinnedPost = null;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post unpinned successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error unpinning post: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
   // Avatars section
   Widget _buildAvatarsSection() {
     if (_avatars.isEmpty) {
@@ -2256,15 +2345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (_isOwnProfile) ...[
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: () {
-                // Navigate to post creation
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Post creation coming soon!'),
-                    backgroundColor: kPrimaryColor,
-                  ),
-                );
-              },
+              onPressed: _navigateToCreatePost,
               icon: const Icon(Icons.add),
               label: const Text('Create Post'),
               style: ElevatedButton.styleFrom(
@@ -2495,46 +2576,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
   
-  /// Build fallback image for posts without images
-  Widget _buildFallbackImage() {
-    return Container(
-      color: Colors.grey[800],
-      child: const Center(
-        child: Icon(
-          Icons.image,
-          color: Colors.white30,
-          size: 32,
-        ),
-      ),
-    );
-  }
-  
-  /// Unpin the currently pinned post
-  Future<void> _unpinPost() async {
-    if (_pinnedPost == null || _activeAvatar == null) return;
-    
-    try {
-      await _profileService.unpinPost(_activeAvatar!.id);
-      
-      setState(() {
-        _pinnedPost = null;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Post unpinned successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to unpin post: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 }
 
 // Card wrapper for the header that appears over the photo
