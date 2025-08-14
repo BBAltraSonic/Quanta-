@@ -36,10 +36,9 @@ class AnalyticsService {
     final event = {
       'event_type': eventType,
       'user_id': userId,
-      'properties': properties,
-      'timestamp': DateTime.now().toIso8601String(),
+      'event_data': properties,
       'session_id': _generateSessionId(),
-      'platform': 'flutter',
+      'created_at': DateTime.now().toIso8601String(),
     };
 
     // Add to queue for batch processing

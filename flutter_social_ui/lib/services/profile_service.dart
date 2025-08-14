@@ -569,6 +569,80 @@ class ProfileService {
     return validatedPrefs;
   }
 
+  /// Get real-time profile metrics from database
+  Future<Map<String, dynamic>> getRealProfileMetrics(String userId, {DateTime? startDate, DateTime? endDate}) async {
+    try {
+      endDate ??= DateTime.now();
+      startDate ??= endDate.subtract(const Duration(days: 30));
+      
+      // Get profile views from analytics events
+      final profileViews = await _authService.supabase
+          .from('analytics_events')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('event_type', 'profile_view')
+          .gte('created_at', startDate.toIso8601String())
+          .lte('created_at', endDate.toIso8601String());
+      
+      // Get user's avatar IDs for post metrics
+      final userAvatars = await _authService.supabase
+          .from('avatars')
+          .select('id')
+          .eq('owner_user_id', userId);
+      
+      final avatarIds = (userAvatars as List).map((a) => a['id']).toList();
+      
+      // Get post engagement metrics
+      Map<String, int> postMetrics = {'total_likes': 0, 'total_comments': 0, 'total_shares': 0, 'total_views': 0};
+      
+      if (avatarIds.isNotEmpty) {
+        // Get posts for user's avatars
+        final posts = await _authService.supabase
+            .from('posts')
+            .select('likes_count, comments_count, shares_count, views_count')
+            .filter('avatar_id', 'in', '(${avatarIds.join(',')})')
+            .gte('created_at', startDate.toIso8601String())
+            .lte('created_at', endDate.toIso8601String());
+        
+        for (final post in posts as List) {
+          postMetrics['total_likes'] = postMetrics['total_likes']! + ((post['likes_count'] ?? 0) as int);
+          postMetrics['total_comments'] = postMetrics['total_comments']! + ((post['comments_count'] ?? 0) as int);
+          postMetrics['total_shares'] = postMetrics['total_shares']! + ((post['shares_count'] ?? 0) as int);
+          postMetrics['total_views'] = postMetrics['total_views']! + ((post['views_count'] ?? 0) as int);
+        }
+      }
+      
+      // Calculate engagement rate
+      final totalEngagement = postMetrics['total_likes']! + postMetrics['total_comments']! + postMetrics['total_shares']!;
+      final totalViews = postMetrics['total_views']!;
+      final engagementRate = totalViews > 0 ? (totalEngagement / totalViews * 100) : 0.0;
+      
+      return {
+        'profile_views': (profileViews as List).length,
+        'engagement_rate': double.parse(engagementRate.toStringAsFixed(2)),
+        'total_likes': postMetrics['total_likes'],
+        'total_comments': postMetrics['total_comments'],
+        'total_shares': postMetrics['total_shares'],
+        'total_views': postMetrics['total_views'],
+        'total_engagement': totalEngagement,
+        'period_start': startDate.toIso8601String(),
+        'period_end': endDate.toIso8601String(),
+      };
+    } catch (e) {
+      debugPrint('Error getting real profile metrics: $e');
+      // Return fallback metrics
+      return {
+        'profile_views': 0,
+        'engagement_rate': 0.0,
+        'total_likes': 0,
+        'total_comments': 0,
+        'total_shares': 0,
+        'total_views': 0,
+        'total_engagement': 0,
+      };
+    }
+  }
+  
   /// Export analytics data
   Future<Map<String, dynamic>> exportAnalyticsData(String userId, {
     int daysBack = 30,

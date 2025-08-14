@@ -60,7 +60,7 @@ class AnalyticsInsightsService {
     }
   }
 
-  /// Get advanced analytics metrics
+  /// Get advanced analytics metrics using real database data
   Future<List<AnalyticsMetric>> _getAdvancedMetrics(
     String userId,
     AnalyticsPeriod period,
@@ -70,9 +70,22 @@ class AnalyticsInsightsService {
     final previousStartDate = startDate.subtract(period.duration);
 
     try {
-      // Get current period metrics
-      final currentMetrics = await _getMetricsForPeriod(userId, startDate, endDate);
-      final previousMetrics = await _getMetricsForPeriod(userId, previousStartDate, startDate);
+      // Get current period metrics from real database
+      final currentRealMetrics = await _profileService.getRealProfileMetrics(
+        userId, 
+        startDate: startDate, 
+        endDate: endDate
+      );
+      
+      final previousRealMetrics = await _profileService.getRealProfileMetrics(
+        userId, 
+        startDate: previousStartDate, 
+        endDate: startDate
+      );
+      
+      // Convert real metrics to AnalyticsMetric objects
+      final currentMetrics = _convertRealMetricsToAnalyticsMetrics(currentRealMetrics);
+      final previousMetrics = _convertRealMetricsToAnalyticsMetrics(previousRealMetrics);
 
       // Combine current and previous for comparison
       final combinedMetrics = <AnalyticsMetric>[];
@@ -473,6 +486,62 @@ class AnalyticsInsightsService {
     }
   }
 
+  /// Convert real metrics data from database to AnalyticsMetric objects
+  List<AnalyticsMetric> _convertRealMetricsToAnalyticsMetrics(Map<String, dynamic> realMetrics) {
+    return [
+      AnalyticsMetric(
+        key: 'profile_views',
+        label: 'Profile Views',
+        value: (realMetrics['profile_views'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'engagement_rate',
+        label: 'Engagement Rate',
+        value: realMetrics['engagement_rate'] ?? 0.0,
+        type: MetricType.percentage,
+        unit: '%',
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'total_likes',
+        label: 'Total Likes',
+        value: (realMetrics['total_likes'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'total_comments',
+        label: 'Total Comments',
+        value: (realMetrics['total_comments'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'total_shares',
+        label: 'Total Shares',
+        value: (realMetrics['total_shares'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'total_views',
+        label: 'Total Views',
+        value: (realMetrics['total_views'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+      AnalyticsMetric(
+        key: 'total_engagement',
+        label: 'Total Engagement',
+        value: (realMetrics['total_engagement'] ?? 0).toDouble(),
+        type: MetricType.count,
+        isGoodDirection: true,
+      ),
+    ];
+  }
+  
   /// Get detailed avatar performance analytics
   Future<Map<String, dynamic>> getAvatarAnalytics({
     required String avatarId,
