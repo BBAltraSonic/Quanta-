@@ -6,6 +6,7 @@ import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
+import '../store/state_service_adapter.dart';
 import '../widgets/video_feed_item.dart';
 import '../widgets/skeleton_widgets.dart';
 
@@ -25,20 +26,20 @@ class _FeedsScreenState extends State<FeedsScreen>
   final RefreshController _refreshController = RefreshController(initialRefresh: false);
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final EnhancedVideoService _videoService = EnhancedVideoService();
+  final StateServiceAdapter _stateAdapter = StateServiceAdapter();
 
-  List<PostModel> _posts = [];
-  Map<String, AvatarModel> _avatarCache = {};
-  Map<String, UserModel> _userCache = {};
-  Map<String, bool> _likedStatus = {};
-  Map<String, bool> _followingStatus = {};
-
+  // UI state only - all data comes from central state
   int _currentIndex = 0;
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
-  bool _hasError = false;
-  String _errorMessage = '';
-  int _currentPage = 0;
   static const int _pageSize = 10;
+  static const String _feedContext = 'video_feed';
+
+  // Central state getters - single source of truth
+  List<PostModel> get _posts => _stateAdapter.feedPosts;
+  bool get _isLoading => _stateAdapter.getLoadingState(_feedContext);
+  bool get _isLoadingMore => _stateAdapter.getLoadingState('${_feedContext}_more');
+  String? get _errorMessage => _stateAdapter.error;
+  bool get _hasError => _errorMessage != null;
+  int get _currentPage => _stateAdapter.getCurrentPage(_feedContext);
 
   @override
   bool get wantKeepAlive => true;
@@ -60,11 +61,8 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Load initial posts
   Future<void> _loadInitialPosts() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-        _errorMessage = '';
-      });
+      _stateAdapter.setLoadingState(_feedContext, true);
+      _stateAdapter.clearError();
 
       final posts = await _feedsService.getVideoFeed(
         page: 0,
@@ -76,28 +74,20 @@ class _FeedsScreenState extends State<FeedsScreen>
         await _loadPostMetadata(posts);
         await _loadLikedAndFollowingStatus(posts);
 
-        setState(() {
-          _posts = posts;
-          _currentPage = 0;
-          _isLoading = false;
-        });
-
+        // Update central state
+        _stateAdapter.setPosts(posts, context: _feedContext);
+        _stateAdapter.setPaginationState(_feedContext, 0, posts.length >= _pageSize);
+        
         // Preload videos for better performance
         _preloadVideosAroundCurrent();
       } else {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = 'No videos available at the moment';
-        });
+        _stateAdapter.setError('No videos available at the moment');
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = 'Failed to load videos. Please try again.';
-      });
+      _stateAdapter.setError('Failed to load videos. Please try again.');
       debugPrint('Error loading initial posts: $e');
+    } finally {
+      _stateAdapter.setLoadingState(_feedContext, false);
     }
   }
 
@@ -147,18 +137,12 @@ class _FeedsScreenState extends State<FeedsScreen>
     final avatarIds = posts.map((post) => post.avatarId).toSet();
     
     for (final avatarId in avatarIds) {
-      if (!_avatarCache.containsKey(avatarId)) {
+      // Check central state first
+      if (_stateAdapter.getAvatar(avatarId) == null) {
         final avatar = await _feedsService.getAvatarForPost(avatarId);
         if (avatar != null) {
-          _avatarCache[avatarId] = avatar;
-          
-          // Also cache the user who owns this avatar
-          if (!_userCache.containsKey(avatar.ownerUserId)) {
-            final user = await _feedsService.getUser(avatar.ownerUserId);
-            if (user != null) {
-              _userCache[avatar.ownerUserId] = user;
-            }
-          }
+          // Store in central state
+          _stateAdapter.setAvatar(avatar);
         }
       }
     }
@@ -174,8 +158,11 @@ class _FeedsScreenState extends State<FeedsScreen>
       _feedsService.getFollowingStatusBatch(avatarIds),
     ]);
 
-    _likedStatus.addAll(likedStatus);
-    _followingStatus.addAll(followingStatus);
+    // Store in central state
+    _stateAdapter.warmCacheFromService(
+      likedPosts: likedStatus,
+      followingAvatars: followingStatus,
+    );
   }
 
   /// Preload videos around current index for smooth playback
@@ -258,24 +245,27 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Handle like action
   Future<void> _handleLike(PostModel post) async {
     try {
+      // Optimistic update
+      _stateAdapter.optimisticTogglePostLike(post.id);
+      
+      // API call
       final isLiked = await _feedsService.toggleLike(post.id);
       
-      setState(() {
-        _likedStatus[post.id] = isLiked;
-        // Update local post data
-        final index = _posts.indexWhere((p) => p.id == post.id);
-        if (index != -1) {
-          _posts[index] = _posts[index].copyWith(
-            likesCount: isLiked 
-                ? _posts[index].likesCount + 1 
-                : _posts[index].likesCount - 1,
-          );
-        }
-      });
+      // Sync with actual result
+      final updatedPost = _stateAdapter.getPost(post.id);
+      if (updatedPost != null) {
+        final newLikesCount = isLiked 
+            ? post.likesCount + 1 
+            : post.likesCount - 1;
+        _stateAdapter.setPostLikeStatus(post.id, isLiked, newLikesCount: newLikesCount);
+      }
 
       // Haptic feedback
       HapticFeedback.mediumImpact();
     } catch (e) {
+      // Revert optimistic update on error
+      _stateAdapter.optimisticTogglePostLike(post.id);
+      
       debugPrint('Error toggling like: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -372,15 +362,14 @@ class _FeedsScreenState extends State<FeedsScreen>
         itemCount: _posts.length,
         itemBuilder: (context, index) {
           final post = _posts[index];
-          final avatar = _avatarCache[post.avatarId];
-          final user = avatar != null ? _userCache[avatar.ownerUserId] : null;
-          final isLiked = _likedStatus[post.id] ?? false;
-          final isFollowing = _followingStatus[post.avatarId] ?? false;
+          final avatar = _stateAdapter.getAvatar(post.avatarId);
+          final isLiked = _stateAdapter.isPostLiked(post.id);
+          final isFollowing = _stateAdapter.isFollowingAvatar(post.avatarId);
 
           return VideoFeedItem(
             post: post,
             avatar: avatar,
-            user: user,
+            user: null, // User data will be handled by VideoFeedItem itself or removed
             isActive: index == _currentIndex,
             isLiked: isLiked,
             isFollowing: isFollowing,
