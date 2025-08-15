@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
 import '../models/comment.dart';
+import '../utils/ownership_manager.dart';
 
 /// Service adapter to bridge existing services with the central AppState
 /// This helps gradually migrate services to use the central state store
@@ -222,6 +223,58 @@ class StateServiceAdapter {
 
   /// Get the underlying AppState for direct access (advanced usage)
   AppState get appState => _appState;
+
+  // ========== OWNERSHIP DETECTION METHODS ==========
+  
+  final OwnershipManager _ownershipManager = OwnershipManager();
+
+  /// Check if the current user owns a profile
+  bool isOwnProfile(String? userId) => _ownershipManager.isOwnProfile(userId);
+  
+  /// Check if the current user owns a post
+  bool isOwnPost(PostModel? post) => _ownershipManager.isOwnPost(post);
+  
+  /// Check if the current user owns a post by ID
+  bool isOwnPostById(String? postId) => _ownershipManager.isOwnPostById(postId);
+  
+  /// Check if the current user owns an avatar
+  bool isOwnAvatar(String? avatarId) => _ownershipManager.isOwnAvatar(avatarId);
+  
+  /// Check if the current user owns a comment
+  bool isOwnComment(Comment? comment) => _ownershipManager.isOwnComment(comment);
+  
+  /// Check if the current user owns a comment by ID
+  bool isOwnCommentById(String? commentId) => _ownershipManager.isOwnCommentById(commentId);
+  
+  /// Generic ownership check for any element
+  bool isOwnElement(dynamic element) => _ownershipManager.isOwnElement(element);
+  
+  /// Check if element belongs to another user
+  bool isOtherElement(dynamic element) => _ownershipManager.isOtherElement(element);
+  
+  /// Check if user can edit an element
+  bool canEdit(dynamic element) => _ownershipManager.canEdit(element);
+  
+  /// Check if user can delete an element
+  bool canDelete(dynamic element) => _ownershipManager.canDelete(element);
+  
+  /// Check if user can view private details
+  bool canViewPrivateDetails(dynamic element) => _ownershipManager.canViewPrivateDetails(element);
+  
+  /// Check if user can modify settings
+  bool canModifySettings(dynamic element) => _ownershipManager.canModifySettings(element);
+  
+  /// Check if user can follow the element owner
+  bool canFollowElement(dynamic element) => _ownershipManager.canFollowElement(element);
+  
+  /// Check if user can report the element
+  bool canReportElement(dynamic element) => _ownershipManager.canReportElement(element);
+  
+  /// Get detailed ownership state
+  OwnershipState getOwnershipState(dynamic element) => _ownershipManager.getOwnershipState(element);
+  
+  /// Debug ownership information
+  void debugOwnership(dynamic element, {String? context}) => _ownershipManager.debugOwnership(element, context: context);
 
   // ========== CACHE WARMING METHODS ==========
 

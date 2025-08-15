@@ -8,8 +8,10 @@ import '../services/auth_service.dart';
 import '../services/user_safety_service.dart';
 import '../services/analytics_service.dart';
 import '../services/database_error_recovery_service.dart';
+import '../services/ownership_guard_service.dart';
 import '../config/db_config.dart';
 import '../services/notification_service.dart' as notification_service;
+import '../store/state_service_adapter.dart';
 
 /// Enhanced feeds service with comprehensive post interaction functionality
 class EnhancedFeedsService {
@@ -21,6 +23,8 @@ class EnhancedFeedsService {
   final AnalyticsService _analyticsService = AnalyticsService();
   final notification_service.NotificationService _notificationService = notification_service.NotificationService();
   final DatabaseErrorRecoveryService _dbErrorRecovery = DatabaseErrorRecoveryService();
+  final StateServiceAdapter _stateAdapter = StateServiceAdapter();
+  final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
   SupabaseClient get _supabase => Supabase.instance.client;
   
   // Realtime subscriptions
@@ -34,6 +38,16 @@ class EnhancedFeedsService {
     bool applySafetyFiltering = true,
   }) async {
     try {
+      // First check if posts are already loaded in state for this page
+      final cachedPosts = _stateAdapter.getCachedPostsForFeed(page);
+      if (cachedPosts.isNotEmpty) {
+        debugPrint('📱 Returning ${cachedPosts.length} cached posts for feed (page $page)');
+        return cachedPosts;
+      }
+
+      // Set loading state
+      _stateAdapter.setFeedLoadingState(page, true);
+
       // Base query without safety subqueries (to avoid SQL syntax errors)
       PostgrestFilterBuilder<PostgrestList> query = _supabase
           .from(DbConfig.postsTable)
@@ -62,10 +76,19 @@ class EnhancedFeedsService {
         posts = await UserSafetyService().filterContent(posts);
       }
       
+      // Store posts in central state
+      _stateAdapter.cachePosts(posts);
+      _stateAdapter.setFeedPostsForPage(page, posts);
+      
+      // Clear loading state
+      _stateAdapter.setFeedLoadingState(page, false);
+      
       debugPrint('📱 Retrieved ${posts.length} posts for feed (page $page, safety filtering: $applySafetyFiltering)');
       return posts;
     } catch (e) {
       debugPrint('❌ Failed to get video feed: $e');
+      _stateAdapter.setFeedLoadingState(page, false);
+      _stateAdapter.setFeedError(e.toString());
       return [];
     }
   }
@@ -177,6 +200,12 @@ class EnhancedFeedsService {
     }
 
     try {
+      // Get current liked status from central state first (for optimistic updates)
+      final currentLikedStatus = _stateAdapter.isPostLiked(postId);
+      
+      // Optimistically update UI state first
+      _stateAdapter.setPostLikedStatus(postId, !currentLikedStatus);
+      
       // First check current status using RPC function with error recovery
       final statusResult = await _dbErrorRecovery.executeWithRetry(() async {
         return _supabase.rpc('get_post_interaction_status', params: {
@@ -185,6 +214,8 @@ class EnhancedFeedsService {
       });
 
       if (!statusResult['success']) {
+        // Revert optimistic update on failure
+        _stateAdapter.setPostLikedStatus(postId, currentLikedStatus);
         throw Exception('Failed to get interaction status: ${statusResult['error']}');
       }
 
@@ -199,9 +230,14 @@ class EnhancedFeedsService {
         });
 
         if (!result['success']) {
+          // Revert optimistic update on failure
+          _stateAdapter.setPostLikedStatus(postId, true);
           throw Exception('Failed to unlike post: ${result['error']}');
         }
 
+        // Update central state with confirmed unlike
+        _stateAdapter.setPostLikedStatus(postId, false);
+        
         // Track analytics
         _analyticsService.trackLikeToggle(postId, false);
 
@@ -215,9 +251,14 @@ class EnhancedFeedsService {
         });
 
         if (!result['success']) {
+          // Revert optimistic update on failure
+          _stateAdapter.setPostLikedStatus(postId, false);
           throw Exception('Failed to like post: ${result['error']}');
         }
 
+        // Update central state with confirmed like
+        _stateAdapter.setPostLikedStatus(postId, true);
+        
         // Create notification for post owner
         await _createLikeNotification(postId, userId);
         
@@ -283,6 +324,15 @@ class EnhancedFeedsService {
     }
 
     try {
+      // Use ownership guard to prevent self-follow
+      await _ownershipGuard.guardFollowAction(avatarId);
+
+      // Get current following status from central state (for optimistic updates)
+      final currentFollowingStatus = _stateAdapter.isAvatarFollowed(avatarId);
+      
+      // Optimistically update UI state first
+      _stateAdapter.setAvatarFollowedStatus(avatarId, !currentFollowingStatus);
+      
       // Check if already following
       final existingFollow = await _supabase
           .from(DbConfig.followsTable)
@@ -299,6 +349,9 @@ class EnhancedFeedsService {
             .eq('avatar_id', avatarId)
             .eq('user_id', userId);
         
+        // Update central state with confirmed unfollow
+        _stateAdapter.setAvatarFollowedStatus(avatarId, false);
+        
         // Track analytics
         _analyticsService.trackFollowToggle(avatarId, false);
         
@@ -311,6 +364,9 @@ class EnhancedFeedsService {
           'created_at': DateTime.now().toIso8601String(),
         });
         
+        // Update central state with confirmed follow
+        _stateAdapter.setAvatarFollowedStatus(avatarId, true);
+        
         // Create notification for avatar owner
         await _createFollowNotification(avatarId, userId);
         
@@ -320,6 +376,8 @@ class EnhancedFeedsService {
         return true;
       }
     } catch (e) {
+      // Revert optimistic update on error
+      _stateAdapter.setAvatarFollowedStatus(avatarId, currentFollowingStatus);
       debugPrint('❌ Failed to toggle follow: $e');
       rethrow;
     }
@@ -424,17 +482,15 @@ class EnhancedFeedsService {
     }
 
     try {
-      // Get comment to verify ownership and get post_id
+      // Use ownership guard to verify comment deletion permissions
+      await _ownershipGuard.guardCommentDelete(commentId);
+
+      // Get comment to get post_id for count update
       final comment = await _supabase
           .from(DbConfig.commentsTable)
           .select('post_id, user_id')
           .eq('id', commentId)
           .single();
-
-      // Check if user owns the comment
-      if (comment['user_id'] != userId) {
-        throw Exception('Not authorized to delete this comment');
-      }
 
       // Delete the comment
       await _supabase
@@ -493,6 +549,12 @@ class EnhancedFeedsService {
     }
 
     try {
+      // Get current bookmark status from central state (for optimistic updates)
+      final currentBookmarkStatus = _stateAdapter.isPostBookmarked(postId);
+      
+      // Optimistically update UI state first
+      _stateAdapter.setPostBookmarkedStatus(postId, !currentBookmarkStatus);
+      
       // Check if already bookmarked
       final existingBookmark = await _supabase
           .from(DbConfig.savedPostsTable)
@@ -509,6 +571,9 @@ class EnhancedFeedsService {
             .eq('post_id', postId)
             .eq('user_id', userId);
         
+        // Update central state with confirmed unbookmark
+        _stateAdapter.setPostBookmarkedStatus(postId, false);
+        
         // Track analytics
         _analyticsService.trackBookmarkToggle(postId, false);
         
@@ -521,12 +586,17 @@ class EnhancedFeedsService {
           'created_at': DateTime.now().toIso8601String(),
         });
         
+        // Update central state with confirmed bookmark
+        _stateAdapter.setPostBookmarkedStatus(postId, true);
+        
         // Track analytics
         _analyticsService.trackBookmarkToggle(postId, true);
         
         return true;
       }
     } catch (e) {
+      // Revert optimistic update on error
+      _stateAdapter.setPostBookmarkedStatus(postId, currentBookmarkStatus);
       debugPrint('❌ Failed to toggle bookmark: $e');
       rethrow;
     }
@@ -589,6 +659,13 @@ class EnhancedFeedsService {
     }
 
     try {
+      // Get post data to verify it's not self-reporting
+      final post = await getPostById(postId);
+      if (post != null) {
+        // Use ownership guard to prevent self-reporting
+        await _ownershipGuard.guardReportAction(post, 'post');
+      }
+
       await _supabase.from(DbConfig.reportsTable).insert({
         'post_id': postId,
         'user_id': userId,

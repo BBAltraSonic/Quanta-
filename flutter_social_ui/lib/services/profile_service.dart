@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import 'auth_service.dart';
+import 'ownership_guard_service.dart';
 
 class ProfileService {
   static final ProfileService _instance = ProfileService._internal();
@@ -11,6 +12,7 @@ class ProfileService {
   ProfileService._internal();
 
   final AuthService _authService = AuthService();
+  final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
 
   // Get user profile with avatars
   Future<Map<String, dynamic>> getUserProfileData(String userId) async {
@@ -104,6 +106,9 @@ class ProfileService {
     String? lastName,
   }) async {
     try {
+      // Use ownership guard to ensure only profile owner can update
+      await _ownershipGuard.guardProfileEdit(userId);
+      
       // Validate inputs
       if (username != null && username.trim().isEmpty) {
         throw Exception('Username cannot be empty');

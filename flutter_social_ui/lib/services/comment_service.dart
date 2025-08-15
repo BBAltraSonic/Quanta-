@@ -7,6 +7,7 @@ import '../config/db_config.dart';
 import 'auth_service.dart';
 import 'ai_service.dart';
 import 'avatar_service.dart';
+import 'ownership_guard_service.dart';
 
 /// Service for handling comments and AI comment generation
 class CommentService {
@@ -15,6 +16,7 @@ class CommentService {
   CommentService._internal();
 
   final AuthService _authService = AuthService();
+  final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
   
   // Comment counts cache for demo mode
   final Map<String, int> _commentCounts = {};
@@ -127,6 +129,12 @@ class CommentService {
   /// Delete a comment
   Future<bool> deleteComment(String commentId) async {
     try {
+      // Guard comment deletion to ensure only the comment owner can delete
+      await _ownershipGuard.guardCommentEdit(
+        commentId: commentId,
+        action: 'delete',
+      );
+      
       return _deleteCommentSupabase(commentId);
     } catch (e) {
       debugPrint('Error deleting comment: $e');

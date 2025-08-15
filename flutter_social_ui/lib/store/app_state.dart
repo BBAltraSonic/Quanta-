@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
 import '../models/comment.dart'; // Use the unified comment model
+import '../utils/ownership_manager.dart';
 
 /// Central application state store - SINGLE SOURCE OF TRUTH
 /// All data modifications must go through this store to ensure consistency

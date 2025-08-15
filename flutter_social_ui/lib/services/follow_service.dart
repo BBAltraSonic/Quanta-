@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../config/app_config.dart';
 import 'auth_service.dart';
 import 'avatar_service.dart';
+import 'ownership_guard_service.dart';
 
 /// Service for handling following/follower relationships
 class FollowService {
@@ -14,6 +15,7 @@ class FollowService {
 
   final AuthService _authService = AuthService();
   final AvatarService _avatarService = AvatarService();
+  final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
   
   // Following data storage
   final Map<String, List<String>> _userFollowingAvatars = {};
@@ -29,6 +31,13 @@ class FollowService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
+      // Guard against self-following by checking avatar ownership
+      await _ownershipGuard.guardSelfAction(
+        resourceId: avatarId, 
+        resourceType: 'avatar',
+        action: 'follow',
+      );
+      
       return _toggleFollowSupabase(avatarId, userId);
     } catch (e) {
       debugPrint('Error toggling follow: $e');
