@@ -2,10 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
-import 'package:flutter_social_ui/services/auth_service.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/config/db_config.dart';
+import 'package:quanta/services/enhanced_feeds_service.dart';
+import 'package:quanta/services/auth_service.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/config/db_config.dart';
 
 // Generate mocks
 @GenerateMocks([SupabaseClient, AuthService])

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_social_ui/services/analytics_service.dart';
+import 'package:quanta/services/analytics_service.dart';
 
 void main() {
   group('AnalyticsEvents Constants', () {

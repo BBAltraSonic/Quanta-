@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../config/app_config.dart';
 
 enum ErrorType {
@@ -132,8 +134,8 @@ class ErrorHandlingService {
       }
     }
 
-    // TODO: In production, send to crash reporting service
-    // Examples: Firebase Crashlytics, Sentry, etc.
+    // Production crash reporting - implement when crash reporting service is configured
+    _sendToCrashReporting(error);
   }
 
   /// Show error dialog to user
@@ -293,7 +295,41 @@ class ErrorHandlingService {
 
   /// Clear error history
   static void clearErrorHistory() => _errorHistory.clear();
-}
 
+  /// Send error to Firebase Crashlytics
+  static void _sendToCrashReporting(AppError error) {
+    // Send to Firebase Crashlytics in production
+    if (!AppConfig.isDevelopment) {
+      try {
+        // Record the error with context
+        FirebaseCrashlytics.instance.recordError(
+          error.originalError ?? error.message,
+          null,
+          fatal: error.type == ErrorType.configuration,
+          information: [
+            DiagnosticsProperty('errorType', error.type.name),
+            DiagnosticsProperty('userMessage', error.userFriendlyMessage),
+            if (error.technicalDetails != null)
+              DiagnosticsProperty('technicalDetails', error.technicalDetails),
+          ],
+        );
+        
+        // Log the error message
+        FirebaseCrashlytics.instance.log(
+          '[${error.type.name.toUpperCase()}] ${error.message}',
+        );
+        
+        // Set custom keys for better categorization
+        FirebaseCrashlytics.instance.setCustomKey('error_type', error.type.name);
+        FirebaseCrashlytics.instance.setCustomKey('has_user_message', error.userFriendlyMessage != null);
+        FirebaseCrashlytics.instance.setCustomKey('has_technical_details', error.technicalDetails != null);
+      } catch (crashlyticsError) {
+        // Fallback: at least log locally if Crashlytics fails
+        debugPrint('Failed to send error to Crashlytics: $crashlyticsError');
+        debugPrint('Original error: ${error.message}');
+      }
+    }
+  }
+}
 
 

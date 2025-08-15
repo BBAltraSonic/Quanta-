@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:flutter_social_ui/screens/avatar_creation_wizard.dart';
-import 'package:flutter_social_ui/screens/app_shell.dart';
-import 'package:flutter_social_ui/services/avatar_service.dart';
-import 'package:flutter_social_ui/services/auth_service.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/constants.dart';
+import 'package:quanta/screens/avatar_creation_wizard.dart';
+import 'package:quanta/screens/app_shell.dart';
+import 'package:quanta/services/avatar_service.dart';
+import 'package:quanta/services/auth_service.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/constants.dart';
 
 // Generate mocks
 @GenerateMocks([AvatarService, AuthService])

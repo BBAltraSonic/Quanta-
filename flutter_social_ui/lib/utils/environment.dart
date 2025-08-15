@@ -2,18 +2,18 @@ class Environment {
   // Supabase Configuration
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://neyfqiauyxfurfhdtrug.supabase.co',
+    defaultValue: '',
   );
   
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5leWZxaWF1eXhmdXJmaGR0cnVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNzQzNzgsImV4cCI6MjA2OTk1MDM3OH0.gKc0NEJvKwipztJyDLcGB2ScJwkh3de8-5BRKk9V6qY',
+    defaultValue: '',
   );
   
   // AI Service Configuration
   static const String openRouterApiKey = String.fromEnvironment(
     'OPENROUTER_API_KEY',
-    defaultValue: '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',
+    defaultValue: '',
   );
   
   static const String huggingFaceApiKey = String.fromEnvironment(

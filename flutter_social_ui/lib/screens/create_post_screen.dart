@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/screens/content_upload_screen.dart';
+import 'package:quanta/screens/content_upload_screen.dart';
 
 class CreatePostScreen extends StatelessWidget {
   const CreatePostScreen({super.key});

@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_social_ui/widgets/post_item.dart';
-import 'package:flutter_social_ui/widgets/overlay_icon.dart';
-import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/widgets/comments_modal.dart';
-import 'package:flutter_social_ui/services/enhanced_feeds_service.dart';
-import 'package:flutter_social_ui/services/enhanced_video_service.dart';
-import 'package:flutter_social_ui/services/share_service.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/constants.dart';
-import 'package:flutter_social_ui/services/user_safety_service.dart';
-import 'package:flutter_social_ui/services/chat_validation_service.dart';
-import 'package:flutter_social_ui/widgets/report_content_dialog.dart';
-import 'package:flutter_social_ui/services/analytics_service.dart';
-import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
+import 'package:quanta/widgets/post_item.dart';
+import 'package:quanta/widgets/overlay_icon.dart';
+import 'package:quanta/screens/chat_screen.dart';
+import 'package:quanta/widgets/comments_modal.dart';
+import 'package:quanta/services/enhanced_feeds_service.dart';
+import 'package:quanta/services/enhanced_video_service.dart';
+import 'package:quanta/services/share_service.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/constants.dart';
+import 'package:quanta/services/user_safety_service.dart';
+import 'package:quanta/services/chat_validation_service.dart';
+import 'package:quanta/widgets/report_content_dialog.dart';
+import 'package:quanta/services/analytics_service.dart';
+import 'package:quanta/widgets/skeleton_widgets.dart';
 
 
 

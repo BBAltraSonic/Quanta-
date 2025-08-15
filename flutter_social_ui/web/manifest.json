@@ -1,11 +1,11 @@
 {
-    "name": "flutter_social_ui",
-    "short_name": "flutter_social_ui",
+    "name": "Quanta - AI Avatar Social Platform",
+    "short_name": "Quanta",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1a1a1a",
+    "theme_color": "#6366f1",
+    "description": "Connect, create, and chat with AI avatars in a revolutionary social platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_social_ui/screens/post_detail_screen.dart';
-import 'package:flutter_social_ui/constants.dart';
-import 'package:flutter_social_ui/screens/create_post_screen.dart';
-import 'package:flutter_social_ui/screens/profile_screen.dart';
+import 'package:quanta/screens/post_detail_screen.dart';
+import 'package:quanta/constants.dart';
+import 'package:quanta/screens/create_post_screen.dart';
+import 'package:quanta/screens/profile_screen.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:flutter_social_ui/screens/search_screen_new.dart';
-import 'package:flutter_social_ui/screens/notifications_screen_new.dart';
-import 'package:flutter_social_ui/services/analytics_service.dart';
-import 'package:flutter_social_ui/services/notification_service.dart' as notification_service;
+import 'package:quanta/screens/search_screen_new.dart';
+import 'package:quanta/screens/notifications_screen_new.dart';
+import 'package:quanta/services/analytics_service.dart';
+import 'package:quanta/services/notification_service.dart' as notification_service;
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});

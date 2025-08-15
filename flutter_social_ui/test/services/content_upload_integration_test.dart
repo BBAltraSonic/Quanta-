@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_social_ui/services/content_upload_service.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
+import 'package:quanta/services/content_upload_service.dart';
+import 'package:quanta/models/post_model.dart';
 
 void main() {
   group('ContentUploadService Integration Tests', () {

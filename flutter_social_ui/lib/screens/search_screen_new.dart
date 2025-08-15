@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/constants.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/services/enhanced_search_service.dart';
-import 'package:flutter_social_ui/screens/chat_screen.dart';
-import 'package:flutter_social_ui/screens/enhanced_post_detail_screen.dart';
-import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
+import 'package:quanta/constants.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/services/enhanced_search_service.dart';
+import 'package:quanta/screens/chat_screen.dart';
+import 'package:quanta/screens/enhanced_post_detail_screen.dart';
+import 'package:quanta/widgets/skeleton_widgets.dart';
 import 'dart:async';
 
 class SearchScreenNew extends StatefulWidget {

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:flutter_social_ui/widgets/enhanced_post_item.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/services/enhanced_video_service.dart';
+import 'package:quanta/widgets/enhanced_post_item.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/services/enhanced_video_service.dart';
 
 // Generate mocks
 @GenerateMocks([EnhancedVideoService])

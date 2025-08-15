@@ -1,11 +1,12 @@
-class AppConfig {
-  // Supabase Configuration
-  static const String supabaseUrl = 'https://neyfqiauyxfurfhdtrug.supabase.co';
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5leWZxaWF1eXhmdXJmaGR0cnVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzNzQzNzgsImV4cCI6MjA2OTk1MDM3OH0.gKc0NEJvKwipztJyDLcGB2ScJwkh3de8-5BRKk9V6qY';
+import '../utils/environment.dart';
 
-  // AI Service Configuration - Use Environment variables instead
-  // These are kept for backward compatibility but should use Environment class
+class AppConfig {
+  // Supabase Configuration - Now uses Environment variables
+  static String get supabaseUrl => Environment.supabaseUrl;
+  static String get supabaseAnonKey => Environment.supabaseAnonKey;
+
+  // AI Service Configuration - Delegated to Environment class
+  static String get openRouterApiKey => Environment.openRouterApiKey;
 
   // App Configuration
   static const String appName = 'Quanta';

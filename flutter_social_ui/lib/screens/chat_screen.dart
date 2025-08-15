@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/models/chat_message.dart';
-import 'package:flutter_social_ui/widgets/chat_bubble.dart';
-import 'package:flutter_social_ui/widgets/day_separator.dart';
-import 'package:flutter_social_ui/services/chat_service.dart';
-import 'package:flutter_social_ui/services/avatar_service.dart';
-import 'package:flutter_social_ui/services/auth_service.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
+import 'package:quanta/models/chat_message.dart';
+import 'package:quanta/widgets/chat_bubble.dart';
+import 'package:quanta/widgets/day_separator.dart';
+import 'package:quanta/services/chat_service.dart';
+import 'package:quanta/services/avatar_service.dart';
+import 'package:quanta/services/auth_service.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/widgets/skeleton_widgets.dart';
 import '../constants.dart';
 
 class ChatScreen extends StatefulWidget {

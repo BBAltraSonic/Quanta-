@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/constants.dart';
-import 'package:flutter_social_ui/services/messages_service.dart';
-import 'package:flutter_social_ui/services/avatar_service.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/widgets/skeleton_widgets.dart';
+import 'package:quanta/constants.dart';
+import 'package:quanta/services/messages_service.dart';
+import 'package:quanta/services/avatar_service.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/widgets/skeleton_widgets.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class PublicChatEntriesScreen extends StatefulWidget {

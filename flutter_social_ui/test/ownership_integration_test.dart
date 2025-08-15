@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/utils/ownership_manager.dart';
-import 'package:flutter_social_ui/store/state_service_adapter.dart';
-import 'package:flutter_social_ui/services/ownership_guard_service.dart';
-import 'package:flutter_social_ui/widgets/ownership_aware_widgets.dart';
-import 'package:flutter_social_ui/models/user_model.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/models/avatar_model.dart';
-import 'package:flutter_social_ui/models/comment.dart';
+import 'package:quanta/utils/ownership_manager.dart';
+import 'package:quanta/store/state_service_adapter.dart';
+import 'package:quanta/services/ownership_guard_service.dart';
+import 'package:quanta/widgets/ownership_aware_widgets.dart';
+import 'package:quanta/models/user_model.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/models/comment.dart';
 
 void main() {
   group('Ownership Integration Tests', () {

@@ -1,22 +1,41 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_social_ui/screens/auth_wrapper.dart';
-import 'package:flutter_social_ui/screens/post_detail_screen.dart';
-import 'package:flutter_social_ui/models/post_model.dart';
-import 'package:flutter_social_ui/services/auth_service.dart';
-import 'package:flutter_social_ui/services/performance_service.dart';
-import 'package:flutter_social_ui/services/theme_service.dart';
-import 'package:flutter_social_ui/services/accessibility_service.dart';
-import 'package:flutter_social_ui/services/offline_service.dart';
-import 'package:flutter_social_ui/services/enhanced_video_service.dart';
-import 'package:flutter_social_ui/services/content_moderation_service.dart';
-import 'package:flutter_social_ui/services/user_safety_service.dart';
-import 'package:flutter_social_ui/services/analytics_service.dart';
-import 'package:flutter_social_ui/services/ui_performance_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_performance/firebase_performance.dart';
+import 'package:quanta/screens/auth_wrapper.dart';
+import 'package:quanta/screens/post_detail_screen.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/services/auth_service.dart';
+import 'package:quanta/services/performance_service.dart';
+import 'package:quanta/services/theme_service.dart';
+import 'package:quanta/services/accessibility_service.dart';
+import 'package:quanta/services/offline_service.dart';
+import 'package:quanta/services/enhanced_video_service.dart';
+import 'package:quanta/services/content_moderation_service.dart';
+import 'package:quanta/services/user_safety_service.dart';
+import 'package:quanta/services/analytics_service.dart';
+import 'package:quanta/services/ui_performance_service.dart';
+import 'package:quanta/services/error_handling_service.dart';
 
 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Configure Firebase Crashlytics for Flutter errors
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+  
+  // Pass all uncaught asynchronous errors to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   // AuthService now handles Supabase initialization
 
