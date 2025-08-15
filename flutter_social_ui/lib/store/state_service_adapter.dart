@@ -199,6 +199,80 @@ class StateServiceAdapter {
     }
   }
 
+  // ========== MISSING METHODS FOR FEEDS SERVICE ==========
+  
+  /// Get cached posts for a specific feed
+  List<PostModel>? getCachedPostsForFeed(String feedType) {
+    // For now, return feed posts - can be expanded to support different feed types
+    return _appState.feedPosts.isNotEmpty ? _appState.feedPosts : null;
+  }
+  
+  /// Cache posts from service
+  void cachePosts(List<PostModel> posts) {
+    for (final post in posts) {
+      setPost(post);
+    }
+  }
+  
+  /// Set feed posts for specific page
+  void setFeedPostsForPage(List<PostModel> posts, int page) {
+    // For now, just set posts - can be expanded to support page-specific caching
+    setPosts(posts);
+  }
+  
+  /// Set feed loading state
+  void setFeedLoadingState(String feedType, bool isLoading) {
+    setLoadingState(feedType, isLoading);
+  }
+  
+  /// Set feed error
+  void setFeedError(String feedType, String? error) {
+    setError(error);
+  }
+  
+  /// Set post liked status (alias for setPostLikeStatus)
+  void setPostLikedStatus(String postId, bool isLiked) {
+    setPostLikeStatus(postId, isLiked);
+  }
+  
+  /// Check if avatar is followed (alias for isFollowingAvatar)
+  bool isAvatarFollowed(String avatarId) {
+    return isFollowingAvatar(avatarId);
+  }
+  
+  /// Set avatar followed status (alias for setFollowStatus)
+  void setAvatarFollowedStatus(String avatarId, bool isFollowing) {
+    setFollowStatus(avatarId, isFollowing);
+  }
+  
+  /// Set post bookmarked status (alias for setBookmarkStatus)
+  void setPostBookmarkedStatus(String postId, bool isBookmarked) {
+    setBookmarkStatus(postId, isBookmarked);
+  }
+  
+  /// Get cached post by ID
+  PostModel? getCachedPost(String postId) {
+    return getPost(postId);
+  }
+  
+  /// Get cached avatar by ID
+  AvatarModel? getCachedAvatar(String avatarId) {
+    return getAvatar(avatarId);
+  }
+  
+  /// Get cached comment by ID
+  Comment? getCachedComment(String commentId) {
+    return getComment(commentId);
+  }
+  
+
+  // Placeholder for notifyListeners - this would typically be handled by
+  // the underlying ChangeNotifier, but for now just adding as no-op
+  void notifyListeners() {
+    // This will be handled by the underlying AppState ChangeNotifier
+    // when proper integration is implemented
+  }
+
   /// Update follow status optimistically
   void optimisticToggleFollow(String avatarId) {
     final currentFollowing = isFollowingAvatar(avatarId);
@@ -235,16 +309,16 @@ class StateServiceAdapter {
   bool isOwnPost(PostModel? post) => _ownershipManager.isOwnPost(post);
   
   /// Check if the current user owns a post by ID
-  bool isOwnPostById(String? postId) => _ownershipManager.isOwnPostById(postId);
+  bool isOwnPostById(String? postId) => _ownershipManager.isOwnPostById(postId, postId != null ? getPost(postId) : null);
   
   /// Check if the current user owns an avatar
-  bool isOwnAvatar(String? avatarId) => _ownershipManager.isOwnAvatar(avatarId);
+  bool isOwnAvatar(String? avatarId) => _ownershipManager.isOwnAvatar(avatarId, avatar: avatarId != null ? getAvatar(avatarId) : null);
   
   /// Check if the current user owns a comment
   bool isOwnComment(Comment? comment) => _ownershipManager.isOwnComment(comment);
   
   /// Check if the current user owns a comment by ID
-  bool isOwnCommentById(String? commentId) => _ownershipManager.isOwnCommentById(commentId);
+  bool isOwnCommentById(String? commentId) => _ownershipManager.isOwnCommentById(commentId, commentId != null ? getComment(commentId) : null);
   
   /// Generic ownership check for any element
   bool isOwnElement(dynamic element) => _ownershipManager.isOwnElement(element);
@@ -329,24 +403,14 @@ class StateServiceAdapter {
 
   /// Batch update for better performance
   void batchUpdate(VoidCallback updates) {
-    // Temporarily pause notifications
-    final previousNotifyListeners = _appState.notifyListeners;
-    bool shouldNotify = false;
-    
-    _appState.notifyListeners = () {
-      shouldNotify = true;
-    };
-
+    // For now, just execute updates directly
+    // In a more sophisticated implementation, we could implement
+    // notification batching to improve performance
     try {
       updates();
     } finally {
-      // Restore notifications
-      _appState.notifyListeners = previousNotifyListeners;
-      
-      // Notify once at the end if any updates happened
-      if (shouldNotify) {
-        _appState.notifyListeners();
-      }
+      // Ensure state is notified after batch operations
+      _appState.notifyListeners();
     }
   }
 }

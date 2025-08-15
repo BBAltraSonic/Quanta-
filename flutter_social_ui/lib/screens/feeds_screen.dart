@@ -96,9 +96,8 @@ class _FeedsScreenState extends State<FeedsScreen>
     if (_isLoadingMore) return;
 
     try {
-      setState(() {
-        _isLoadingMore = true;
-      });
+      // Set loading state through state adapter
+      _stateAdapter.setLoadingState('${_feedContext}_more', true);
 
       final newPosts = await _feedsService.getVideoFeed(
         page: _currentPage + 1,
@@ -110,10 +109,11 @@ class _FeedsScreenState extends State<FeedsScreen>
         await _loadPostMetadata(newPosts);
         await _loadLikedAndFollowingStatus(newPosts);
 
-        setState(() {
-          _posts.addAll(newPosts);
-          _currentPage++;
-        });
+        // Add new posts to existing posts and update pagination
+        final existingPosts = List<PostModel>.from(_posts);
+        existingPosts.addAll(newPosts);
+        _stateAdapter.setPosts(existingPosts, context: _feedContext);
+        _stateAdapter.setPaginationState(_feedContext, _currentPage + 1, newPosts.length >= _pageSize);
 
         _preloadVideosAroundCurrent();
       }
@@ -126,9 +126,8 @@ class _FeedsScreenState extends State<FeedsScreen>
         ),
       );
     } finally {
-      setState(() {
-        _isLoadingMore = false;
-      });
+      // Clear loading state through state adapter
+      _stateAdapter.setLoadingState('${_feedContext}_more', false);
     }
   }
 
@@ -218,11 +217,13 @@ class _FeedsScreenState extends State<FeedsScreen>
         await _loadPostMetadata(posts);
         await _loadLikedAndFollowingStatus(posts);
 
+        // Update state through state adapter
+        _stateAdapter.setPosts(posts, context: _feedContext);
+        _stateAdapter.setPaginationState(_feedContext, 0, posts.length >= _pageSize);
+        _stateAdapter.clearError();
+        
         setState(() {
-          _posts = posts;
-          _currentPage = 0;
           _currentIndex = 0;
-          _hasError = false;
         });
 
         // Jump to first post
@@ -279,11 +280,14 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Handle follow action
   Future<void> _handleFollow(String avatarId) async {
     try {
+      // Optimistic update
+      _stateAdapter.optimisticToggleFollow(avatarId);
+      
+      // API call
       final isFollowing = await _feedsService.toggleFollow(avatarId);
       
-      setState(() {
-        _followingStatus[avatarId] = isFollowing;
-      });
+      // Sync with actual result
+      _stateAdapter.setFollowStatus(avatarId, isFollowing);
 
       // Haptic feedback
       HapticFeedback.mediumImpact();
@@ -296,6 +300,9 @@ class _FeedsScreenState extends State<FeedsScreen>
         ),
       );
     } catch (e) {
+      // Revert optimistic update on error
+      _stateAdapter.optimisticToggleFollow(avatarId);
+      
       debugPrint('Error toggling follow: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -396,7 +403,7 @@ class _FeedsScreenState extends State<FeedsScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            _errorMessage,
+            _errorMessage ?? 'An error occurred',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,

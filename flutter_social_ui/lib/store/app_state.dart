@@ -22,14 +22,14 @@ class AppState extends ChangeNotifier {
 
   // ========== AVATAR DATA (Authoritative) ==========
   final Map<String, AvatarModel> _avatars = {};
-  final Map<String, List<AvatarModel>> _userAvatars = {}; // userId -> List<AvatarModel>
+  final Map<String, List<String>> _userAvatars = {}; // userId -> List<avatarId>
   AvatarModel? _activeAvatar;
   
   Map<String, AvatarModel> get avatars => Map.unmodifiable(_avatars);
   AvatarModel? get activeAvatar => _activeAvatar;
   
   AvatarModel? getAvatar(String avatarId) => _avatars[avatarId];
-  List<AvatarModel> getUserAvatars(String userId) => _userAvatars[userId] ?? [];
+  List<AvatarModel> getUserAvatars(String userId) => (_userAvatars[userId] ?? []).map((id) => _avatars[id]).where((a) => a != null).cast<AvatarModel>().toList();
 
   // ========== POST DATA (Authoritative) ==========
   final Map<String, PostModel> _posts = {};

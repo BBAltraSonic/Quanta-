@@ -32,11 +32,7 @@ class FollowService {
 
     try {
       // Guard against self-following by checking avatar ownership
-      await _ownershipGuard.guardSelfAction(
-        resourceId: avatarId, 
-        resourceType: 'avatar',
-        action: 'follow',
-      );
+      await _ownershipGuard.guardFollowAction(avatarId);
       
       return _toggleFollowSupabase(avatarId, userId);
     } catch (e) {

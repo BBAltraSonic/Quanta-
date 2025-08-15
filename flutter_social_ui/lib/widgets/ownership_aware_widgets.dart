@@ -180,9 +180,8 @@ class OwnershipActionButtons extends StatelessWidget {
 
   Widget _buildOtherActions(BuildContext context, OwnershipActionStyle style) {
     final stateAdapter = StateServiceAdapter();
-    final isFollowing = stateAdapter.isFollowingAvatar(
-      _getAvatarIdFromElement(element)
-    );
+    final avatarId = _getAvatarIdFromElement(element);
+    final isFollowing = avatarId != null ? stateAdapter.isFollowingAvatar(avatarId) : false;
     
     return Row(
       mainAxisSize: MainAxisSize.min,

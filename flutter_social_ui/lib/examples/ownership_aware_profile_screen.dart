@@ -129,7 +129,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => EditProfileScreen(userId: _targetUserId),
+          builder: (context) => EditProfileScreen(user: _user!),
         ),
       );
     } catch (e) {
@@ -204,13 +204,15 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
     try {
       await _guardService.guardPostEdit(post.id);
       
-      // Navigate to edit post screen
+      // Navigate to edit post screen (note: current CreatePostScreen doesn't support editing)
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CreatePostScreen(editPost: post),
+          builder: (context) => const CreatePostScreen(),
         ),
       );
+      
+      // TODO: Implement post editing functionality
     } catch (e) {
       _showErrorSnackbar('${e.toString()}');
     }

@@ -4,8 +4,6 @@ import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../models/comment.dart';
 import '../services/auth_service.dart';
-import '../store/state_service_adapter.dart';
-
 /// Centralized ownership detection and management utility
 /// Provides reliable methods to determine element ownership across all data types
 class OwnershipManager {
@@ -14,7 +12,6 @@ class OwnershipManager {
   OwnershipManager._internal();
 
   final AuthService _authService = AuthService();
-  final StateServiceAdapter _stateAdapter = StateServiceAdapter();
 
   /// Get the current authenticated user ID
   String? get currentUserId => _authService.currentUserId;
@@ -42,49 +39,43 @@ class OwnershipManager {
   bool isOwnPost(PostModel? post) {
     if (!isAuthenticated || post == null) return false;
     
-    // Check direct ownership via user_id if available
-    if (post.userId != null) {
-      return currentUserId == post.userId;
-    }
-    
-    // Check ownership via avatar_id
+    // Posts are owned through avatars - for now, we cannot reliably check without avatar data
+    // This should be handled at a higher level where avatar data is available
     if (post.avatarId != null) {
-      return isOwnAvatar(post.avatarId);
+      debugPrint('⚠️ Post avatar ownership check requires avatar data');
+      return false;
     }
     
     return false;
   }
 
-  /// Check ownership by post ID (uses cached data or fetches if needed)
-  bool isOwnPostById(String? postId) {
+  /// Check ownership by post ID with provided post data
+  bool isOwnPostById(String? postId, PostModel? post) {
     if (!isAuthenticated || postId == null) return false;
     
-    // Try to get from cached posts first
-    final cachedPost = _stateAdapter.getCachedPost(postId);
-    if (cachedPost != null) {
-      return isOwnPost(cachedPost);
+    // Use provided post data if available
+    if (post != null) {
+      return isOwnPost(post);
     }
     
-    // If not cached, we can't determine ownership reliably
-    // This should trigger a fetch in the calling code
-    debugPrint('⚠️ Post $postId not in cache - ownership check may be unreliable');
+    // If no post data provided, we can't determine ownership reliably
+    debugPrint('⚠️ Post $postId data not provided - ownership check may be unreliable');
     return false;
   }
 
   // ==================== AVATAR OWNERSHIP ====================
 
-  /// Check if the current user owns a specific avatar
-  bool isOwnAvatar(String? avatarId) {
+  /// Check if the current user owns a specific avatar with provided avatar data
+  bool isOwnAvatar(String? avatarId, {AvatarModel? avatar}) {
     if (!isAuthenticated || avatarId == null) return false;
     
-    // Try to get from cached avatars first
-    final cachedAvatar = _stateAdapter.getCachedAvatar(avatarId);
-    if (cachedAvatar != null) {
-      return isOwnAvatarModel(cachedAvatar);
+    // Use provided avatar data if available
+    if (avatar != null) {
+      return isOwnAvatarModel(avatar);
     }
     
-    // If not cached, we can't determine ownership reliably
-    debugPrint('⚠️ Avatar $avatarId not in cache - ownership check may be unreliable');
+    // If no avatar data provided, we can't determine ownership reliably
+    debugPrint('⚠️ Avatar $avatarId data not provided - ownership check may be unreliable');
     return false;
   }
 
@@ -105,25 +96,26 @@ class OwnershipManager {
       return currentUserId == comment.userId;
     }
     
-    // Check ownership via avatar_id if user_id is not available
+    // For avatar-based ownership, we cannot reliably check without avatar data
+    // This should be handled at a higher level where avatar data is available
     if (comment.avatarId != null) {
-      return isOwnAvatar(comment.avatarId);
+      debugPrint('⚠️ Comment avatar ownership check requires avatar data');
+      return false;
     }
     
     return false;
   }
 
-  /// Check comment ownership by ID (uses cached data)
-  bool isOwnCommentById(String? commentId) {
+  /// Check comment ownership by ID with provided comment data
+  bool isOwnCommentById(String? commentId, Comment? comment) {
     if (!isAuthenticated || commentId == null) return false;
     
-    // Try to get from cached comments first
-    final cachedComment = _stateAdapter.getCachedComment(commentId);
-    if (cachedComment != null) {
-      return isOwnComment(cachedComment);
+    // Use provided comment data if available
+    if (comment != null) {
+      return isOwnComment(comment);
     }
     
-    debugPrint('⚠️ Comment $commentId not in cache - ownership check may be unreliable');
+    debugPrint('⚠️ Comment $commentId data not provided - ownership check may be unreliable');
     return false;
   }
 
@@ -180,10 +172,12 @@ class OwnershipManager {
       }
     }
     
-    // Check avatar ownership for posts
+    // For avatar ownership, we cannot reliably check without avatar data
+    // This should be handled at a higher level where avatar data is available
     final avatarId = data['avatar_id'] ?? data['avatarId'];
     if (avatarId is String && avatarId.isNotEmpty) {
-      return isOwnAvatar(avatarId);
+      debugPrint('⚠️ Map-based avatar ownership check requires avatar data');
+      return false;
     }
     
     return false;

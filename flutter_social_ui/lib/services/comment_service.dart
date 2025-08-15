@@ -126,14 +126,24 @@ class CommentService {
     }
   }
 
+  /// Edit a comment
+  Future<Comment?> editComment(String commentId, String newText) async {
+    try {
+      // Guard comment edit to ensure only the comment owner can edit
+      await _ownershipGuard.guardCommentEdit(commentId);
+      
+      return _editCommentSupabase(commentId, newText);
+    } catch (e) {
+      debugPrint('Error editing comment: $e');
+      return null;
+    }
+  }
+
   /// Delete a comment
   Future<bool> deleteComment(String commentId) async {
     try {
       // Guard comment deletion to ensure only the comment owner can delete
-      await _ownershipGuard.guardCommentEdit(
-        commentId: commentId,
-        action: 'delete',
-      );
+      await _ownershipGuard.guardCommentDelete(commentId);
       
       return _deleteCommentSupabase(commentId);
     } catch (e) {
@@ -398,6 +408,34 @@ class CommentService {
       }
     } catch (e) {
       debugPrint('Error toggling comment like: $e');
+      rethrow;
+    }
+  }
+
+  Future<Comment?> _editCommentSupabase(String commentId, String newText) async {
+    final user = _authService.currentUser;
+    final session = _authService.supabase.auth.currentSession;
+    
+    if (user == null || session == null) {
+      throw Exception('User not authenticated');
+    }
+
+    try {
+      // Update the comment text
+      final response = await _authService.supabase
+          .from(DbConfig.commentsTable)
+          .update({
+            'text': newText,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', commentId)
+          .eq('user_id', user.id) // Ensure only owner can edit
+          .select()
+          .single();
+
+      return Comment.fromJson(response);
+    } catch (e) {
+      debugPrint('Error editing comment: $e');
       rethrow;
     }
   }

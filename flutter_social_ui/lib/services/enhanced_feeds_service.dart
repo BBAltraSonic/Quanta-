@@ -9,6 +9,7 @@ import '../services/user_safety_service.dart';
 import '../services/analytics_service.dart';
 import '../services/database_error_recovery_service.dart';
 import '../services/ownership_guard_service.dart';
+import '../widgets/ownership_aware_widgets.dart';
 import '../config/db_config.dart';
 import '../services/notification_service.dart' as notification_service;
 import '../store/state_service_adapter.dart';
@@ -39,14 +40,14 @@ class EnhancedFeedsService {
   }) async {
     try {
       // First check if posts are already loaded in state for this page
-      final cachedPosts = _stateAdapter.getCachedPostsForFeed(page);
-      if (cachedPosts.isNotEmpty) {
+      final cachedPosts = _stateAdapter.getCachedPostsForFeed('video_feed');
+      if (cachedPosts != null && cachedPosts.isNotEmpty) {
         debugPrint('📱 Returning ${cachedPosts.length} cached posts for feed (page $page)');
         return cachedPosts;
       }
 
       // Set loading state
-      _stateAdapter.setFeedLoadingState(page, true);
+      _stateAdapter.setFeedLoadingState('video_feed_$page', true);
 
       // Base query without safety subqueries (to avoid SQL syntax errors)
       PostgrestFilterBuilder<PostgrestList> query = _supabase
@@ -78,17 +79,17 @@ class EnhancedFeedsService {
       
       // Store posts in central state
       _stateAdapter.cachePosts(posts);
-      _stateAdapter.setFeedPostsForPage(page, posts);
+      _stateAdapter.setFeedPostsForPage(posts, page);
       
       // Clear loading state
-      _stateAdapter.setFeedLoadingState(page, false);
+      _stateAdapter.setFeedLoadingState('video_feed_$page', false);
       
       debugPrint('📱 Retrieved ${posts.length} posts for feed (page $page, safety filtering: $applySafetyFiltering)');
       return posts;
     } catch (e) {
       debugPrint('❌ Failed to get video feed: $e');
-      _stateAdapter.setFeedLoadingState(page, false);
-      _stateAdapter.setFeedError(e.toString());
+      _stateAdapter.setFeedLoadingState('video_feed_$page', false);
+      _stateAdapter.setError(e.toString());
       return [];
     }
   }
@@ -323,12 +324,12 @@ class EnhancedFeedsService {
       throw Exception('User not authenticated');
     }
 
+    // Get current following status from central state (for optimistic updates and rollback)
+    final currentFollowingStatus = _stateAdapter.isAvatarFollowed(avatarId);
+
     try {
       // Use ownership guard to prevent self-follow
       await _ownershipGuard.guardFollowAction(avatarId);
-
-      // Get current following status from central state (for optimistic updates)
-      final currentFollowingStatus = _stateAdapter.isAvatarFollowed(avatarId);
       
       // Optimistically update UI state first
       _stateAdapter.setAvatarFollowedStatus(avatarId, !currentFollowingStatus);
@@ -450,6 +451,9 @@ class EnhancedFeedsService {
     }
 
     try {
+      // No ownership guard needed for adding comments - anyone can comment on a post
+      // unless they are blocked, which is handled at the UI level
+      
       final response = await _supabase.from(DbConfig.commentsTable).insert({
         'post_id': postId,
         'user_id': userId,
@@ -548,9 +552,10 @@ class EnhancedFeedsService {
       throw Exception('User not authenticated');
     }
 
+    // Get current bookmark status from central state (for optimistic updates and rollback)
+    final currentBookmarkStatus = _stateAdapter.isPostBookmarked(postId);
+
     try {
-      // Get current bookmark status from central state (for optimistic updates)
-      final currentBookmarkStatus = _stateAdapter.isPostBookmarked(postId);
       
       // Optimistically update UI state first
       _stateAdapter.setPostBookmarkedStatus(postId, !currentBookmarkStatus);
@@ -690,11 +695,10 @@ class EnhancedFeedsService {
       throw Exception('User not authenticated');
     }
 
-    if (userId == blockedUserId) {
-      throw Exception('Cannot block yourself');
-    }
-
     try {
+      // Use ownership guard to prevent self-blocking
+      await _ownershipGuard.guardBlockAction(blockedUserId);
+      
       await _supabase.from(DbConfig.userBlocksTable).insert({
         'blocker_user_id': userId,
         'blocked_user_id': blockedUserId,
@@ -736,11 +740,15 @@ class EnhancedFeedsService {
       throw Exception('User not authenticated');
     }
 
-    if (userId == mutedUserId) {
-      throw Exception('Cannot mute yourself');
-    }
-
     try {
+      // Use ownership guard to prevent self-muting
+      await _ownershipGuard.guardOwnershipAction(
+        element: mutedUserId,
+        action: 'mute',
+        elementType: 'user',
+        permission: OwnershipPermission.isOther,
+      );
+      
       await _supabase.from(DbConfig.userMutesTable).upsert({
         'muter_user_id': userId,
         'muted_user_id': mutedUserId,

@@ -212,6 +212,9 @@ class ProfileService {
   // Set active avatar
   Future<void> setActiveAvatar(String userId, String avatarId) async {
     try {
+      // Use ownership guard to ensure only profile owner can set active avatar
+      await _ownershipGuard.guardProfileEdit(userId);
+      
       await _authService.supabase
           .from('users')
           .update({'active_avatar_id': avatarId})
@@ -227,6 +230,9 @@ class ProfileService {
     required Map<String, dynamic> preferences,
   }) async {
     try {
+      // Use ownership guard to ensure only profile owner can update preferences
+      await _ownershipGuard.guardProfileEdit(userId);
+      
       final validatedPrefs = _validatePreferences(preferences);
       await _authService.supabase
           .from('users')
@@ -272,6 +278,9 @@ class ProfileService {
   // Delete account
   Future<void> deleteAccount(String userId) async {
     try {
+      // Use ownership guard to ensure only profile owner can delete account
+      await _ownershipGuard.guardProfileEdit(userId);
+      
       // Delete user's avatars first
       await _authService.supabase
           .from('avatars')
@@ -317,6 +326,9 @@ class ProfileService {
   /// Set pinned post for an avatar
   Future<void> setPinnedPost(String avatarId, String? postId) async {
     try {
+      // Use ownership guard to ensure only avatar owner can pin posts
+      await _ownershipGuard.guardAvatarSettings(avatarId);
+      
       await _authService.supabase
           .from('avatars')
           .update({'pinned_post_id': postId})
@@ -329,6 +341,9 @@ class ProfileService {
   /// Remove pinned post for an avatar
   Future<void> unpinPost(String avatarId) async {
     try {
+      // Use ownership guard to ensure only avatar owner can unpin posts
+      await _ownershipGuard.guardAvatarSettings(avatarId);
+      
       await _authService.supabase
           .from('avatars')
           .update({'pinned_post_id': null})
@@ -467,6 +482,9 @@ class ProfileService {
   /// Export user data
   Future<Map<String, dynamic>> exportUserData(String userId) async {
     try {
+      // Use ownership guard to ensure only profile owner can export their data
+      await _ownershipGuard.guardProfilePrivateView(userId);
+      
       // Get user data
       final userResponse = await _authService.supabase
           .from('users')
@@ -515,6 +533,9 @@ class ProfileService {
   /// Get user preferences safely
   Future<Map<String, dynamic>> getUserPreferences(String userId) async {
     try {
+      // Use ownership guard to ensure only profile owner can view preferences
+      await _ownershipGuard.guardProfilePrivateView(userId);
+      
       final response = await _authService.supabase
           .from('users')
           .select('preferences')
@@ -577,6 +598,9 @@ class ProfileService {
   /// Get real-time profile metrics from database
   Future<Map<String, dynamic>> getRealProfileMetrics(String userId, {DateTime? startDate, DateTime? endDate}) async {
     try {
+      // Use ownership guard to ensure only profile owner can view private analytics
+      await _ownershipGuard.guardProfilePrivateView(userId);
+      
       endDate ??= DateTime.now();
       startDate ??= endDate.subtract(const Duration(days: 30));
       
@@ -653,6 +677,9 @@ class ProfileService {
     int daysBack = 30,
   }) async {
     try {
+      // Use ownership guard to ensure only profile owner can export analytics data
+      await _ownershipGuard.guardProfilePrivateView(userId);
+      
       final endDate = DateTime.now();
       final startDate = endDate.subtract(Duration(days: daysBack));
       
