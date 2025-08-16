@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import '../config/app_config.dart';
 
 enum ErrorType {
@@ -296,7 +297,7 @@ class ErrorHandlingService {
   /// Clear error history
   static void clearErrorHistory() => _errorHistory.clear();
 
-  /// Send error to Firebase Crashlytics
+  /// Send error to crash reporting services (Firebase Crashlytics and Sentry)
   static void _sendToCrashReporting(AppError error) {
     // Send to Firebase Crashlytics in production
     if (!AppConfig.isDevelopment) {
@@ -326,6 +327,30 @@ class ErrorHandlingService {
       } catch (crashlyticsError) {
         // Fallback: at least log locally if Crashlytics fails
         debugPrint('Failed to send error to Crashlytics: $crashlyticsError');
+        debugPrint('Original error: ${error.message}');
+      }
+      
+      // Send to Sentry
+      try {
+        Sentry.captureException(
+          error.originalError ?? error.message,
+          stackTrace: error.originalError is Error ? error.originalError.stackTrace : null,
+          withScope: (scope) {
+            scope
+              ..setLevel(error.type == ErrorType.configuration ? SentryLevel.fatal : SentryLevel.error)
+              ..setTag('error_type', error.type.name)
+              ..setTag('has_user_message', (error.userFriendlyMessage != null).toString())
+              ..setTag('has_technical_details', (error.technicalDetails != null).toString())
+              ..setContexts('app_error', {
+                'type': error.type.name,
+                'message': error.message,
+                'user_friendly_message': error.userFriendlyMessage,
+                'technical_details': error.technicalDetails,
+              });
+          },
+        );
+      } catch (sentryError) {
+        debugPrint('Failed to send error to Sentry: $sentryError');
         debugPrint('Original error: ${error.message}');
       }
     }

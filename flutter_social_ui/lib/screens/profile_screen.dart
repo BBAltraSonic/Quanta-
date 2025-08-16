@@ -672,6 +672,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         actions: [
           if (_isOwnProfile) ...[
+            // DEBUG: Test crash button (remove before production)
+            if (const bool.fromEnvironment('DEBUG_MODE', defaultValue: false))
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  onPressed: () {
+                    // Test Sentry crash reporting
+                    throw Exception('Test crash from profile screen');
+                  },
+                  icon: const Icon(Icons.bug_report, color: Colors.red),
+                  tooltip: 'Test Crash (DEBUG)',
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: IconButton(

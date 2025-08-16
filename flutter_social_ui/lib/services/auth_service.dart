@@ -23,17 +23,12 @@ class AuthService {
   Future<void> initialize() async {
     // Prevent multiple initializations
     if (_isInitialized) {
-      print('🔍 DEBUG: AuthService already initialized, skipping...');
       return;
     }
     
     try {
       // Validate core configuration only (AI services are completely optional)
       Environment.validateConfiguration();
-      
-      // Debug: Print the URL being used
-      print('🔍 DEBUG: Using Supabase URL: ${Environment.supabaseUrl}');
-      print('🔍 DEBUG: Using Supabase Key: ${Environment.supabaseAnonKey.substring(0, 20)}...');
       
       // Initialize Supabase (handle if already initialized)
       try {

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_performance/firebase_performance.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:quanta/screens/auth_wrapper.dart';
 import 'package:quanta/screens/post_detail_screen.dart';
 import 'package:quanta/models/post_model.dart';
@@ -23,40 +25,55 @@ import 'package:quanta/services/error_handling_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
   
-  // Configure Firebase Crashlytics for Flutter errors
-  FlutterError.onError = (errorDetails) {
-    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
-  };
-  
-  // Pass all uncaught asynchronous errors to Crashlytics
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+  // Initialize Sentry for crash reporting
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = dotenv.env['SENTRY_DSN'] ?? '';
+      // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring.
+      // We recommend adjusting this value in production.
+      options.tracesSampleRate = 1.0;
+      options.environment = dotenv.env['ENVIRONMENT'] ?? 'development';
+    },
+    appRunner: () async {
+      // Initialize Firebase
+      await Firebase.initializeApp();
+      
+      // Configure Firebase Crashlytics for Flutter errors
+      FlutterError.onError = (errorDetails) {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+      };
+      
+      // Pass all uncaught asynchronous errors to Crashlytics
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
 
-  // AuthService now handles Supabase initialization
+      // AuthService now handles Supabase initialization
 
-  // Initialize performance services
-  await PerformanceService.warmupApp();
+      // Initialize performance services
+      await PerformanceService.warmupApp();
 
-  // Initialize core services
-  await Future.wait([
-    AuthService().initialize(),
-    PerformanceService().initialize(),
-    ThemeService().initialize(),
-    AccessibilityService().initialize(),
-    OfflineService().initialize(),
-    EnhancedVideoService().initialize(),
-    ContentModerationService().initialize(),
-    UserSafetyService().initialize(),
-    AnalyticsService().initialize(),
-    UIPerformanceService().initialize(),
-  ]);
+      // Initialize core services
+      await Future.wait([
+        AuthService().initialize(),
+        PerformanceService().initialize(),
+        ThemeService().initialize(),
+        AccessibilityService().initialize(),
+        OfflineService().initialize(),
+        EnhancedVideoService().initialize(),
+        ContentModerationService().initialize(),
+        UserSafetyService().initialize(),
+        AnalyticsService().initialize(),
+        UIPerformanceService().initialize(),
+      ]);
 
-  runApp(const MyApp());
+      runApp(const MyApp());
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
