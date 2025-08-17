@@ -45,5 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Privacy permissions for Quanta app functionality -->
+	<key>NSCameraUsageDescription</key>
+	<string>Quanta needs camera access to let you create and share photos and videos with your AI avatars.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Quanta needs microphone access to record audio for your videos and voice messages.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Quanta needs photo library access to let you select and share existing photos and videos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Quanta needs permission to save photos and videos to your photo library.</string>
 </dict>
 </plist>

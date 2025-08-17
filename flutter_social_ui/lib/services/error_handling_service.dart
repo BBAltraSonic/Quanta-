@@ -32,7 +32,8 @@ class AppError {
 }
 
 class ErrorHandlingService {
-  static final ErrorHandlingService _instance = ErrorHandlingService._internal();
+  static final ErrorHandlingService _instance =
+      ErrorHandlingService._internal();
   factory ErrorHandlingService() => _instance;
   ErrorHandlingService._internal();
 
@@ -41,67 +42,72 @@ class ErrorHandlingService {
   /// Convert a generic error to an AppError with user-friendly messaging
   static AppError handleError(dynamic error) {
     final errorString = error.toString().toLowerCase();
-    
+
     // Network errors
-    if (errorString.contains('network') || 
+    if (errorString.contains('network') ||
         errorString.contains('connection') ||
         errorString.contains('timeout') ||
         errorString.contains('socket')) {
       return AppError(
         type: ErrorType.network,
         message: error.toString(),
-        userFriendlyMessage: 'Network connection issue. Please check your internet connection and try again.',
+        userFriendlyMessage:
+            'Network connection issue. Please check your internet connection and try again.',
         originalError: error,
       );
     }
 
     // Authentication errors
-    if (errorString.contains('auth') || 
+    if (errorString.contains('auth') ||
         errorString.contains('login') ||
         errorString.contains('unauthorized') ||
         errorString.contains('session')) {
       return AppError(
         type: ErrorType.authentication,
         message: error.toString(),
-        userFriendlyMessage: 'Authentication failed. Please check your credentials and try again.',
+        userFriendlyMessage:
+            'Authentication failed. Please check your credentials and try again.',
         originalError: error,
       );
     }
 
     // Configuration errors
-    if (errorString.contains('config') || 
+    if (errorString.contains('config') ||
         errorString.contains('supabase') ||
         errorString.contains('api key') ||
         errorString.contains('not configured')) {
       return AppError(
         type: ErrorType.configuration,
         message: error.toString(),
-        userFriendlyMessage: 'App configuration issue. Please contact support or check your environment settings.',
+        userFriendlyMessage:
+            'App configuration issue. Please contact support or check your environment settings.',
         technicalDetails: AppConfig.configurationError,
         originalError: error,
       );
     }
 
     // Permission errors
-    if (errorString.contains('permission') || 
+    if (errorString.contains('permission') ||
         errorString.contains('access denied') ||
         errorString.contains('forbidden')) {
       return AppError(
         type: ErrorType.permission,
         message: error.toString(),
-        userFriendlyMessage: 'Permission denied. Please check your account permissions.',
+        userFriendlyMessage:
+            'Permission denied. Please check your account permissions.',
         originalError: error,
       );
     }
 
     // Validation errors
-    if (errorString.contains('validation') || 
+    if (errorString.contains('validation') ||
         errorString.contains('invalid') ||
         errorString.contains('required')) {
       return AppError(
         type: ErrorType.validation,
         message: error.toString(),
-        userFriendlyMessage: 'Invalid input. Please check your information and try again.',
+        userFriendlyMessage:
+            'Invalid input. Please check your information and try again.',
         originalError: error,
       );
     }
@@ -110,7 +116,8 @@ class ErrorHandlingService {
     return AppError(
       type: ErrorType.unknown,
       message: error.toString(),
-      userFriendlyMessage: 'An unexpected error occurred. Please try again or contact support if the issue persists.',
+      userFriendlyMessage:
+          'An unexpected error occurred. Please try again or contact support if the issue persists.',
       originalError: error,
     );
   }
@@ -118,7 +125,7 @@ class ErrorHandlingService {
   /// Log an error (in production, this could send to analytics/crash reporting)
   static void logError(AppError error) {
     _errorHistory.add(error);
-    
+
     // Keep only last 100 errors to prevent memory issues
     if (_errorHistory.length > 100) {
       _errorHistory.removeAt(0);
@@ -140,7 +147,11 @@ class ErrorHandlingService {
   }
 
   /// Show error dialog to user
-  static void showErrorDialog(BuildContext context, dynamic error, {VoidCallback? onRetry}) {
+  static void showErrorDialog(
+    BuildContext context,
+    dynamic error, {
+    VoidCallback? onRetry,
+  }) {
     final appError = handleError(error);
     logError(appError);
 
@@ -156,10 +167,7 @@ class ErrorHandlingService {
               size: 24,
             ),
             const SizedBox(width: 8),
-            const Text(
-              'Error',
-              style: TextStyle(color: Colors.white),
-            ),
+            const Text('Error', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: Column(
@@ -170,12 +178,13 @@ class ErrorHandlingService {
               appError.displayMessage,
               style: const TextStyle(color: Colors.white70),
             ),
-            if (AppConfig.isDevelopment && appError.technicalDetails != null) ...[
+            if (AppConfig.isDevelopment &&
+                appError.technicalDetails != null) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -232,11 +241,7 @@ class ErrorHandlingService {
         backgroundColor: _getErrorColor(appError.type),
         content: Row(
           children: [
-            Icon(
-              _getErrorIcon(appError.type),
-              color: Colors.white,
-              size: 20,
-            ),
+            Icon(_getErrorIcon(appError.type), color: Colors.white, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -314,33 +319,52 @@ class ErrorHandlingService {
               DiagnosticsProperty('technicalDetails', error.technicalDetails),
           ],
         );
-        
+
         // Log the error message
         FirebaseCrashlytics.instance.log(
           '[${error.type.name.toUpperCase()}] ${error.message}',
         );
-        
+
         // Set custom keys for better categorization
-        FirebaseCrashlytics.instance.setCustomKey('error_type', error.type.name);
-        FirebaseCrashlytics.instance.setCustomKey('has_user_message', error.userFriendlyMessage != null);
-        FirebaseCrashlytics.instance.setCustomKey('has_technical_details', error.technicalDetails != null);
+        FirebaseCrashlytics.instance.setCustomKey(
+          'error_type',
+          error.type.name,
+        );
+        FirebaseCrashlytics.instance.setCustomKey(
+          'has_user_message',
+          error.userFriendlyMessage != null,
+        );
+        FirebaseCrashlytics.instance.setCustomKey(
+          'has_technical_details',
+          error.technicalDetails != null,
+        );
       } catch (crashlyticsError) {
         // Fallback: at least log locally if Crashlytics fails
         debugPrint('Failed to send error to Crashlytics: $crashlyticsError');
         debugPrint('Original error: ${error.message}');
       }
-      
+
       // Send to Sentry
       try {
         Sentry.captureException(
           error.originalError ?? error.message,
-          stackTrace: error.originalError is Error ? error.originalError.stackTrace : null,
+          stackTrace: error.originalError is Error
+              ? error.originalError.stackTrace
+              : null,
           withScope: (scope) {
+            scope.level = error.type == ErrorType.configuration
+                ? SentryLevel.fatal
+                : SentryLevel.error;
             scope
-              ..setLevel(error.type == ErrorType.configuration ? SentryLevel.fatal : SentryLevel.error)
               ..setTag('error_type', error.type.name)
-              ..setTag('has_user_message', (error.userFriendlyMessage != null).toString())
-              ..setTag('has_technical_details', (error.technicalDetails != null).toString())
+              ..setTag(
+                'has_user_message',
+                (error.userFriendlyMessage != null).toString(),
+              )
+              ..setTag(
+                'has_technical_details',
+                (error.technicalDetails != null).toString(),
+              )
               ..setContexts('app_error', {
                 'type': error.type.name,
                 'message': error.message,
@@ -356,5 +380,3 @@ class ErrorHandlingService {
     }
   }
 }
-
-

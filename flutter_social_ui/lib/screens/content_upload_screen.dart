@@ -6,6 +6,7 @@ import 'package:quanta/services/content_upload_service.dart';
 import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/services/auth_service.dart';
 import 'package:quanta/services/content_moderation_service.dart';
+import 'package:quanta/services/avatar_content_service.dart';
 import 'package:quanta/screens/avatar_creation_wizard.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -25,7 +26,9 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final ContentUploadService _contentService = ContentUploadService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
-  final ContentModerationService _moderationService = ContentModerationService();
+  final ContentModerationService _moderationService =
+      ContentModerationService();
+  final AvatarContentService _avatarContentService = AvatarContentService();
 
   static const int _captionMaxLength = 2000;
 
@@ -71,7 +74,16 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       final avatars = await _avatarService.getUserAvatars();
       setState(() {
         _userAvatars = avatars;
-        _selectedAvatar = avatars.isNotEmpty ? avatars.first : null;
+        // Use active avatar from app state if available, otherwise use first avatar
+        final activeAvatar = _authService.currentUser != null
+            ? avatars
+                  .where(
+                    (a) => a.id == _authService.currentUser!.activeAvatarId,
+                  )
+                  .firstOrNull
+            : null;
+        _selectedAvatar =
+            activeAvatar ?? (avatars.isNotEmpty ? avatars.first : null);
         _loadingAvatars = false;
       });
     } catch (e) {
@@ -102,12 +114,14 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
 
     return Scaffold(
       backgroundColor: kBackgroundColor,
-appBar: AppBar(
+      appBar: AppBar(
         title: Text('Create Post'),
         backgroundColor: kBackgroundColor,
         actions: [
           Tooltip(
-            message: _canUpload() ? 'Share your post' : 'Complete all fields to share',
+            message: _canUpload()
+                ? 'Share your post'
+                : 'Complete all fields to share',
             child: TextButton(
               onPressed: _canUpload() ? _uploadContent : null,
               child: Text(
@@ -125,7 +139,9 @@ appBar: AppBar(
                 preferredSize: Size.fromHeight(4),
                 child: LinearProgressIndicator(
                   minHeight: 4,
-                  value: _uploadProgress > 0 && _uploadProgress < 1.0 ? _uploadProgress : null,
+                  value: _uploadProgress > 0 && _uploadProgress < 1.0
+                      ? _uploadProgress
+                      : null,
                   backgroundColor: kLightTextColor.withOpacity(0.2),
                   valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
                 ),
@@ -141,7 +157,7 @@ appBar: AppBar(
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-children: [
+          children: [
             // Readiness checklist
             _buildReadinessChecklist(),
             SizedBox(height: 16),
@@ -163,7 +179,7 @@ children: [
                           builder: (context) => const AvatarCreationWizard(),
                         ),
                       );
-                      
+
                       if (result != null) {
                         await _loadUserAvatars();
                       }
@@ -189,7 +205,11 @@ children: [
                         CircleAvatar(
                           radius: 16,
                           backgroundColor: kLightTextColor,
-                          child: Icon(Icons.person_add, size: 16, color: kBackgroundColor),
+                          child: Icon(
+                            Icons.person_add,
+                            size: 16,
+                            color: kBackgroundColor,
+                          ),
                         ),
                         SizedBox(width: 12),
                         Expanded(
@@ -198,11 +218,15 @@ children: [
                             children: [
                               Text(
                                 'No avatar selected',
-                                style: kBodyTextStyle.copyWith(color: kLightTextColor),
+                                style: kBodyTextStyle.copyWith(
+                                  color: kLightTextColor,
+                                ),
                               ),
                               Text(
                                 'Create an avatar to post content',
-                                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                                style: kCaptionTextStyle.copyWith(
+                                  color: kLightTextColor,
+                                ),
                               ),
                             ],
                           ),
@@ -261,19 +285,24 @@ children: [
             ),
             SizedBox(height: 8),
 
-// Media preview or picker
+            // Media preview or picker
             GestureDetector(
               onTap: _pickMedia,
               child: Semantics(
                 button: true,
-                label: _selectedMedia != null ? 'Change selected media' : 'Add photo or video',
+                label: _selectedMedia != null
+                    ? 'Change selected media'
+                    : 'Add photo or video',
                 child: Container(
                   width: double.infinity,
                   height: _selectedMedia != null ? 300 : 210,
                   decoration: BoxDecoration(
                     color: kCardColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPrimaryColor.withOpacity(0.3), style: BorderStyle.solid),
+                    border: Border.all(
+                      color: kPrimaryColor.withOpacity(0.3),
+                      style: BorderStyle.solid,
+                    ),
                   ),
                   child: _selectedMedia != null
                       ? _buildMediaPreview()
@@ -326,7 +355,9 @@ children: [
                               padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
                                 'Recommended: JPG/PNG up to 10MB • Videos up to ${Environment.maxVideoSizeMB}MB',
-                                style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                                style: kCaptionTextStyle.copyWith(
+                                  color: kLightTextColor,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -371,7 +402,7 @@ children: [
               style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-TextField(
+            TextField(
               controller: _captionController,
               style: kBodyTextStyle,
               maxLines: 4,
@@ -451,27 +482,42 @@ TextField(
                 runSpacing: 8,
                 children: ContentUploadService()
                     .suggestHashtags(_captionController.text, _selectedAvatar!)
-                    .map((tag) => GestureDetector(
-                          onTap: () {
-                            final t = _captionController.text.trim();
-                            final newText = t.isEmpty ? tag : '$t $tag';
-                            _captionController.text = newText;
-                            _captionController.selection = TextSelection.fromPosition(
-                              TextPosition(offset: _captionController.text.length),
+                    .map(
+                      (tag) => GestureDetector(
+                        onTap: () {
+                          final t = _captionController.text.trim();
+                          final newText = t.isEmpty ? tag : '$t $tag';
+                          _captionController.text = newText;
+                          _captionController.selection =
+                              TextSelection.fromPosition(
+                                TextPosition(
+                                  offset: _captionController.text.length,
+                                ),
+                              );
+                          setState(() {
+                            _extractedHashtags = PostModel.extractHashtags(
+                              _captionController.text,
                             );
-                            setState(() {
-                              _extractedHashtags = PostModel.extractHashtags(_captionController.text);
-                            });
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: kPrimaryColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(tag, style: kCaptionTextStyle.copyWith(color: kPrimaryColor)),
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
                           ),
-                        ))
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            tag,
+                            style: kCaptionTextStyle.copyWith(
+                              color: kPrimaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -479,7 +525,7 @@ TextField(
             SizedBox(height: 32),
 
             // Upload button (no spinner)
-SizedBox(
+            SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: _canUpload() ? _uploadContent : null,
@@ -490,13 +536,13 @@ SizedBox(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                icon: Icon(_isUploading ? Icons.hourglass_top : Icons.send, color: Colors.white),
+                icon: Icon(
+                  _isUploading ? Icons.hourglass_top : Icons.send,
+                  color: Colors.white,
+                ),
                 label: Text(
                   _isUploading ? 'Sharing…' : 'Share Post',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -529,14 +575,16 @@ SizedBox(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: items
-            .map((i) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _ChecklistChip(
-                    label: i.label,
-                    isDone: i.isDone,
-                    onTap: i.onTap,
-                  ),
-                ))
+            .map(
+              (i) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _ChecklistChip(
+                  label: i.label,
+                  isDone: i.isDone,
+                  onTap: i.onTap,
+                ),
+              ),
+            )
             .toList(),
       ),
     );
@@ -564,13 +612,17 @@ SizedBox(
                         children: const [
                           CircularProgressIndicator(color: Colors.white),
                           SizedBox(height: 8),
-                          Text('Loading video preview…', style: TextStyle(color: Colors.white)),
+                          Text(
+                            'Loading video preview…',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
             ),
           ),
-          if ((_videoDurationSeconds != null || _mediaSizeLabelMB != null) && initialized)
+          if ((_videoDurationSeconds != null || _mediaSizeLabelMB != null) &&
+              initialized)
             Positioned(
               top: 12,
               left: 12,
@@ -725,7 +777,7 @@ SizedBox(
 
       if (pickedFile != null) {
         final file = File(pickedFile.path);
-        
+
         // Validate video if it's a video file
         if (isVideo == true) {
           final isValid = await _validateVideoFile(file);
@@ -737,7 +789,7 @@ SizedBox(
         setState(() {
           _selectedMedia = file;
           final bytes = file.lengthSync();
-          _mediaSizeLabelMB = (bytes / (1024 * 1024)).toStringAsFixed(1) + 'MB';
+          _mediaSizeLabelMB = '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
         });
 
         if (_postType == PostType.video) {
@@ -827,7 +879,9 @@ SizedBox(
     debugPrint('📄 Caption length: ${_captionController.text.trim().length}');
     if (_selectedMedia != null) {
       debugPrint('📁 Media file: ${_selectedMedia!.path}');
-      debugPrint('📏 File size: ${(_selectedMedia!.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB');
+      debugPrint(
+        '📏 File size: ${(_selectedMedia!.lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB',
+      );
     }
 
     try {
@@ -861,12 +915,14 @@ SizedBox(
       );
 
       final moderationResult = await _moderationService.moderatePost(mockPost);
-      
+
       // Handle moderation result
       if (moderationResult.action == ModerationAction.block) {
-        throw Exception('Content violates community guidelines: ${moderationResult.reasons.join(', ')}');
+        throw Exception(
+          'Content violates community guidelines: ${moderationResult.reasons.join(', ')}',
+        );
       }
-      
+
       if (moderationResult.action == ModerationAction.warn) {
         // Show warning dialog but allow to proceed
         final shouldContinue = await _showModerationWarning(moderationResult);
@@ -897,7 +953,7 @@ SizedBox(
       if (post != null) {
         // Navigate to home screen (index 0) with success message
         Navigator.of(context).popUntil((route) => route.isFirst);
-        
+
         // Show success feedback
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -932,37 +988,38 @@ SizedBox(
 
   Future<bool> _showModerationWarning(dynamic moderationResult) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Content Warning'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Your content has been flagged for potential issues:'),
-            SizedBox(height: 8),
-            ...moderationResult.reasons.map<Widget>((reason) => 
-              Padding(
-                padding: EdgeInsets.only(left: 16, bottom: 4),
-                child: Text('• $reason'),
-              ),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Content Warning'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Your content has been flagged for potential issues:'),
+                SizedBox(height: 8),
+                ...moderationResult.reasons.map<Widget>(
+                  (reason) => Padding(
+                    padding: EdgeInsets.only(left: 16, bottom: 4),
+                    child: Text('• $reason'),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text('Do you want to publish anyway?'),
+              ],
             ),
-            SizedBox(height: 16),
-            Text('Do you want to publish anyway?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text('Publish Anyway'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Publish Anyway'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<bool> _validateVideoFile(File videoFile) async {
@@ -970,11 +1027,13 @@ SizedBox(
       // Check file size
       final fileSize = videoFile.lengthSync();
       final maxSize = Environment.maxVideoSizeMB * 1024 * 1024;
-      
+
       if (fileSize > maxSize) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Video file is too large. Maximum size is ${Environment.maxVideoSizeMB}MB.'),
+            content: Text(
+              'Video file is too large. Maximum size is ${Environment.maxVideoSizeMB}MB.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -995,7 +1054,7 @@ SizedBox(
     final urlController = TextEditingController();
     String? selectedPlatform;
     PostType selectedType = PostType.image;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: kCardColor,
@@ -1020,14 +1079,19 @@ SizedBox(
                 style: kHeadingTextStyle.copyWith(fontSize: 18),
               ),
               SizedBox(height: 20),
-              
+
               // Platform selection
-              Text('Platform:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Platform:',
+                style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: selectedPlatform,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   hintText: 'Select platform',
                 ),
                 items: _contentService.getSupportedPlatforms().map((platform) {
@@ -1049,9 +1113,12 @@ SizedBox(
                 },
               ),
               SizedBox(height: 16),
-              
+
               // Content type selection
-              Text('Content Type:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Content Type:',
+                style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               Row(
                 children: [
@@ -1082,31 +1149,38 @@ SizedBox(
                 ],
               ),
               SizedBox(height: 16),
-              
+
               // URL input
-              Text('Content URL:', style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Content URL:',
+                style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               TextFormField(
                 controller: urlController,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   hintText: 'Paste the content URL here',
                   prefixIcon: Icon(Icons.link),
                 ),
                 keyboardType: TextInputType.url,
               ),
               SizedBox(height: 24),
-              
+
               // Import button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (selectedPlatform != null && urlController.text.isNotEmpty)
+                  onPressed:
+                      (selectedPlatform != null &&
+                          urlController.text.isNotEmpty)
                       ? () => _importExternalContent(
-                            selectedPlatform!,
-                            urlController.text,
-                            selectedType,
-                          )
+                          selectedPlatform!,
+                          urlController.text,
+                          selectedType,
+                        )
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimaryColor,
@@ -1117,7 +1191,10 @@ SizedBox(
                   ),
                   child: Text(
                     'Import Content',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -1129,9 +1206,13 @@ SizedBox(
     );
   }
 
-  Future<void> _importExternalContent(String platform, String url, PostType type) async {
+  Future<void> _importExternalContent(
+    String platform,
+    String url,
+    PostType type,
+  ) async {
     Navigator.pop(context); // Close the modal
-    
+
     try {
       setState(() {
         _isUploading = true;
@@ -1146,9 +1227,7 @@ SizedBox(
         sourceUrl: url,
         sourcePlatform: platform,
         type: type,
-        metadata: {
-          'imported_at': DateTime.now().toIso8601String(),
-        },
+        metadata: {'imported_at': DateTime.now().toIso8601String()},
       );
 
       setState(() {
@@ -1160,7 +1239,7 @@ SizedBox(
 
       // Navigate to home screen with success message
       Navigator.of(context).popUntil((route) => route.isFirst);
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1176,7 +1255,6 @@ SizedBox(
           behavior: SnackBarBehavior.floating,
         ),
       );
-      
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1198,14 +1276,22 @@ class _ChecklistItem {
   final String label;
   final bool isDone;
   final VoidCallback onTap;
-  _ChecklistItem({required this.label, required this.isDone, required this.onTap});
+  _ChecklistItem({
+    required this.label,
+    required this.isDone,
+    required this.onTap,
+  });
 }
 
 class _ChecklistChip extends StatelessWidget {
   final String label;
   final bool isDone;
   final VoidCallback onTap;
-  const _ChecklistChip({super.key, required this.label, required this.isDone, required this.onTap});
+  const _ChecklistChip({
+    required this.label,
+    required this.isDone,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

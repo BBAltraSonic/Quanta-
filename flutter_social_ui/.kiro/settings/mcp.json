@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "DEBUG"
+      },
+      "disabled": false,
+      "autoApprove": []
+    },
+    "supabase-broken": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/supabase-community/supabase-mcp.git", "supabase-mcp"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "DEBUG"
+      },
+      "disabled": true,
+      "autoApprove": []
+    }
+  }
+}

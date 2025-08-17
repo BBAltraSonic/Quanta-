@@ -1,25 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
 import 'package:quanta/widgets/enhanced_post_item.dart';
 import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/avatar_model.dart';
-import 'package:quanta/services/enhanced_video_service.dart';
-
-// Generate mocks
-@GenerateMocks([EnhancedVideoService])
-import 'enhanced_post_item_test.mocks.dart';
 
 void main() {
   group('EnhancedPostItem Widget Tests', () {
-    late MockEnhancedVideoService mockVideoService;
     late PostModel testPost;
     late AvatarModel testAvatar;
 
     setUp(() {
-      mockVideoService = MockEnhancedVideoService();
-      
       testPost = PostModel(
         id: 'test-post-id',
         avatarId: 'test-avatar-id',
@@ -74,7 +64,9 @@ void main() {
       );
     }
 
-    testWidgets('should display post content correctly', (WidgetTester tester) async {
+    testWidgets('should display post content correctly', (
+      WidgetTester tester,
+    ) async {
       // Act
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
@@ -88,7 +80,9 @@ void main() {
       expect(find.text('25'), findsOneWidget); // comments count
     });
 
-    testWidgets('should show follow button when not following', (WidgetTester tester) async {
+    testWidgets('should show follow button when not following', (
+      WidgetTester tester,
+    ) async {
       // Act
       await tester.pumpWidget(createTestWidget(isFollowing: false));
       await tester.pump();
@@ -97,7 +91,9 @@ void main() {
       expect(find.text('Follow'), findsOneWidget);
     });
 
-    testWidgets('should hide follow button when already following', (WidgetTester tester) async {
+    testWidgets('should hide follow button when already following', (
+      WidgetTester tester,
+    ) async {
       // Act
       await tester.pumpWidget(createTestWidget(isFollowing: true));
       await tester.pump();
@@ -106,21 +102,25 @@ void main() {
       expect(find.text('Follow'), findsNothing);
     });
 
-    testWidgets('should call onLike when like button is tapped', (WidgetTester tester) async {
+    testWidgets('should call onLike when like button is tapped', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       bool likeCalled = false;
-      
+
       // Act
-      await tester.pumpWidget(createTestWidget(
-        onLike: () => likeCalled = true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(onLike: () => likeCalled = true),
+      );
       await tester.pump();
 
       // Find and tap the like button
-      final likeButton = find.byWidgetPredicate((widget) =>
-          widget is GestureDetector &&
-          widget.child.toString().contains('heart'));
-      
+      final likeButton = find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector &&
+            widget.child.toString().contains('heart'),
+      );
+
       await tester.tap(likeButton.first);
       await tester.pump();
 
@@ -128,21 +128,25 @@ void main() {
       expect(likeCalled, isTrue);
     });
 
-    testWidgets('should call onComment when comment button is tapped', (WidgetTester tester) async {
+    testWidgets('should call onComment when comment button is tapped', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       bool commentCalled = false;
-      
+
       // Act
-      await tester.pumpWidget(createTestWidget(
-        onComment: () => commentCalled = true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(onComment: () => commentCalled = true),
+      );
       await tester.pump();
 
       // Find and tap the comment button
-      final commentButton = find.byWidgetPredicate((widget) =>
-          widget is GestureDetector &&
-          widget.child.toString().contains('chat'));
-      
+      final commentButton = find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector &&
+            widget.child.toString().contains('chat'),
+      );
+
       await tester.tap(commentButton.first);
       await tester.pump();
 
@@ -150,21 +154,25 @@ void main() {
       expect(commentCalled, isTrue);
     });
 
-    testWidgets('should call onShare when share button is tapped', (WidgetTester tester) async {
+    testWidgets('should call onShare when share button is tapped', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       bool shareCalled = false;
-      
+
       // Act
-      await tester.pumpWidget(createTestWidget(
-        onShare: () => shareCalled = true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(onShare: () => shareCalled = true),
+      );
       await tester.pump();
 
       // Find and tap the share button
-      final shareButton = find.byWidgetPredicate((widget) =>
-          widget is GestureDetector &&
-          widget.child.toString().contains('reply'));
-      
+      final shareButton = find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector &&
+            widget.child.toString().contains('reply'),
+      );
+
       await tester.tap(shareButton.first);
       await tester.pump();
 
@@ -172,21 +180,25 @@ void main() {
       expect(shareCalled, isTrue);
     });
 
-    testWidgets('should call onSave when save button is tapped', (WidgetTester tester) async {
+    testWidgets('should call onSave when save button is tapped', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       bool saveCalled = false;
-      
+
       // Act
-      await tester.pumpWidget(createTestWidget(
-        onSave: () => saveCalled = true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(onSave: () => saveCalled = true),
+      );
       await tester.pump();
 
       // Find and tap the save button
-      final saveButton = find.byWidgetPredicate((widget) =>
-          widget is GestureDetector &&
-          widget.child.toString().contains('bookmark'));
-      
+      final saveButton = find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector &&
+            widget.child.toString().contains('bookmark'),
+      );
+
       await tester.tap(saveButton.first);
       await tester.pump();
 
@@ -194,14 +206,16 @@ void main() {
       expect(saveCalled, isTrue);
     });
 
-    testWidgets('should handle double tap for like', (WidgetTester tester) async {
+    testWidgets('should handle double tap for like', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       bool likeCalled = false;
-      
+
       // Act
-      await tester.pumpWidget(createTestWidget(
-        onLike: () => likeCalled = true,
-      ));
+      await tester.pumpWidget(
+        createTestWidget(onLike: () => likeCalled = true),
+      );
       await tester.pump();
 
       // Double tap anywhere on the post
@@ -213,7 +227,9 @@ void main() {
       expect(likeCalled, isTrue);
     });
 
-    testWidgets('should display correct counts with formatting', (WidgetTester tester) async {
+    testWidgets('should display correct counts with formatting', (
+      WidgetTester tester,
+    ) async {
       // Arrange
       final postWithLargeCounts = testPost.copyWith(
         likesCount: 1500,
@@ -221,14 +237,16 @@ void main() {
       );
 
       // Act
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: EnhancedPostItem(
-            post: postWithLargeCounts,
-            avatar: testAvatar,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EnhancedPostItem(
+              post: postWithLargeCounts,
+              avatar: testAvatar,
+            ),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       // Assert
@@ -236,7 +254,9 @@ void main() {
       expect(find.text('2.5M'), findsOneWidget); // comments count formatted
     });
 
-    testWidgets('should show AI indicator for avatar', (WidgetTester tester) async {
+    testWidgets('should show AI indicator for avatar', (
+      WidgetTester tester,
+    ) async {
       // Act
       await tester.pumpWidget(createTestWidget());
       await tester.pump();
@@ -245,45 +265,65 @@ void main() {
       expect(find.byIcon(Icons.smart_toy), findsOneWidget);
     });
 
-    testWidgets('should handle image posts correctly', (WidgetTester tester) async {
+    testWidgets('should handle image posts correctly', (
+      WidgetTester tester,
+    ) async {
       // Arrange
-      final imagePost = testPost.copyWith(
+      final imagePost = PostModel(
+        id: 'test-image-post-id',
+        avatarId: 'test-avatar-id',
         type: PostType.image,
-        videoUrl: null,
         imageUrl: 'https://example.com/image.jpg',
+        caption: 'Test image post caption',
+        hashtags: ['test', 'image'],
+        viewsCount: 100,
+        likesCount: 50,
+        commentsCount: 25,
+        sharesCount: 10,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       // Act
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: EnhancedPostItem(
-            post: imagePost,
-            avatar: testAvatar,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EnhancedPostItem(post: imagePost, avatar: testAvatar),
           ),
         ),
-      ));
+      );
       await tester.pump();
 
       // Assert - Should not show video controls for image posts
       expect(find.byIcon(Icons.play_arrow), findsNothing);
     });
 
-    testWidgets('should show bookmark state correctly', (WidgetTester tester) async {
+    testWidgets('should show bookmark state correctly', (
+      WidgetTester tester,
+    ) async {
       // Test unbookmarked state
       await tester.pumpWidget(createTestWidget(isBookmarked: false));
       await tester.pump();
-      
+
       // Should show regular bookmark icon
-      expect(find.byWidgetPredicate((widget) =>
-          widget.toString().contains('bookmark')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget.toString().contains('bookmark'),
+        ),
+        findsOneWidget,
+      );
 
       // Test bookmarked state
       await tester.pumpWidget(createTestWidget(isBookmarked: true));
       await tester.pump();
-      
+
       // Should still show bookmark icon but with different color
-      expect(find.byWidgetPredicate((widget) =>
-          widget.toString().contains('bookmark')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget.toString().contains('bookmark'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

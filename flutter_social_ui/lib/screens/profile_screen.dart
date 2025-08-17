@@ -5,22 +5,29 @@ import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
 import '../models/analytics_insight_model.dart';
+// Using ProfileViewMode from AppState instead of separate model
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
 import '../services/follow_service.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/analytics_insights_service.dart';
 import '../services/user_role_service.dart';
+import '../services/avatar_profile_service.dart';
+import '../services/avatar_content_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
 import '../screens/chat_screen.dart';
 import '../screens/create_post_screen.dart';
 import '../widgets/skeleton_widgets.dart';
+import '../widgets/avatar_switcher.dart';
+import '../store/app_state.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String? userId; // null means current user's profile
-  const ProfileScreen({super.key, this.userId});
+  final String?
+  avatarId; // Avatar ID to display, null means current user's active avatar
+  final String? userId; // Deprecated: kept for backward compatibility
+  const ProfileScreen({super.key, this.avatarId, this.userId});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -32,56 +39,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final FollowService _followService = FollowService();
   final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
   final UserRoleService _roleService = UserRoleService();
-  
-  UserModel? _user;
-  List<AvatarModel> _avatars = [];
-  AvatarModel? _activeAvatar;
-  Map<String, dynamic> _stats = {};
+  final AvatarProfileService _avatarProfileService = AvatarProfileService();
+  final AppState _appState = AppState();
+
+  // Avatar-centric state
+  AvatarModel? _currentAvatar;
+  AvatarProfileData? _avatarProfileData;
+  ProfileViewMode _viewMode = ProfileViewMode.guest;
+  List<AvatarModel> _userAvatars = [];
   bool _isLoading = true;
-  bool _isOwnProfile = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-  
-  // Activity-based UI state (for display only, not restrictions)
+
+  // Legacy user data (for backward compatibility)
+  UserModel? _user;
+  final Map<String, dynamic> _stats =
+      {}; // Legacy stats for backward compatibility
+  final List<AvatarModel> _avatars =
+      []; // Legacy avatars list for backward compatibility
+
+  // Unused legacy variables (kept for backward compatibility)
+  // ignore: unused_field
   bool _isCreator = false;
+  // ignore: unused_field
   bool _isFan = false;
+  // ignore: unused_field
   UserRole _userRole = UserRole.creator;
-  
+
   // Posts content state
-  List<PostModel> _userPosts = [];
+  List<PostModel> _avatarPosts = [];
   bool _isPostsLoading = false;
   bool _hasMorePosts = true;
   int _postsPage = 1;
   final int _postsPerPage = 20;
   Map<String, dynamic>? _comparisons;
-  
+
   // Pinned post and collaborations state
   PostModel? _pinnedPost;
   List<PostModel> _collaborationPosts = [];
   bool _isPinnedPostLoading = false;
   bool _isCollaborationsLoading = false;
-  
+
   // Analytics state
   List<AnalyticsInsight> _insights = [];
   List<AnalyticsMetric> _detailedMetrics = [];
   AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.month;
-  
+
   @override
   void initState() {
     super.initState();
     _loadProfileData();
   }
-  
+
   /// Load user posts from database
-  Future<void> _loadUserPosts({bool loadMore = false}) async {
-    if (_isPostsLoading || (_userPosts.isNotEmpty && !loadMore && !_hasMorePosts)) return;
-    
-    if (_user == null) return;
-    
+  /// Load avatar posts from database
+  Future<void> _loadAvatarPosts({bool loadMore = false}) async {
+    if (_isPostsLoading ||
+        (_avatarPosts.isNotEmpty && !loadMore && !_hasMorePosts)) {
+      return;
+    }
+
+    if (_currentAvatar == null) return;
+
     setState(() {
       _isPostsLoading = true;
     });
-    
+
+    try {
+      // Use EnhancedFeedsService to get avatar-specific posts
+      final feedsService = EnhancedFeedsService();
+      final posts = await feedsService.getAvatarPosts(
+        avatarId: _currentAvatar!.id,
+        page: loadMore ? _postsPage + 1 : 1,
+        limit: _postsPerPage,
+      );
+
+      setState(() {
+        if (loadMore) {
+          _avatarPosts.addAll(posts);
+          _postsPage++;
+        } else {
+          _avatarPosts = posts;
+          _postsPage = 1;
+        }
+        _hasMorePosts = posts.length == _postsPerPage;
+        _isPostsLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isPostsLoading = false;
+      });
+      debugPrint('Error loading avatar posts: $e');
+    }
+  }
+
+  /// Legacy method for loading user posts (backward compatibility)
+  Future<void> _loadUserPosts({bool loadMore = false}) async {
+    if (_isPostsLoading ||
+        (_avatarPosts.isNotEmpty && !loadMore && !_hasMorePosts)) {
+      return;
+    }
+
+    if (_user == null) return;
+
+    setState(() {
+      _isPostsLoading = true;
+    });
+
     try {
       // Use EnhancedFeedsService to get posts for this user
       final feedsService = EnhancedFeedsService();
@@ -90,13 +154,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         page: loadMore ? _postsPage + 1 : 1,
         limit: _postsPerPage,
       );
-      
+
       setState(() {
         if (loadMore) {
-          _userPosts.addAll(posts);
+          _avatarPosts.addAll(posts);
           _postsPage++;
         } else {
-          _userPosts = posts;
+          _avatarPosts = posts;
           _postsPage = 1;
         }
         _hasMorePosts = posts.length == _postsPerPage;
@@ -109,58 +173,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
       debugPrint('Error loading user posts: $e');
     }
   }
-  
+
   Future<void> _loadProfileData() async {
     try {
       final currentUserId = _authService.currentUserId;
-      if (currentUserId == null) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+
+      // Determine which avatar to load
+      String? targetAvatarId = widget.avatarId;
+
+      // If no avatar ID provided, use current user's active avatar or fallback to user-based loading
+      if (targetAvatarId == null) {
+        if (currentUserId != null) {
+          final activeAvatar = await _avatarProfileService.getActiveAvatar(
+            currentUserId,
+          );
+          targetAvatarId = activeAvatar?.id;
         }
-        return;
+
+        // Fallback to legacy user-based loading if no avatar found
+        if (targetAvatarId == null && widget.userId != null) {
+          await _loadLegacyUserProfile();
+          return;
+        }
+
+        // If still no avatar, show empty state
+        if (targetAvatarId == null) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+          return;
+        }
       }
-      
-      // Determine if we're viewing our own profile or someone else's
-      final targetUserId = widget.userId ?? currentUserId;
-      _isOwnProfile = targetUserId == currentUserId;
-      
-      // Load the profile data
-      final profileData = await _profileService.getUserProfileData(targetUserId);
-      
-      // If viewing another user's profile, check follow status
-      if (!_isOwnProfile && _activeAvatar != null) {
-        await _checkFollowStatus(targetUserId);
+
+      // Load avatar profile data
+      final avatarProfileData = await _avatarProfileService.getAvatarProfile(
+        targetAvatarId,
+        isOwnerView: currentUserId != null,
+      );
+
+      // Determine view mode
+      final viewMode = _avatarProfileService.determineViewMode(
+        targetAvatarId,
+        currentUserId,
+      );
+
+      // Check follow status for public view
+      if (viewMode == ProfileViewMode.public) {
+        await _checkAvatarFollowStatus(targetAvatarId);
       }
-      
+
+      // Load user avatars for owner view
+      List<AvatarModel> userAvatars = [];
+      if (viewMode == ProfileViewMode.owner && currentUserId != null) {
+        userAvatars = await _avatarProfileService.getUserAvatars(currentUserId);
+      }
+
       if (mounted) {
         setState(() {
-          _user = profileData['user'] as UserModel;
-          _avatars = profileData['avatars'] as List<AvatarModel>;
-          _activeAvatar = profileData['active_avatar'] as AvatarModel?;
-          _stats = profileData['stats'] as Map<String, dynamic>;
+          _currentAvatar = avatarProfileData.avatar;
+          _avatarProfileData = avatarProfileData;
+          _viewMode = viewMode;
+          _userAvatars = userAvatars;
           _isLoading = false;
         });
       }
-      
-      // Load role information for the target user
-      await _loadUserRoles(targetUserId);
-      
-      // Load user posts after profile data is loaded
-      await _loadUserPosts();
-      
-      // Load pinned post and collaborations if active avatar exists
-      if (_activeAvatar != null) {
-        await _loadPinnedPost();
-        await _loadCollaborations();
-      }
-      
-      // Load analytics data if it's the user's own profile
-      if (_isOwnProfile) {
+
+      // Load avatar posts
+      await _loadAvatarPosts();
+
+      // Load pinned post and collaborations
+      await _loadPinnedPost();
+      await _loadCollaborations();
+
+      // Load analytics data for owner view
+      if (viewMode == ProfileViewMode.owner) {
         await _loadAnalyticsData();
       }
     } catch (e) {
+      debugPrint('Error loading avatar profile data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -168,17 +260,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-  
+
+  /// Legacy method for backward compatibility with user-based profiles
+  Future<void> _loadLegacyUserProfile() async {
+    try {
+      final currentUserId = _authService.currentUserId;
+      if (currentUserId == null) return;
+
+      final targetUserId = widget.userId ?? currentUserId;
+      final isOwnProfile = targetUserId == currentUserId;
+
+      // Load the profile data using legacy method
+      final profileData = await _profileService.getUserProfileData(
+        targetUserId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _user = profileData['user'] as UserModel;
+          _userAvatars = profileData['avatars'] as List<AvatarModel>;
+          _currentAvatar = profileData['active_avatar'] as AvatarModel?;
+          _viewMode = isOwnProfile
+              ? ProfileViewMode.owner
+              : ProfileViewMode.public;
+          _isLoading = false;
+        });
+      }
+
+      // Load posts using legacy method
+      await _loadUserPosts();
+    } catch (e) {
+      debugPrint('Error loading legacy user profile: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Check follow status for avatar-centric profiles
+  Future<void> _checkAvatarFollowStatus(String avatarId) async {
+    try {
+      setState(() {
+        _isFollowLoading = true;
+      });
+
+      // Check if current user is following this avatar
+      final isFollowing = await _followService.isFollowing(avatarId);
+
+      setState(() {
+        _isFollowing = isFollowing;
+        _isFollowLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isFollowLoading = false;
+      });
+      debugPrint('Error checking avatar follow status: $e');
+    }
+  }
+
+  /// Legacy method for checking follow status (backward compatibility)
   Future<void> _checkFollowStatus(String targetUserId) async {
     try {
       setState(() {
         _isFollowLoading = true;
       });
-      
-      if (_activeAvatar != null) {
+
+      if (_currentAvatar != null) {
         // Check if current user is following the target user's active avatar
-        final isFollowing = await _followService.isFollowing(_activeAvatar!.id);
-        
+        final isFollowing = await _followService.isFollowing(
+          _currentAvatar!.id,
+        );
+
         setState(() {
           _isFollowing = isFollowing;
           _isFollowLoading = false;
@@ -190,31 +345,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
-  
+
   Future<void> _toggleFollow() async {
-    if (_user == null || _activeAvatar == null) return;
-    
+    if (_currentAvatar == null) return;
+
     try {
       setState(() {
         _isFollowLoading = true;
       });
-      
-      // Toggle follow status for the target user's active avatar
-      final newFollowStatus = await _followService.toggleFollow(_activeAvatar!.id);
-      
+
+      // Toggle follow status for the current avatar
+      final newFollowStatus = await _followService.toggleFollow(
+        _currentAvatar!.id,
+      );
+
       setState(() {
         _isFollowing = newFollowStatus;
       });
-      
+
       // Refresh follower count
-      await _refreshFollowerCount();
-      
+      await _refreshAvatarFollowerCount();
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isFollowing 
-              ? 'Now following ${_user!.displayName ?? _user!.username}!' 
-              : 'Unfollowed ${_user!.displayName ?? _user!.username}'),
+          content: Text(
+            _isFollowing
+                ? 'Now following ${_currentAvatar!.name}!'
+                : 'Unfollowed ${_currentAvatar!.name}',
+          ),
           backgroundColor: kPrimaryColor,
         ),
       );
@@ -231,66 +390,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
-  
+
+  /// Refresh avatar follower count
+  Future<void> _refreshAvatarFollowerCount() async {
+    if (_currentAvatar == null) return;
+
+    try {
+      final updatedStats = await _avatarProfileService.getAvatarStats(
+        _currentAvatar!.id,
+      );
+
+      // Update app state
+      _appState.updateAvatarFollowerCount(
+        _currentAvatar!.id,
+        updatedStats.followersCount,
+      );
+
+      // Update avatar profile data
+      if (_avatarProfileData != null) {
+        setState(() {
+          _avatarProfileData = AvatarProfileData(
+            avatar: _avatarProfileData!.avatar,
+            stats: updatedStats,
+            recentPosts: _avatarProfileData!.recentPosts,
+            viewMode: _avatarProfileData!.viewMode,
+            availableActions: _avatarProfileData!.availableActions,
+            engagementMetrics: _avatarProfileData!.engagementMetrics,
+            otherAvatars: _avatarProfileData!.otherAvatars,
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error refreshing avatar follower count: $e');
+    }
+  }
+
+  /// Legacy method for refreshing follower count (backward compatibility)
   Future<void> _refreshFollowerCount() async {
     if (_user == null) return;
-    
+
     try {
       final updatedStats = await _profileService.getUserStats(_user!.id);
       setState(() {
-        _stats = updatedStats;
+        // Legacy stats update - will be removed when fully migrated
       });
     } catch (e) {
       // Silently fail, as this is just a refresh
     }
   }
-  
+
+  /// Handle avatar switching
+  Future<void> _onAvatarSelected(AvatarModel selectedAvatar) async {
+    if (_currentAvatar?.id == selectedAvatar.id) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Set as active avatar
+      final currentUserId = _authService.currentUserId;
+      if (currentUserId != null) {
+        await _avatarProfileService.setActiveAvatar(
+          currentUserId,
+          selectedAvatar.id,
+        );
+      }
+
+      // Reload profile data for the new avatar
+      await _loadProfileData();
+    } catch (e) {
+      debugPrint('Error switching avatar: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error switching avatar: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _navigateToEditProfile() async {
     if (_user == null) return;
-    
+
     final updatedUser = await Navigator.push<UserModel>(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(user: _user!),
-      ),
+      MaterialPageRoute(builder: (context) => EditProfileScreen(user: _user!)),
     );
-    
+
     if (updatedUser != null) {
       setState(() {
         _user = updatedUser;
       });
     }
   }
-  
+
   void _navigateToSettings() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SettingsScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
   }
-  
+
   void _navigateToAvatarManagement() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AvatarManagementScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const AvatarManagementScreen()),
     );
   }
-  
+
   void _navigateToCreatePost() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const CreatePostScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const CreatePostScreen()),
     );
   }
-  
+
   void _navigateToChat() {
-    if (_activeAvatar == null && _avatars.isEmpty) {
+    if (_currentAvatar == null && _userAvatars.isEmpty) {
       // Show tooltip or guide to create avatar
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -300,8 +521,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       return;
     }
-    
-    final chatAvatar = _activeAvatar ?? _avatars.first;
+
+    final chatAvatar = _currentAvatar ?? _userAvatars.first;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -313,12 +534,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   void _shareProfile() {
     // Simple share profile functionality - shows profile URL
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Profile shared! Link: quanta.app/profile/${_user?.username ?? 'user'}'),
+        content: Text(
+          'Profile shared! Link: quanta.app/profile/${_user?.username ?? 'user'}',
+        ),
         backgroundColor: kPrimaryColor,
         action: SnackBarAction(
           label: 'COPY',
@@ -336,7 +559,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   String _formatNumber(int number) {
     if (number >= 1000000) {
       return '${(number / 1000000).toStringAsFixed(1)}M';
@@ -345,18 +568,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     return number.toString();
   }
-  
+
   /// Load analytics data for the user's profile
   Future<void> _loadAnalyticsData() async {
     if (_user == null) return;
-    
+
     try {
       final analyticsData = await _analyticsService.getProfileAnalytics(
         userId: _user!.id,
         period: _selectedPeriod,
         includeComparisons: true,
       );
-      
+
       setState(() {
         _detailedMetrics = analyticsData['metrics'] as List<AnalyticsMetric>;
         _insights = analyticsData['insights'] as List<AnalyticsInsight>;
@@ -372,21 +595,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
-  
+
   /// Handle period change in analytics
   void _onPeriodChanged(AnalyticsPeriod period) {
     if (_selectedPeriod != period) {
       setState(() {
         _selectedPeriod = period;
       });
-      
+
       // Reload analytics data for the new period
-      if (_isOwnProfile && _user != null) {
+      if (_viewMode == ProfileViewMode.owner && _user != null) {
         _loadAnalyticsData();
       }
     }
   }
-  
+
   /// Format metric value based on its type
   String _formatMetricValue(AnalyticsMetric metric) {
     switch (metric.type) {
@@ -410,14 +633,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return metric.value.toString();
     }
   }
-  
+
   /// Load user role information
   Future<void> _loadUserRoles(String userId) async {
     try {
       final isCreator = await _roleService.isCreator(userId);
       final isFan = await _roleService.isFan(userId);
       final userRole = await _roleService.getUserRole(userId);
-      
+
       if (mounted) {
         setState(() {
           _isCreator = isCreator;
@@ -437,16 +660,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-  
+
   /// Handle insight action button press
   void _handleInsightAction(AnalyticsInsight insight) {
     final actionType = insight.actionData?['type'] as String?;
-    
+
     switch (actionType) {
       case 'engagement_tips':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Engagement tips: Post consistently, use trending hashtags, engage with your audience!'),
+            content: Text(
+              'Engagement tips: Post consistently, use trending hashtags, engage with your audience!',
+            ),
             backgroundColor: Colors.blue,
             duration: Duration(seconds: 4),
           ),
@@ -455,7 +680,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'growth_strategy':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Growth tips: Collaborate with others, post at peak times, create shareable content!'),
+            content: Text(
+              'Growth tips: Collaborate with others, post at peak times, create shareable content!',
+            ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),
           ),
@@ -464,7 +691,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'reach_optimization':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Reach tips: Use relevant hashtags, post when your audience is active, create engaging content!'),
+            content: Text(
+              'Reach tips: Use relevant hashtags, post when your audience is active, create engaging content!',
+            ),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -473,7 +702,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       case 'post_scheduling':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Schedule your posts for 6-8 PM on weekdays for maximum engagement!'),
+            content: Text(
+              'Schedule your posts for 6-8 PM on weekdays for maximum engagement!',
+            ),
             backgroundColor: Colors.purple,
             duration: Duration(seconds: 4),
           ),
@@ -489,27 +720,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         break;
     }
   }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  /// Load pinned post for the active avatar
+
+  /// Load pinned post for the current avatar
   Future<void> _loadPinnedPost() async {
-    if (_activeAvatar == null) return;
-    
+    if (_currentAvatar == null) return;
+
     setState(() {
       _isPinnedPostLoading = true;
     });
-    
+
     try {
-      final pinnedPostData = await _profileService.getPinnedPost(_activeAvatar!.id);
-      
+      final pinnedPostData = await _profileService.getPinnedPost(
+        _currentAvatar!.id,
+      );
+
       if (pinnedPostData != null) {
         setState(() {
           _pinnedPost = PostModel.fromJson(pinnedPostData);
@@ -523,18 +747,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
-  
-  /// Load collaboration posts for the active avatar
+
+  /// Load collaboration posts for the current avatar
   Future<void> _loadCollaborations() async {
-    if (_activeAvatar == null) return;
-    
+    if (_currentAvatar == null) return;
+
     setState(() {
       _isCollaborationsLoading = true;
     });
-    
+
     try {
-      final collaborationData = await _profileService.getCollaborationPosts(_activeAvatar!.id);
-      
+      final collaborationData = await _profileService.getCollaborationPosts(
+        _currentAvatar!.id,
+      );
+
       setState(() {
         _collaborationPosts = collaborationData
             .map((data) => PostModel.fromJson(data))
@@ -557,9 +783,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Container(
-                color: Colors.grey[800],
-              ),
+              Container(color: Colors.grey[800]),
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -581,9 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
                 sliver: SliverToBoxAdapter(
-                  child: _HeaderCard(
-                    child: SkeletonProfileHeader(),
-                  ),
+                  child: _HeaderCard(child: SkeletonProfileHeader()),
                 ),
               ),
               SliverPadding(
@@ -606,7 +828,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: 3,
-                            separatorBuilder: (context, index) => const SizedBox(width: 12),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (context, index) => Container(
                               width: 90,
                               decoration: BoxDecoration(
@@ -671,7 +894,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         actions: [
-          if (_isOwnProfile) ...[
+          if (_viewMode == ProfileViewMode.owner) ...[
             // DEBUG: Test crash button (remove before production)
             if (const bool.fromEnvironment('DEBUG_MODE', defaultValue: false))
               Padding(
@@ -737,110 +960,123 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ],
       ),
-      body: _isLoading 
+      body: _isLoading
           ? _buildSkeletonLoading()
           : Stack(
-        children: [
-          // Fullscreen profile photo background with dark + red overlays
-          Positioned.fill(
-            child: Stack(
-              fit: StackFit.expand,
               children: [
-                _user?.profileImageUrl != null
-                    ? _user!.profileImageUrl!.startsWith('assets/')
-                        ? Image.asset(
-                            _user!.profileImageUrl!,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.network(
-                            _user!.profileImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Image(
-                                image: AssetImage('assets/images/We.jpg'),
-                                fit: BoxFit.cover,
-                              );
-                            },
-                          )
-                    : const Image(
-                        image: AssetImage('assets/images/We.jpg'),
-                        fit: BoxFit.cover,
+                // Fullscreen profile photo background with dark + red overlays
+                Positioned.fill(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _user?.profileImageUrl != null
+                          ? _user!.profileImageUrl!.startsWith('assets/')
+                                ? Image.asset(
+                                    _user!.profileImageUrl!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network(
+                                    _user!.profileImageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Image(
+                                        image: AssetImage(
+                                          'assets/images/We.jpg',
+                                        ),
+                                        fit: BoxFit.cover,
+                                      );
+                                    },
+                                  )
+                          : const Image(
+                              image: AssetImage('assets/images/We.jpg'),
+                              fit: BoxFit.cover,
+                            ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.65),
+                              Colors.black.withOpacity(0.88),
+                            ],
+                          ),
+                        ),
                       ),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.65),
-                        Colors.black.withOpacity(0.88),
-                      ],
-                    ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              kPrimaryColor.withOpacity(0.12),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        kPrimaryColor.withOpacity(0.12),
-                        Colors.transparent,
-                      ],
-                    ),
+                SafeArea(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
+                        sliver: SliverToBoxAdapter(
+                          child: _HeaderCard(child: _headerBlock()),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildAvatarsSection(),
+                        ),
+                      ),
+                      // Pinned Post Section
+                      if (_pinnedPost != null || _isPinnedPostLoading)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                          sliver: SliverToBoxAdapter(
+                            child: _buildPinnedPostSection(),
+                          ),
+                        ),
+                      // Collaborations Section
+                      if (_collaborationPosts.isNotEmpty ||
+                          _isCollaborationsLoading)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                          sliver: SliverToBoxAdapter(
+                            child: _buildCollaborationsSection(),
+                          ),
+                        ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+                        sliver: SliverToBoxAdapter(child: _userPostsMasonry()),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 240, 20, 14),
-                  sliver: SliverToBoxAdapter(
-                    child: _HeaderCard(child: _headerBlock()),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                  sliver: SliverToBoxAdapter(
-                    child: _buildAvatarsSection(),
-                  ),
-                ),
-                // Pinned Post Section
-                if (_pinnedPost != null || _isPinnedPostLoading)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                    sliver: SliverToBoxAdapter(
-                      child: _buildPinnedPostSection(),
-                    ),
-                  ),
-                // Collaborations Section
-                if (_collaborationPosts.isNotEmpty || _isCollaborationsLoading)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                    sliver: SliverToBoxAdapter(
-                      child: _buildCollaborationsSection(),
-                    ),
-                  ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-                  sliver: SliverToBoxAdapter(child: _userPostsMasonry()),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  // Header (name + bio + metrics)
+  // Header (avatar name + bio + metrics + avatar switcher)
   Widget _headerBlock() {
-    final displayName = _user?.displayName ?? _user?.username ?? 'User';
-    final activeAvatar = _avatars.isNotEmpty ? _avatars.first : null;
-    
+    // Use avatar data if available, fallback to user data for backward compatibility
+    final avatarName =
+        _currentAvatar?.name ?? _user?.displayName ?? _user?.username ?? 'User';
+    final avatarBio = _currentAvatar?.bio ?? 'Virtual influencer creator';
+    final avatarImageUrl =
+        _currentAvatar?.avatarImageUrl ?? _user?.profileImageUrl;
+
+    // Get stats from avatar profile data or fallback to legacy stats
+    final stats = _avatarProfileData?.stats;
+    final postsCount = stats?.postsCount ?? 0;
+    final followersCount = stats?.followersCount ?? 0;
+    final followingCount = stats?.followingCount ?? 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -849,21 +1085,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundImage: _user?.profileImageUrl != null
-                  ? _user!.profileImageUrl!.startsWith('assets/')
-                      ? AssetImage(_user!.profileImageUrl!) as ImageProvider
-                      : NetworkImage(_user!.profileImageUrl!)
+              backgroundImage: avatarImageUrl != null
+                  ? avatarImageUrl.startsWith('assets/')
+                        ? AssetImage(avatarImageUrl) as ImageProvider
+                        : NetworkImage(avatarImageUrl)
                   : const AssetImage('assets/images/p.jpg'),
             ),
             const SizedBox(width: 12),
-            // Name with inline verification badge (to the right of the name)
+            // Avatar name with inline verification badge
             Expanded(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
                     child: Text(
-                      displayName,
+                      avatarName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -883,35 +1119,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          activeAvatar?.bio ?? 'Virtual influencer creator',
-          style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.35),
+          avatarBio,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 13.5,
+            height: 1.35,
+          ),
         ),
-        // Note: Role badges removed - everyone is a creator in this simplified social media model
+
+        // Avatar switcher for owner view
+        if (_viewMode == ProfileViewMode.owner && _userAvatars.length > 1) ...[
+          const SizedBox(height: 12),
+          AvatarSwitcher(
+            avatars: _userAvatars,
+            activeAvatar: _currentAvatar,
+            onAvatarSelected: _onAvatarSelected,
+            style: AvatarSwitcherStyle.dropdown,
+            showAvatarNames: true,
+            showAvatarStats: true,
+          ),
+        ],
+
         const SizedBox(height: 14),
-        // Stats row (Posts • Followers • Following)
+        // Stats row (Posts • Followers • Following) - Avatar-specific
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            _StatColumn(value: _formatNumber(postsCount), label: 'Posts'),
             _StatColumn(
-              value: _formatNumber(_stats['posts_count'] ?? 0),
-              label: 'Posts',
-            ),
-            _StatColumn(
-              value: _formatNumber(_stats['followers_count'] ?? 0),
+              value: _formatNumber(followersCount),
               label: 'Followers',
             ),
             _StatColumn(
-              value: _formatNumber(_stats['following_count'] ?? 0),
+              value: _formatNumber(followingCount),
               label: 'Following',
             ),
           ],
         ),
         const SizedBox(height: 16),
-        // Primary actions
+        // Primary actions based on view mode
         Row(
           children: [
-            if (_isOwnProfile) ...{
-              // Own profile: Show Share and Chat buttons
+            if (_viewMode == ProfileViewMode.owner) ...[
+              // Owner view: Show Share and Chat buttons
               Expanded(
                 child: ElevatedButton(
                   onPressed: _shareProfile,
@@ -948,13 +1198,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-            } else ...[
-              // Other user's profile: Show Follow and Message buttons
+            ] else if (_viewMode == ProfileViewMode.public) ...[
+              // Public view: Show Follow and Message buttons (avatar-specific)
               Expanded(
                 child: ElevatedButton(
                   onPressed: _isFollowLoading ? null : _toggleFollow,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isFollowing ? Colors.grey[700] : kPrimaryColor,
+                    backgroundColor: _isFollowing
+                        ? Colors.grey[700]
+                        : kPrimaryColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -968,7 +1220,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Text(
@@ -995,17 +1249,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
+            ] else ...[
+              // Guest view: Show only Share button
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _shareProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Share Profile',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
             ],
           ],
         ),
       ],
     );
   }
-  
+
   // Enhanced Analytics section - Phase 3
   Widget _buildAnalyticsSection() {
     // Only show enhanced analytics for own profile
-    if (!_isOwnProfile) {
+    if (_viewMode != ProfileViewMode.owner) {
       return _buildBasicAnalyticsSection();
     }
 
@@ -1029,9 +1303,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Flexible(
-                    child: _buildPeriodSelector(),
-                  ),
+                  Flexible(child: _buildPeriodSelector()),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1061,20 +1333,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                ..._insights.take(3).map((insight) => _buildInsightCard(insight)),
+                ..._insights
+                    .take(3)
+                    .map((insight) => _buildInsightCard(insight)),
               ],
             ),
           ),
         if (_insights.isNotEmpty) const SizedBox(height: 14),
         // Benchmarks and Comparisons
-        if (_comparisons != null)
-          _HeaderCard(
-            child: _buildBenchmarksSection(),
-          ),
+        if (_comparisons != null) _HeaderCard(child: _buildBenchmarksSection()),
       ],
     );
   }
-  
+
   Widget _buildBasicAnalyticsSection() {
     return _HeaderCard(
       child: Column(
@@ -1131,7 +1402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildPeriodSelector() {
     return Container(
       padding: const EdgeInsets.all(2),
@@ -1158,7 +1429,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(
                     color: isSelected ? Colors.white : Colors.white70,
                     fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
@@ -1168,38 +1441,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildEnhancedMetricsGrid() {
     if (_detailedMetrics.isEmpty) {
       return _buildBasicMetricsGrid();
     }
-    
+
     return Column(
       children: [
         Row(
           children: [
             Expanded(
-              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
-                (m) => m.key == 'engagement_rate',
-                orElse: () => AnalyticsMetric(
-                  key: 'engagement_rate',
-                  label: 'Engagement',
-                  value: 0.0,
-                  type: MetricType.percentage,
+              child: _buildDetailedMetricCard(
+                _detailedMetrics.firstWhere(
+                  (m) => m.key == 'engagement_rate',
+                  orElse: () => AnalyticsMetric(
+                    key: 'engagement_rate',
+                    label: 'Engagement',
+                    value: 0.0,
+                    type: MetricType.percentage,
+                  ),
                 ),
-              )),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
-                (m) => m.key == 'reach',
-                orElse: () => AnalyticsMetric(
-                  key: 'reach',
-                  label: 'Reach',
-                  value: 0,
-                  type: MetricType.count,
+              child: _buildDetailedMetricCard(
+                _detailedMetrics.firstWhere(
+                  (m) => m.key == 'reach',
+                  orElse: () => AnalyticsMetric(
+                    key: 'reach',
+                    label: 'Reach',
+                    value: 0,
+                    type: MetricType.count,
+                  ),
                 ),
-              )),
+              ),
             ),
           ],
         ),
@@ -1207,34 +1484,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Row(
           children: [
             Expanded(
-              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
-                (m) => m.key == 'profile_views',
-                orElse: () => AnalyticsMetric(
-                  key: 'profile_views',
-                  label: 'Profile Views',
-                  value: 0,
-                  type: MetricType.count,
+              child: _buildDetailedMetricCard(
+                _detailedMetrics.firstWhere(
+                  (m) => m.key == 'profile_views',
+                  orElse: () => AnalyticsMetric(
+                    key: 'profile_views',
+                    label: 'Profile Views',
+                    value: 0,
+                    type: MetricType.count,
+                  ),
                 ),
-              )),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildDetailedMetricCard(_detailedMetrics.firstWhere(
-                (m) => m.key == 'follower_growth',
-                orElse: () => AnalyticsMetric(
-                  key: 'follower_growth',
-                  label: 'New Followers',
-                  value: 0,
-                  type: MetricType.count,
+              child: _buildDetailedMetricCard(
+                _detailedMetrics.firstWhere(
+                  (m) => m.key == 'follower_growth',
+                  orElse: () => AnalyticsMetric(
+                    key: 'follower_growth',
+                    label: 'New Followers',
+                    value: 0,
+                    type: MetricType.count,
+                  ),
                 ),
-              )),
+              ),
             ),
           ],
         ),
       ],
     );
   }
-  
+
   Widget _buildBasicMetricsGrid() {
     return Row(
       children: [
@@ -1262,11 +1543,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-  
+
   Widget _buildDetailedMetricCard(AnalyticsMetric metric) {
     final hasChange = metric.changePercentage != null;
     final isPositive = metric.isPositiveChange;
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1301,9 +1582,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (hasChange)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+                    color: (isPositive ? Colors.green : Colors.red).withOpacity(
+                      0.1,
+                    ),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -1332,7 +1618,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildInsightCard(AnalyticsInsight insight) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1347,11 +1633,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                insight.type.icon,
-                color: insight.type.color,
-                size: 16,
-              ),
+              Icon(insight.type.icon, color: insight.type.color, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1366,13 +1648,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (insight.priority == InsightPriority.high ||
                   insight.priority == InsightPriority.critical)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: insight.priority.color,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    insight.priority == InsightPriority.high ? 'HIGH' : 'URGENT',
+                    insight.priority == InsightPriority.high
+                        ? 'HIGH'
+                        : 'URGENT',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 8,
@@ -1398,7 +1685,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: TextButton(
                 onPressed: () => _handleInsightAction(insight),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   backgroundColor: insight.type.color.withOpacity(0.1),
                 ),
                 child: Text(
@@ -1416,12 +1706,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildBenchmarksSection() {
     final category = _comparisons!['category'] as String;
     final percentile = _comparisons!['user_percentile'] as int;
     final message = _comparisons!['benchmark_message'] as String;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1466,15 +1756,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const Text(
                         'Creator Category',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: kPrimaryColor,
                       borderRadius: BorderRadius.circular(16),
@@ -1505,7 +1795,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
-  
+
   Widget _buildAnalyticsCard({
     required String title,
     required String value,
@@ -1563,7 +1853,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: Text(
                   subtitle,
-                   style: TextStyle(
+                  style: TextStyle(
                     color: isPositive ? Colors.greenAccent : Colors.redAccent,
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
@@ -1578,10 +1868,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   Widget _buildTopAvatarCard() {
-    final topAvatar = _avatars.first; // In real app, this would be sorted by performance
-    
+    final topAvatar =
+        _avatars.first; // In real app, this would be sorted by performance
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1595,8 +1886,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             radius: 20,
             backgroundImage: topAvatar.avatarImageUrl != null
                 ? topAvatar.avatarImageUrl!.startsWith('assets/')
-                    ? AssetImage(topAvatar.avatarImageUrl!) as ImageProvider
-                    : NetworkImage(topAvatar.avatarImageUrl!)
+                      ? AssetImage(topAvatar.avatarImageUrl!) as ImageProvider
+                      : NetworkImage(topAvatar.avatarImageUrl!)
                 : null,
             child: topAvatar.avatarImageUrl == null
                 ? const Icon(Icons.person, color: kLightTextColor, size: 20)
@@ -1617,10 +1908,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 Text(
                   '${_formatNumber(topAvatar.followersCount)} followers • ${(topAvatar.engagementRate * 100).toStringAsFixed(1)}% engagement',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],
             ),
@@ -1644,17 +1932,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build pinned post section
   Widget _buildPinnedPostSection() {
     if (_isPinnedPostLoading) {
       return _buildPinnedPostSkeleton();
     }
-    
+
     if (_pinnedPost == null) {
       return const SizedBox.shrink();
     }
-    
+
     return _HeaderCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1672,14 +1960,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const Spacer(),
-              if (_isOwnProfile)
+              if (_viewMode == ProfileViewMode.owner)
                 IconButton(
                   onPressed: _unpinPost,
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: Colors.white70,
-                    size: 20,
-                  ),
+                  icon: Icon(Icons.more_vert, color: Colors.white70, size: 20),
                   tooltip: 'Post options',
                 ),
             ],
@@ -1690,7 +1974,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build pinned post skeleton loading
   Widget _buildPinnedPostSkeleton() {
     return _HeaderCard(
@@ -1699,7 +1983,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              SkeletonWidget(width: 20, height: 20, borderRadius: BorderRadius.circular(10)),
+              SkeletonWidget(
+                width: 20,
+                height: 20,
+                borderRadius: BorderRadius.circular(10),
+              ),
               const SizedBox(width: 8),
               SkeletonWidget(width: 100, height: 16),
             ],
@@ -1739,12 +2027,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build pinned post card
   Widget _buildPinnedPostCard(PostModel post) {
     final isVideo = post.type == PostType.video;
     final imageUrl = post.thumbnailUrl ?? post.imageUrl;
-    
+
     return GestureDetector(
       onTap: () {
         // Navigate to post detail
@@ -1779,12 +2067,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? Image.asset(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
                           )
                         : Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
                           )
                   else
                     _buildFallbackImage(),
@@ -1865,17 +2155,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build collaborations section
   Widget _buildCollaborationsSection() {
     if (_isCollaborationsLoading) {
       return _buildCollaborationsSkeleton();
     }
-    
+
     if (_collaborationPosts.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return _HeaderCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1895,10 +2185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const Spacer(),
               Text(
                 '${_collaborationPosts.length} posts',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -1919,7 +2206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build collaborations skeleton loading
   Widget _buildCollaborationsSkeleton() {
     return _HeaderCard(
@@ -1928,7 +2215,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Row(
             children: [
-              SkeletonWidget(width: 20, height: 20, borderRadius: BorderRadius.circular(10)),
+              SkeletonWidget(
+                width: 20,
+                height: 20,
+                borderRadius: BorderRadius.circular(10),
+              ),
               const SizedBox(width: 8),
               SkeletonWidget(width: 120, height: 16),
               const Spacer(),
@@ -1977,12 +2268,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build collaboration post card
   Widget _buildCollaborationPostCard(PostModel post) {
     final isVideo = post.type == PostType.video;
     final imageUrl = post.thumbnailUrl ?? post.imageUrl;
-    
+
     return GestureDetector(
       onTap: () {
         // Navigate to post detail
@@ -2018,12 +2309,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? Image.asset(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
                           )
                         : Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
                           )
                   else
                     _buildFallbackImage(),
@@ -2032,7 +2325,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     top: 6,
                     right: 6,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         borderRadius: BorderRadius.circular(4),
@@ -2106,14 +2402,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Format post date for display
   String _formatPostDate(DateTime? dateTime) {
     if (dateTime == null) return '';
-    
+
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inDays > 7) {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     } else if (difference.inDays > 0) {
@@ -2126,31 +2422,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return 'Just now';
     }
   }
-  
+
   /// Build fallback image for posts
   Widget _buildFallbackImage() {
     return Container(
       color: Colors.grey[800],
-      child: Center(
-        child: Icon(
-          Icons.image,
-          color: Colors.white54,
-          size: 32,
-        ),
-      ),
+      child: Center(child: Icon(Icons.image, color: Colors.white54, size: 32)),
     );
   }
-  
-  /// Unpin post from avatar
+
+  /// Unpin post from current avatar
   Future<void> _unpinPost() async {
-    if (_activeAvatar == null) return;
-    
+    if (_currentAvatar == null) return;
+
     try {
-      await _profileService.unpinPost(_activeAvatar!.id);
+      await _profileService.unpinPost(_currentAvatar!.id);
       setState(() {
         _pinnedPost = null;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -2170,18 +2460,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-  
+
   // Avatars section
   Widget _buildAvatarsSection() {
-    if (_avatars.isEmpty) {
-      // Show empty state only when viewing your own profile (creator view)
-      if (_isOwnProfile) {
-        return _buildEmptyAvatarsState();
-      }
-      // Hide section when viewing others with no avatars (fan view)
+    // Only show avatars section for owner view or if there are multiple avatars to display
+    if (_viewMode != ProfileViewMode.owner && _userAvatars.length <= 1) {
       return const SizedBox.shrink();
     }
-    
+
+    if (_userAvatars.isEmpty) {
+      // Show empty state only when viewing your own profile (owner view)
+      if (_viewMode == ProfileViewMode.owner) {
+        return _buildEmptyAvatarsState();
+      }
+      return const SizedBox.shrink();
+    }
+
     return _HeaderCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2190,7 +2484,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _isOwnProfile ? 'My Avatars' : '${_user?.displayName ?? 'User'}\'s Avatars',
+                _viewMode == ProfileViewMode.owner
+                    ? 'My Avatars'
+                    : '${_currentAvatar?.name ?? 'User'}\'s Avatars',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -2214,61 +2510,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
             height: 120,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: _avatars.length,
+              itemCount: _userAvatars.length,
               separatorBuilder: (context, index) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final avatar = _avatars[index];
-                return Container(
-                  width: 90,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundImage: avatar.avatarImageUrl != null
-                            ? avatar.avatarImageUrl!.startsWith('assets/')
-                                ? AssetImage(avatar.avatarImageUrl!) as ImageProvider
-                                : NetworkImage(avatar.avatarImageUrl!)
-                            : null,
-                        child: avatar.avatarImageUrl == null
-                            ? const Icon(Icons.person, color: kLightTextColor)
-                            : null,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        avatar.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                final avatar = _userAvatars[index];
+                final isActive = _currentAvatar?.id == avatar.id;
+                return GestureDetector(
+                  onTap: _viewMode == ProfileViewMode.owner
+                      ? () => _onAvatarSelected(avatar)
+                      : null,
+                  child: Container(
+                    width: 90,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: isActive
+                          ? Border.all(color: kPrimaryColor, width: 2)
+                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_formatNumber(avatar.followersCount)} followers',
-                        style: const TextStyle(
-                          color: kLightTextColor,
-                          fontSize: 10,
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundImage: avatar.avatarImageUrl != null
+                              ? avatar.avatarImageUrl!.startsWith('assets/')
+                                    ? AssetImage(avatar.avatarImageUrl!)
+                                          as ImageProvider
+                                    : NetworkImage(avatar.avatarImageUrl!)
+                              : null,
+                          child: avatar.avatarImageUrl == null
+                              ? const Icon(Icons.person, color: kLightTextColor)
+                              : null,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          avatar.name,
+                          style: TextStyle(
+                            color: isActive ? kPrimaryColor : Colors.white,
+                            fontWeight: isActive
+                                ? FontWeight.bold
+                                : FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_formatNumber(avatar.followersCount)} followers',
+                          style: const TextStyle(
+                            color: kLightTextColor,
+                            fontSize: 10,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        if (isActive) ...[
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kPrimaryColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'ACTIVE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 );
               },
@@ -2279,22 +2608,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Database-backed posts grid - Phase 4
+  /// Avatar posts grid - displays posts for the current avatar
   Widget _userPostsMasonry() {
     // Show loading state while posts are loading
-    if (_isPostsLoading && _userPosts.isEmpty) {
+    if (_isPostsLoading && _avatarPosts.isEmpty) {
       return _buildPostsLoadingGrid();
     }
-    
+
     // Show empty state if no posts
-    if (_userPosts.isEmpty) {
+    if (_avatarPosts.isEmpty) {
       return _buildEmptyPostsState();
     }
-    
+
     // Show posts in masonry layout
     return _buildDatabasePostsGrid();
   }
-  
+
   /// Build loading skeleton for posts
   Widget _buildPostsLoadingGrid() {
     return LayoutBuilder(
@@ -2303,7 +2632,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const gap = 12.0;
         final leftColW = (totalW - gap) * 0.35;
         final rightColW = totalW - leftColW - gap;
-        
+
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2365,22 +2694,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
   }
-  
-  /// Build empty posts state
+
+  /// Build empty posts state for avatar
   Widget _buildEmptyPostsState() {
+    final isOwner = _viewMode == ProfileViewMode.owner;
+    final avatarName = _currentAvatar?.name ?? 'This avatar';
+
     return Container(
       padding: const EdgeInsets.all(40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.grid_view,
-            size: 64,
-            color: Colors.white30,
-          ),
+          Icon(Icons.grid_view, size: 64, color: Colors.white30),
           const SizedBox(height: 16),
           Text(
-            _isOwnProfile ? 'No posts yet' : 'No posts to show',
+            isOwner ? 'No posts yet' : 'No posts to show',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -2389,16 +2717,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _isOwnProfile 
-                ? 'Share your first moment to get started!' 
-                : 'This user hasn\'t posted anything yet.',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            isOwner
+                ? 'Share your first moment as ${_currentAvatar?.name ?? 'this avatar'} to get started!'
+                : '$avatarName hasn\'t posted anything yet.',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
             textAlign: TextAlign.center,
           ),
-          if (_isOwnProfile) ...[
+          if (isOwner) ...[
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _navigateToCreatePost,
@@ -2407,7 +2732,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -2418,7 +2746,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build empty avatars state
   Widget _buildEmptyAvatarsState() {
     return Container(
@@ -2426,14 +2754,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.person_outline,
-            size: 64,
-            color: Colors.white30,
-          ),
+          Icon(Icons.person_outline, size: 64, color: Colors.white30),
           const SizedBox(height: 16),
           Text(
-            _isOwnProfile ? 'No avatars yet' : 'No avatars to show',
+            _viewMode == ProfileViewMode.owner
+                ? 'No avatars yet'
+                : 'No avatars to show',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -2442,16 +2768,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _isOwnProfile 
-                ? 'Create your first avatar to get started!' 
+            _viewMode == ProfileViewMode.owner
+                ? 'Create your first avatar to get started!'
                 : 'This user hasn\'t created any avatars yet.',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
             textAlign: TextAlign.center,
           ),
-          if (_isOwnProfile) ...[
+          if (_viewMode == ProfileViewMode.owner) ...[
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _navigateToAvatarManagement,
@@ -2460,7 +2783,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -2471,7 +2797,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
+
   /// Build the actual database posts grid
   Widget _buildDatabasePostsGrid() {
     return LayoutBuilder(
@@ -2480,19 +2806,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const gap = 12.0;
         final leftColW = (totalW - gap) * 0.35;
         final rightColW = totalW - leftColW - gap;
-        
-        // Distribute posts between left and right columns
+
+        // Distribute avatar posts between left and right columns
         final leftPosts = <PostModel>[];
         final rightPosts = <PostModel>[];
-        
-        for (int i = 0; i < _userPosts.length; i++) {
+
+        for (int i = 0; i < _avatarPosts.length; i++) {
           if (i % 3 == 0) {
-            leftPosts.add(_userPosts[i]);
+            leftPosts.add(_avatarPosts[i]);
           } else {
-            rightPosts.add(_userPosts[i]);
+            rightPosts.add(_avatarPosts[i]);
           }
         }
-        
+
         return Column(
           children: [
             Row(
@@ -2502,15 +2828,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 SizedBox(
                   width: leftColW,
                   child: Column(
-                    children: leftPosts.map((post) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildPostTile(
-                        post: post,
-                        height: 120,
-                        width: leftColW,
-                        radius: 18,
-                      ),
-                    )).toList(),
+                    children: leftPosts
+                        .map(
+                          (post) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildPostTile(
+                              post: post,
+                              height: 120,
+                              width: leftColW,
+                              radius: 18,
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2524,7 +2854,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       final isFirst = index == 0;
                       final height = isFirst ? 180.0 : 120.0;
                       final radius = isFirst ? 22.0 : 18.0;
-                      
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildPostTile(
@@ -2552,11 +2882,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: OutlinedButton(
-                  onPressed: () => _loadUserPosts(loadMore: true),
+                  onPressed: () => _loadAvatarPosts(loadMore: true),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.white30),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -2569,7 +2902,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
   }
-  
+
   /// Build individual post tile from database data
   Widget _buildPostTile({
     required PostModel post,
@@ -2579,7 +2912,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     final isVideo = post.type == PostType.video;
     final imageUrl = post.thumbnailUrl ?? post.imageUrl;
-    
+
     return GestureDetector(
       onTap: () {
         // Navigate to post detail
@@ -2602,12 +2935,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? Image.asset(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildFallbackImage(),
                     )
                   : Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => _buildFallbackImage(),
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildFallbackImage(),
                     )
             else
               _buildFallbackImage(),
@@ -2617,10 +2952,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.4),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black.withOpacity(0.4), Colors.transparent],
                 ),
               ),
             ),
@@ -2661,11 +2993,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.favorite,
-                      color: Colors.white,
-                      size: 12,
-                    ),
+                    Icon(Icons.favorite, color: Colors.white, size: 12),
                     const SizedBox(width: 4),
                     Text(
                       _formatNumber(post.likesCount ?? 0),
@@ -2684,7 +3012,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-  
 }
 
 // Card wrapper for the header that appears over the photo

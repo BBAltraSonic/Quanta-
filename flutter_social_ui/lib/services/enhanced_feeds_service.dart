@@ -16,18 +16,21 @@ import '../store/state_service_adapter.dart';
 
 /// Enhanced feeds service with comprehensive post interaction functionality
 class EnhancedFeedsService {
-  static final EnhancedFeedsService _instance = EnhancedFeedsService._internal();
+  static final EnhancedFeedsService _instance =
+      EnhancedFeedsService._internal();
   factory EnhancedFeedsService() => _instance;
   EnhancedFeedsService._internal();
 
   final AuthService _authService = AuthService();
   final AnalyticsService _analyticsService = AnalyticsService();
-  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
-  final DatabaseErrorRecoveryService _dbErrorRecovery = DatabaseErrorRecoveryService();
+  final notification_service.NotificationService _notificationService =
+      notification_service.NotificationService();
+  final DatabaseErrorRecoveryService _dbErrorRecovery =
+      DatabaseErrorRecoveryService();
   final StateServiceAdapter _stateAdapter = StateServiceAdapter();
   final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
   SupabaseClient get _supabase => Supabase.instance.client;
-  
+
   // Realtime subscriptions
   final Map<String, RealtimeChannel> _realtimeSubscriptions = {};
 
@@ -42,7 +45,9 @@ class EnhancedFeedsService {
       // First check if posts are already loaded in state for this page
       final cachedPosts = _stateAdapter.getCachedPostsForFeed('video_feed');
       if (cachedPosts != null && cachedPosts.isNotEmpty) {
-        debugPrint('📱 Returning ${cachedPosts.length} cached posts for feed (page $page)');
+        debugPrint(
+          '📱 Returning ${cachedPosts.length} cached posts for feed (page $page)',
+        );
         return cachedPosts;
       }
 
@@ -67,24 +72,30 @@ class EnhancedFeedsService {
         orderedQuery = query.order('created_at', ascending: false);
       }
 
-      final response = await orderedQuery
-          .range(page * limit, (page + 1) * limit - 1);
+      final response = await orderedQuery.range(
+        page * limit,
+        (page + 1) * limit - 1,
+      );
 
-      var posts = response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
+      var posts = response
+          .map<PostModel>((json) => PostModel.fromJson(json))
+          .toList();
 
       // Apply client-side safety filtering
       if (applySafetyFiltering) {
         posts = await UserSafetyService().filterContent(posts);
       }
-      
+
       // Store posts in central state
       _stateAdapter.cachePosts(posts);
       _stateAdapter.setFeedPostsForPage(posts, page);
-      
+
       // Clear loading state
       _stateAdapter.setFeedLoadingState('video_feed_$page', false);
-      
-      debugPrint('📱 Retrieved ${posts.length} posts for feed (page $page, safety filtering: $applySafetyFiltering)');
+
+      debugPrint(
+        '📱 Retrieved ${posts.length} posts for feed (page $page, safety filtering: $applySafetyFiltering)',
+      );
       return posts;
     } catch (e) {
       debugPrint('❌ Failed to get video feed: $e');
@@ -104,41 +115,98 @@ class EnhancedFeedsService {
     try {
       // Calculate offset for pagination
       final offset = (page - 1) * limit;
-      
+
       // First get user's avatar IDs
       final avatarResponse = await _supabase
           .from('avatars')
           .select('id')
           .eq('owner_user_id', userId);
-      
+
       if (avatarResponse.isEmpty) {
         debugPrint('📱 No avatars found for user $userId');
         return [];
       }
-      
-      final avatarIds = (avatarResponse as List).map((avatar) => avatar['id'] as String).toList();
-      
-      // Now get posts for these avatars
+
+      final avatarIds = (avatarResponse as List)
+          .map((avatar) => avatar['id'] as String)
+          .toList();
+
+      // Now get posts for these avatars - ensuring avatar_id is not null
       final response = await _supabase
           .from(DbConfig.postsTable)
           .select('*')
-          .filter('avatar_id', 'in', '(${avatarIds.join(",")})')
+          .inFilter('avatar_id', avatarIds)
           .eq('is_active', true)
           .eq('status', DbConfig.publishedStatus)
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      var posts = response.map<PostModel>((json) => PostModel.fromJson(json)).toList();
+      var posts = response
+          .map<PostModel>((json) => PostModel.fromJson(json))
+          .toList();
 
       // Apply safety filtering if requested
       if (applySafetyFiltering) {
         posts = await UserSafetyService().filterContent(posts);
       }
-      
-      debugPrint('📱 Retrieved ${posts.length} posts for user $userId via ${avatarIds.length} avatars (page $page)');
+
+      // Update app state with avatar associations
+      for (final post in posts) {
+        _stateAdapter.cachePosts([post]);
+        // Note: Avatar association is handled by AvatarContentService
+      }
+
+      debugPrint(
+        '📱 Retrieved ${posts.length} posts for user $userId via ${avatarIds.length} avatars (page $page)',
+      );
       return posts;
     } catch (e) {
       debugPrint('❌ Failed to get user posts: $e');
+      return [];
+    }
+  }
+
+  /// Get posts for a specific avatar
+  Future<List<PostModel>> getAvatarPosts({
+    required String avatarId,
+    int page = 1,
+    int limit = 20,
+    bool applySafetyFiltering = false,
+  }) async {
+    try {
+      // Calculate offset for pagination
+      final offset = (page - 1) * limit;
+
+      // Get posts for the specific avatar only
+      final response = await _supabase
+          .from(DbConfig.postsTable)
+          .select('*')
+          .eq('avatar_id', avatarId)
+          .eq('is_active', true)
+          .eq('status', DbConfig.publishedStatus)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      var posts = response
+          .map<PostModel>((json) => PostModel.fromJson(json))
+          .toList();
+
+      // Apply safety filtering if requested
+      if (applySafetyFiltering) {
+        posts = await UserSafetyService().filterContent(posts);
+      }
+
+      // Update app state with posts and avatar associations
+      for (final post in posts) {
+        _stateAdapter.cachePosts([post]);
+      }
+
+      debugPrint(
+        '📱 Retrieved ${posts.length} posts for avatar $avatarId (page $page)',
+      );
+      return posts;
+    } catch (e) {
+      debugPrint('❌ Failed to get avatar posts: $e');
       return [];
     }
   }
@@ -203,21 +271,24 @@ class EnhancedFeedsService {
     try {
       // Get current liked status from central state first (for optimistic updates)
       final currentLikedStatus = _stateAdapter.isPostLiked(postId);
-      
+
       // Optimistically update UI state first
       _stateAdapter.setPostLikedStatus(postId, !currentLikedStatus);
-      
+
       // First check current status using RPC function with error recovery
       final statusResult = await _dbErrorRecovery.executeWithRetry(() async {
-        return _supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': postId,
-        });
+        return _supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': postId},
+        );
       });
 
       if (!statusResult['success']) {
         // Revert optimistic update on failure
         _stateAdapter.setPostLikedStatus(postId, currentLikedStatus);
-        throw Exception('Failed to get interaction status: ${statusResult['error']}');
+        throw Exception(
+          'Failed to get interaction status: ${statusResult['error']}',
+        );
       }
 
       final isCurrentlyLiked = statusResult['data']['user_liked'] as bool;
@@ -225,9 +296,10 @@ class EnhancedFeedsService {
       if (isCurrentlyLiked) {
         // Unlike using RPC function with error recovery
         final result = await _dbErrorRecovery.executeWithRetry(() async {
-          return _supabase.rpc('decrement_likes_count', params: {
-            'target_post_id': postId,
-          });
+          return _supabase.rpc(
+            'decrement_likes_count',
+            params: {'target_post_id': postId},
+          );
         });
 
         if (!result['success']) {
@@ -238,7 +310,7 @@ class EnhancedFeedsService {
 
         // Update central state with confirmed unlike
         _stateAdapter.setPostLikedStatus(postId, false);
-        
+
         // Track analytics
         _analyticsService.trackLikeToggle(postId, false);
 
@@ -246,9 +318,10 @@ class EnhancedFeedsService {
       } else {
         // Like using RPC function with error recovery
         final result = await _dbErrorRecovery.executeWithRetry(() async {
-          return _supabase.rpc('increment_likes_count', params: {
-            'target_post_id': postId,
-          });
+          return _supabase.rpc(
+            'increment_likes_count',
+            params: {'target_post_id': postId},
+          );
         });
 
         if (!result['success']) {
@@ -259,13 +332,13 @@ class EnhancedFeedsService {
 
         // Update central state with confirmed like
         _stateAdapter.setPostLikedStatus(postId, true);
-        
+
         // Create notification for post owner
         await _createLikeNotification(postId, userId);
-        
+
         // Track analytics
         _analyticsService.trackLikeToggle(postId, true);
-        
+
         return true;
       }
     } catch (e) {
@@ -281,9 +354,10 @@ class EnhancedFeedsService {
 
     try {
       final result = await _dbErrorRecovery.executeWithRetry(() async {
-        return _supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': postId,
-        });
+        return _supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': postId},
+        );
       });
 
       if (!result['success']) {
@@ -309,7 +383,9 @@ class EnhancedFeedsService {
           .limit(limit);
 
       return response
-          .map<UserModel>((item) => UserModel.fromJson(item[DbConfig.usersTable]))
+          .map<UserModel>(
+            (item) => UserModel.fromJson(item[DbConfig.usersTable]),
+          )
           .toList();
     } catch (e) {
       debugPrint('❌ Failed to get post likers: $e');
@@ -330,10 +406,10 @@ class EnhancedFeedsService {
     try {
       // Use ownership guard to prevent self-follow
       await _ownershipGuard.guardFollowAction(avatarId);
-      
+
       // Optimistically update UI state first
       _stateAdapter.setAvatarFollowedStatus(avatarId, !currentFollowingStatus);
-      
+
       // Check if already following
       final existingFollow = await _supabase
           .from(DbConfig.followsTable)
@@ -349,13 +425,13 @@ class EnhancedFeedsService {
             .delete()
             .eq('avatar_id', avatarId)
             .eq('user_id', userId);
-        
+
         // Update central state with confirmed unfollow
         _stateAdapter.setAvatarFollowedStatus(avatarId, false);
-        
+
         // Track analytics
         _analyticsService.trackFollowToggle(avatarId, false);
-        
+
         return false;
       } else {
         // Follow
@@ -364,16 +440,16 @@ class EnhancedFeedsService {
           'user_id': userId,
           'created_at': DateTime.now().toIso8601String(),
         });
-        
+
         // Update central state with confirmed follow
         _stateAdapter.setAvatarFollowedStatus(avatarId, true);
-        
+
         // Create notification for avatar owner
         await _createFollowNotification(avatarId, userId);
-        
+
         // Track analytics
         _analyticsService.trackFollowToggle(avatarId, true);
-        
+
         return true;
       }
     } catch (e) {
@@ -405,7 +481,11 @@ class EnhancedFeedsService {
   }
 
   /// Get comments for a post with pagination
-  Future<List<Comment>> getComments(String postId, {int limit = 20, int offset = 0}) async {
+  Future<List<Comment>> getComments(
+    String postId, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
     try {
       final response = await _supabase
           .from(DbConfig.commentsTable)
@@ -421,7 +501,7 @@ class EnhancedFeedsService {
 
       return response.map<Comment>((json) {
         final comment = Comment.fromJson(json);
-        
+
         // Add user/avatar display info
         if (json['users'] != null) {
           final userData = json['users'] as Map<String, dynamic>;
@@ -434,7 +514,7 @@ class EnhancedFeedsService {
             // Note: Comment model needs to be updated to support avatar names
           );
         }
-        
+
         return comment;
       }).toList();
     } catch (e) {
@@ -453,23 +533,31 @@ class EnhancedFeedsService {
     try {
       // No ownership guard needed for adding comments - anyone can comment on a post
       // unless they are blocked, which is handled at the UI level
-      
-      final response = await _supabase.from(DbConfig.commentsTable).insert({
-        'post_id': postId,
-        'user_id': userId,
-        'text': text,
-        'created_at': DateTime.now().toIso8601String(),
-      }).select().single();
+
+      final response = await _supabase
+          .from(DbConfig.commentsTable)
+          .insert({
+            'post_id': postId,
+            'user_id': userId,
+            'text': text,
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
 
       // Update comments count
       await _incrementCommentsCount(postId);
-      
+
       // Create notification for post owner
       await _createCommentNotification(postId, userId);
-      
+
       // Track analytics
       final comment = Comment.fromJson(response);
-      _analyticsService.trackCommentAdd(postId, comment.id!, commentLength: text.length);
+      _analyticsService.trackCommentAdd(
+        postId,
+        comment.id,
+        commentLength: text.length,
+      );
 
       return comment;
     } catch (e) {
@@ -497,10 +585,7 @@ class EnhancedFeedsService {
           .single();
 
       // Delete the comment
-      await _supabase
-          .from(DbConfig.commentsTable)
-          .delete()
-          .eq('id', commentId);
+      await _supabase.from(DbConfig.commentsTable).delete().eq('id', commentId);
 
       // Decrement comments count
       await _decrementCommentsCount(comment['post_id']);
@@ -513,12 +598,15 @@ class EnhancedFeedsService {
   }
 
   /// Subscribe to real-time comments for a post
-  RealtimeChannel subscribeToComments(String postId, Function(Comment) onNewComment) {
+  RealtimeChannel subscribeToComments(
+    String postId,
+    Function(Comment) onNewComment,
+  ) {
     final channelName = 'comments:$postId';
-    
+
     // Unsubscribe existing channel if any
     _realtimeSubscriptions[channelName]?.unsubscribe();
-    
+
     final channel = _supabase
         .channel(channelName)
         .onPostgresChanges(
@@ -540,7 +628,7 @@ class EnhancedFeedsService {
           },
         )
         .subscribe();
-    
+
     _realtimeSubscriptions[channelName] = channel;
     return channel;
   }
@@ -556,10 +644,9 @@ class EnhancedFeedsService {
     final currentBookmarkStatus = _stateAdapter.isPostBookmarked(postId);
 
     try {
-      
       // Optimistically update UI state first
       _stateAdapter.setPostBookmarkedStatus(postId, !currentBookmarkStatus);
-      
+
       // Check if already bookmarked
       final existingBookmark = await _supabase
           .from(DbConfig.savedPostsTable)
@@ -575,13 +662,13 @@ class EnhancedFeedsService {
             .delete()
             .eq('post_id', postId)
             .eq('user_id', userId);
-        
+
         // Update central state with confirmed unbookmark
         _stateAdapter.setPostBookmarkedStatus(postId, false);
-        
+
         // Track analytics
         _analyticsService.trackBookmarkToggle(postId, false);
-        
+
         return false;
       } else {
         // Add bookmark
@@ -590,13 +677,13 @@ class EnhancedFeedsService {
           'user_id': userId,
           'created_at': DateTime.now().toIso8601String(),
         });
-        
+
         // Update central state with confirmed bookmark
         _stateAdapter.setPostBookmarkedStatus(postId, true);
-        
+
         // Track analytics
         _analyticsService.trackBookmarkToggle(postId, true);
-        
+
         return true;
       }
     } catch (e) {
@@ -628,7 +715,11 @@ class EnhancedFeedsService {
   }
 
   /// Share a post
-  Future<bool> sharePost(String postId, {String? message, String? platform}) async {
+  Future<bool> sharePost(
+    String postId, {
+    String? message,
+    String? platform,
+  }) async {
     final userId = _authService.currentUserId;
     if (userId == null) {
       throw Exception('User not authenticated');
@@ -645,9 +736,13 @@ class EnhancedFeedsService {
 
       // Update shares count
       await _incrementSharesCount(postId);
-      
+
       // Track analytics
-      _analyticsService.trackShareAttempt(postId, platform ?? 'unknown', successful: true);
+      _analyticsService.trackShareAttempt(
+        postId,
+        platform ?? 'unknown',
+        successful: true,
+      );
 
       return true;
     } catch (e) {
@@ -657,7 +752,12 @@ class EnhancedFeedsService {
   }
 
   /// Report a post
-  Future<bool> reportPost(String postId, String reportType, {String? reason, String? details}) async {
+  Future<bool> reportPost(
+    String postId,
+    String reportType, {
+    String? reason,
+    String? details,
+  }) async {
     final userId = _authService.currentUserId;
     if (userId == null) {
       throw Exception('User not authenticated');
@@ -698,7 +798,7 @@ class EnhancedFeedsService {
     try {
       // Use ownership guard to prevent self-blocking
       await _ownershipGuard.guardBlockAction(blockedUserId);
-      
+
       await _supabase.from(DbConfig.userBlocksTable).insert({
         'blocker_user_id': userId,
         'blocked_user_id': blockedUserId,
@@ -748,7 +848,7 @@ class EnhancedFeedsService {
         elementType: 'user',
         permission: OwnershipPermission.isOther,
       );
-      
+
       await _supabase.from(DbConfig.userMutesTable).upsert({
         'muter_user_id': userId,
         'muted_user_id': mutedUserId,
@@ -757,7 +857,9 @@ class EnhancedFeedsService {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      debugPrint('✅ User muted: $mutedUserId for ${duration?.toString() ?? 'indefinitely'}');
+      debugPrint(
+        '✅ User muted: $mutedUserId for ${duration?.toString() ?? 'indefinitely'}',
+      );
       return true;
     } catch (e) {
       debugPrint('❌ Failed to mute user: $e');
@@ -794,10 +896,10 @@ class EnhancedFeedsService {
 
     try {
       // Use the database function that includes automatic cleanup
-      final response = await _supabase.rpc('is_user_muted', params: {
-        'muter_id': currentUserId,
-        'muted_id': userId,
-      });
+      final response = await _supabase.rpc(
+        'is_user_muted',
+        params: {'muter_id': currentUserId, 'muted_id': userId},
+      );
 
       return response == true;
     } catch (e) {
@@ -813,10 +915,10 @@ class EnhancedFeedsService {
 
     try {
       // Use the database function for consistency
-      final response = await _supabase.rpc('is_user_blocked', params: {
-        'blocker_id': currentUserId,
-        'blocked_id': userId,
-      });
+      final response = await _supabase.rpc(
+        'is_user_blocked',
+        params: {'blocker_id': currentUserId, 'blocked_id': userId},
+      );
 
       return response == true;
     } catch (e) {
@@ -826,12 +928,13 @@ class EnhancedFeedsService {
   }
 
   /// Record view event with analytics
-  Future<void> recordViewEvent(String postId, {
+  Future<void> recordViewEvent(
+    String postId, {
     int? durationSeconds,
     double? watchPercentage,
   }) async {
     final userId = _authService.currentUserId;
-    
+
     try {
       // Record detailed view event
       await _supabase.from(DbConfig.viewEventsTable).insert({
@@ -847,7 +950,8 @@ class EnhancedFeedsService {
       });
 
       // Update post view count if significant view
-      if (durationSeconds != null && durationSeconds >= DbConfig.viewThresholdSeconds) {
+      if (durationSeconds != null &&
+          durationSeconds >= DbConfig.viewThresholdSeconds) {
         await incrementViewCount(postId);
       }
     } catch (e) {
@@ -859,9 +963,10 @@ class EnhancedFeedsService {
   Future<void> incrementViewCount(String postId) async {
     try {
       final result = await _dbErrorRecovery.executeWithRetry(() async {
-        return _supabase.rpc('increment_view_count', params: {
-          'target_post_id': postId,
-        });
+        return _supabase.rpc(
+          'increment_view_count',
+          params: {'target_post_id': postId},
+        );
       });
 
       if (!result['success']) {
@@ -889,7 +994,9 @@ class EnhancedFeedsService {
       );
 
       return Map.fromEntries(
-        postIds.map((postId) => MapEntry(postId, likedPostIds.contains(postId))),
+        postIds.map(
+          (postId) => MapEntry(postId, likedPostIds.contains(postId)),
+        ),
       );
     } catch (e) {
       debugPrint('❌ Failed to get liked status batch: $e');
@@ -898,7 +1005,9 @@ class EnhancedFeedsService {
   }
 
   /// Get following status for multiple avatars (for efficient batch checking)
-  Future<Map<String, bool>> getFollowingStatusBatch(List<String> avatarIds) async {
+  Future<Map<String, bool>> getFollowingStatusBatch(
+    List<String> avatarIds,
+  ) async {
     final userId = _authService.currentUserId;
     if (userId == null) return {};
 
@@ -914,7 +1023,10 @@ class EnhancedFeedsService {
       );
 
       return Map.fromEntries(
-        avatarIds.map((avatarId) => MapEntry(avatarId, followingAvatarIds.contains(avatarId))),
+        avatarIds.map(
+          (avatarId) =>
+              MapEntry(avatarId, followingAvatarIds.contains(avatarId)),
+        ),
       );
     } catch (e) {
       debugPrint('❌ Failed to get following status batch: $e');
@@ -923,7 +1035,9 @@ class EnhancedFeedsService {
   }
 
   /// Get bookmarked status for multiple posts
-  Future<Map<String, bool>> getBookmarkedStatusBatch(List<String> postIds) async {
+  Future<Map<String, bool>> getBookmarkedStatusBatch(
+    List<String> postIds,
+  ) async {
     final userId = _authService.currentUserId;
     if (userId == null) return {};
 
@@ -939,7 +1053,9 @@ class EnhancedFeedsService {
       );
 
       return Map.fromEntries(
-        postIds.map((postId) => MapEntry(postId, bookmarkedPostIds.contains(postId))),
+        postIds.map(
+          (postId) => MapEntry(postId, bookmarkedPostIds.contains(postId)),
+        ),
       );
     } catch (e) {
       debugPrint('❌ Failed to get bookmarked status batch: $e');
@@ -953,9 +1069,10 @@ class EnhancedFeedsService {
 
   Future<void> _incrementCommentsCount(String postId) async {
     try {
-      await _supabase.rpc('increment_comments_count', params: {
-        'post_id': postId,
-      });
+      await _supabase.rpc(
+        'increment_comments_count',
+        params: {'post_id': postId},
+      );
     } catch (e) {
       debugPrint('❌ Failed to increment comments count: $e');
     }
@@ -963,9 +1080,10 @@ class EnhancedFeedsService {
 
   Future<void> _decrementCommentsCount(String postId) async {
     try {
-      await _supabase.rpc('decrement_comments_count', params: {
-        'post_id': postId,
-      });
+      await _supabase.rpc(
+        'decrement_comments_count',
+        params: {'post_id': postId},
+      );
     } catch (e) {
       debugPrint('❌ Failed to decrement comments count: $e');
     }
@@ -974,7 +1092,10 @@ class EnhancedFeedsService {
   Future<void> _incrementSharesCount(String postId) async {
     try {
       // Use RPC to properly increment the counter
-      await _supabase.rpc('increment_shares_count', params: {'post_id': postId});
+      await _supabase.rpc(
+        'increment_shares_count',
+        params: {'post_id': postId},
+      );
     } catch (e) {
       debugPrint('❌ Failed to increment shares count: $e');
     }
@@ -1013,7 +1134,10 @@ class EnhancedFeedsService {
     }
   }
 
-  Future<void> _createCommentNotification(String postId, String commenterId) async {
+  Future<void> _createCommentNotification(
+    String postId,
+    String commenterId,
+  ) async {
     try {
       // Get post owner
       final post = await _supabase
@@ -1045,7 +1169,10 @@ class EnhancedFeedsService {
     }
   }
 
-  Future<void> _createFollowNotification(String avatarId, String followerId) async {
+  Future<void> _createFollowNotification(
+    String avatarId,
+    String followerId,
+  ) async {
     try {
       final avatar = await _supabase
           .from(DbConfig.avatarsTable)
