@@ -9,13 +9,13 @@ class DraftRestorationBanner extends StatefulWidget {
   final bool showDismiss;
 
   const DraftRestorationBanner({
-    Key? key,
+    super.key,
     required this.draftAge,
     required this.onRestore,
     required this.onDismiss,
     this.customMessage,
     this.showDismiss = true,
-  }) : super(key: key);
+  });
 
   @override
   State<DraftRestorationBanner> createState() => _DraftRestorationBannerState();
@@ -24,7 +24,7 @@ class DraftRestorationBanner extends StatefulWidget {
 class _DraftRestorationBannerState extends State<DraftRestorationBanner>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _slideAnimation;
+  late Animation<Offset> _slideAnimation;
   bool _isVisible = true;
 
   @override
@@ -34,14 +34,11 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
-    _slideAnimation = Tween<double>(
-      begin: -1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.0, -1.0), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
 
     _animationController.forward();
   }
@@ -74,7 +71,7 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
     if (!_isVisible) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    
+
     return SlideTransition(
       position: _slideAnimation,
       child: Container(
@@ -101,11 +98,7 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.restore,
-                  color: theme.colorScheme.primary,
-                  size: 20,
-                ),
+                Icon(Icons.restore, color: theme.colorScheme.primary, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -120,10 +113,11 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        widget.customMessage ?? 
-                        'You have unsaved changes from ${widget.draftAge}.',
+                        widget.customMessage ??
+                            'You have unsaved changes from ${widget.draftAge}.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -139,7 +133,9 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
                       minWidth: 24,
                       minHeight: 24,
                     ),
-                    color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
+                    color: theme.colorScheme.onPrimaryContainer.withValues(
+                      alpha: 0.6,
+                    ),
                   ),
               ],
             ),
@@ -151,8 +147,12 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
                   TextButton(
                     onPressed: _dismiss,
                     style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      foregroundColor: theme.colorScheme.onPrimaryContainer
+                          .withValues(alpha: 0.7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                     ),
                     child: const Text('Dismiss'),
                   ),
@@ -163,7 +163,10 @@ class _DraftRestorationBannerState extends State<DraftRestorationBanner>
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: theme.colorScheme.onPrimary,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -185,10 +188,10 @@ class UnsavedChangesIndicator extends StatelessWidget {
   final bool isVisible;
 
   const UnsavedChangesIndicator({
-    Key? key,
+    super.key,
     required this.changedFields,
     this.isVisible = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +200,7 @@ class UnsavedChangesIndicator extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -252,14 +255,15 @@ class AutoSaveStatusIndicator extends StatefulWidget {
   final DateTime? lastSaved;
 
   const AutoSaveStatusIndicator({
-    Key? key,
+    super.key,
     this.isSaving = false,
     this.isEnabled = true,
     this.lastSaved,
-  }) : super(key: key);
+  });
 
   @override
-  State<AutoSaveStatusIndicator> createState() => _AutoSaveStatusIndicatorState();
+  State<AutoSaveStatusIndicator> createState() =>
+      _AutoSaveStatusIndicatorState();
 }
 
 class _AutoSaveStatusIndicatorState extends State<AutoSaveStatusIndicator>
@@ -274,14 +278,10 @@ class _AutoSaveStatusIndicatorState extends State<AutoSaveStatusIndicator>
       duration: const Duration(seconds: 1),
       vsync: this,
     );
-    
-    _pulseAnimation = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+
+    _pulseAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
     if (widget.isSaving) {
       _pulseController.repeat(reverse: true);
@@ -291,7 +291,7 @@ class _AutoSaveStatusIndicatorState extends State<AutoSaveStatusIndicator>
   @override
   void didUpdateWidget(AutoSaveStatusIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (widget.isSaving != oldWidget.isSaving) {
       if (widget.isSaving) {
         _pulseController.repeat(reverse: true);
@@ -313,7 +313,7 @@ class _AutoSaveStatusIndicatorState extends State<AutoSaveStatusIndicator>
     if (!widget.isEnabled) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
@@ -367,7 +367,7 @@ class _AutoSaveStatusIndicatorState extends State<AutoSaveStatusIndicator>
 
     final now = DateTime.now();
     final difference = now.difference(widget.lastSaved!);
-    
+
     if (difference.inSeconds < 30) {
       return 'Saved just now';
     } else if (difference.inMinutes < 1) {

@@ -1,9 +1,5 @@
-import 'dart:convert';
 import 'dart:math';
-import 'package:http/http.dart' as http;
 import '../models/avatar_model.dart';
-import '../models/post_model.dart';
-import '../utils/environment.dart';
 import 'ai_service.dart';
 
 class ContentSuggestion {
@@ -88,8 +84,6 @@ class SmartContentService {
   static final SmartContentService _instance = SmartContentService._internal();
   factory SmartContentService() => _instance;
   SmartContentService._internal();
-
-  final AIService _aiService = AIService();
 
   // Trending hashtags database (in production, this would come from analytics)
   static const Map<String, List<String>> _trendingHashtags = {
@@ -763,18 +757,21 @@ class SmartContentService {
         case PersonalityTrait.friendly:
           if (lowerCaption.contains(
             RegExp(r'\b(hi|hello|thanks|please|love)\b'),
-          ))
+          )) {
             score += 0.1;
+          }
           break;
         case PersonalityTrait.humorous:
-          if (lowerCaption.contains(RegExp(r'😄|😅|😊|haha|lol|funny')))
+          if (lowerCaption.contains(RegExp(r'😄|😅|😊|haha|lol|funny'))) {
             score += 0.1;
+          }
           break;
         case PersonalityTrait.inspiring:
           if (lowerCaption.contains(
             RegExp(r'\b(inspire|motivate|dream|achieve|believe)\b'),
-          ))
+          )) {
             score += 0.1;
+          }
           break;
         default:
           break;

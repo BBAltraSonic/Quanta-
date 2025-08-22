@@ -3,21 +3,40 @@ import 'package:flutter/services.dart';
 
 /// Service to handle keyboard navigation and shortcuts
 class KeyboardNavigationService {
-  static final KeyboardNavigationService _instance = KeyboardNavigationService._internal();
+  static final KeyboardNavigationService _instance =
+      KeyboardNavigationService._internal();
   factory KeyboardNavigationService() => _instance;
   KeyboardNavigationService._internal();
 
   /// Common keyboard shortcuts for the app
-  static const Map<String, LogicalKeySet> shortcuts = {
+  static final Map<String, LogicalKeySet> shortcuts = {
     'save': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyS),
     'cancel': LogicalKeySet(LogicalKeyboardKey.escape),
     'next_field': LogicalKeySet(LogicalKeyboardKey.tab),
-    'prev_field': LogicalKeySet(LogicalKeyboardKey.shift, LogicalKeyboardKey.tab),
-    'submit': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.enter),
-    'focus_username': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyU),
-    'focus_email': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyE),
-    'focus_bio': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyB),
-    'toggle_private': LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyP),
+    'prev_field': LogicalKeySet(
+      LogicalKeyboardKey.shift,
+      LogicalKeyboardKey.tab,
+    ),
+    'submit': LogicalKeySet(
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.enter,
+    ),
+    'focus_username': LogicalKeySet(
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.keyU,
+    ),
+    'focus_email': LogicalKeySet(
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.keyE,
+    ),
+    'focus_bio': LogicalKeySet(
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.keyB,
+    ),
+    'toggle_private': LogicalKeySet(
+      LogicalKeyboardKey.control,
+      LogicalKeyboardKey.keyP,
+    ),
   };
 
   /// Create keyboard shortcuts widget
@@ -25,12 +44,23 @@ class KeyboardNavigationService {
     required Widget child,
     required Map<LogicalKeySet, VoidCallback> shortcuts,
   }) {
+    final shortcutMap = <ShortcutActivator, Intent>{};
+    final actionMap = <Type, Action<Intent>>{};
+
+    for (final entry in shortcuts.entries) {
+      final intent = _CustomIntent(entry.key.hashCode);
+      shortcutMap[entry.key] = intent;
+      actionMap[intent.runtimeType] = CallbackAction<Intent>(
+        onInvoke: (intent) {
+          entry.value();
+          return null;
+        },
+      );
+    }
+
     return Shortcuts(
-      shortcuts: shortcuts,
-      child: Actions(
-        actions: _createActions(shortcuts),
-        child: child,
-      ),
+      shortcuts: shortcutMap,
+      child: Actions(actions: actionMap, child: child),
     );
   }
 
@@ -42,12 +72,7 @@ class KeyboardNavigationService {
   }) {
     return FocusTraversalGroup(
       policy: policy ?? OrderedTraversalPolicy(),
-      child: requestFocus
-          ? Focus(
-              autofocus: true,
-              child: child,
-            )
-          : child,
+      child: requestFocus ? Focus(autofocus: true, child: child) : child,
     );
   }
 
@@ -71,11 +96,7 @@ class KeyboardNavigationService {
           onUnfocus?.call();
         }
       },
-      child: Semantics(
-        label: semanticLabel,
-        tooltip: tooltip,
-        child: child,
-      ),
+      child: Semantics(label: semanticLabel, tooltip: tooltip, child: child),
     );
   }
 
@@ -111,35 +132,7 @@ class KeyboardNavigationService {
 
   /// Show keyboard shortcuts help
   void showShortcutsHelp(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: createShortcutsHelpDialog,
-    );
-  }
-
-  Map<Type, Action<Intent>> _createActions(Map<LogicalKeySet, VoidCallback> shortcuts) {
-    final actions = <Type, Action<Intent>>{};
-    
-    for (final entry in shortcuts.entries) {
-      final intent = _createIntentForShortcut(entry.key);
-      actions[intent.runtimeType] = _createCallbackAction(entry.value);
-    }
-    
-    return actions;
-  }
-
-  Intent _createIntentForShortcut(LogicalKeySet shortcut) {
-    // Create a unique intent for each shortcut
-    return _CustomIntent(shortcut.hashCode);
-  }
-
-  Action<Intent> _createCallbackAction(VoidCallback callback) {
-    return CallbackAction<Intent>(
-      onInvoke: (intent) {
-        callback();
-        return null;
-      },
-    );
+    showDialog(context: context, builder: createShortcutsHelpDialog);
   }
 
   Widget _buildShortcutRow(String description, String shortcut) {
@@ -147,10 +140,7 @@ class KeyboardNavigationService {
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(description),
-          ),
+          Expanded(flex: 2, child: Text(description)),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -161,10 +151,7 @@ class KeyboardNavigationService {
               ),
               child: Text(
                 shortcut,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -180,9 +167,8 @@ class _CustomIntent extends Intent {
   const _CustomIntent(this.id);
 
   @override
-  bool operator ==(Object other) => 
-      identical(this, other) || 
-      (other is _CustomIntent && other.id == id);
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is _CustomIntent && other.id == id);
 
   @override
   int get hashCode => id.hashCode;
@@ -190,10 +176,11 @@ class _CustomIntent extends Intent {
 
 /// Mixin to add keyboard navigation support to StatefulWidgets
 mixin KeyboardNavigationMixin<T extends StatefulWidget> on State<T> {
-  final KeyboardNavigationService _navigationService = KeyboardNavigationService();
-  
+  final KeyboardNavigationService _navigationService =
+      KeyboardNavigationService();
+
   final Map<String, FocusNode> _focusNodes = {};
-  
+
   @override
   void dispose() {
     for (final node in _focusNodes.values) {
@@ -237,66 +224,6 @@ mixin KeyboardNavigationMixin<T extends StatefulWidget> on State<T> {
   /// Show shortcuts help
   void showShortcutsHelp() {
     _navigationService.showShortcutsHelp(context);
-  }
-}
-
-/// Custom focus traversal policy for forms
-class FormFocusTraversalPolicy extends FocusTraversalPolicy {
-  final List<String> fieldOrder;
-
-  const FormFocusTraversalPolicy(this.fieldOrder);
-
-  @override
-  FocusNode? findFirstFocus(FocusNode currentNode) {
-    return _getOrderedNodes(currentNode).firstOrNull;
-  }
-
-  @override
-  FocusNode? findLastFocus(FocusNode currentNode) {
-    final nodes = _getOrderedNodes(currentNode);
-    return nodes.isNotEmpty ? nodes.last : null;
-  }
-
-  @override
-  FocusNode? findNextFocus(FocusNode currentNode, {TraversalDirection? direction}) {
-    final nodes = _getOrderedNodes(currentNode);
-    final currentIndex = nodes.indexOf(currentNode);
-    
-    if (currentIndex == -1 || currentIndex == nodes.length - 1) {
-      return null;
-    }
-    
-    return nodes[currentIndex + 1];
-  }
-
-  @override
-  FocusNode? findPreviousFocus(FocusNode currentNode, {TraversalDirection? direction}) {
-    final nodes = _getOrderedNodes(currentNode);
-    final currentIndex = nodes.indexOf(currentNode);
-    
-    if (currentIndex <= 0) {
-      return null;
-    }
-    
-    return nodes[currentIndex - 1];
-  }
-
-  List<FocusNode> _getOrderedNodes(FocusNode currentNode) {
-    final scopeNode = currentNode.nearestScope;
-    if (scopeNode == null) return [];
-    
-    final allNodes = scopeNode.descendants
-        .where((node) => node.canRequestFocus)
-        .toList();
-    
-    // Sort based on fieldOrder if available
-    allNodes.sort((a, b) {
-      // This is a simplified sorting - in practice you'd want to
-      // associate nodes with field names and use fieldOrder
-      return 0;
-    });
-    
-    return allNodes;
   }
 }
 

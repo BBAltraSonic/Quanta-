@@ -2,12 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
-import '../models/user_model.dart';
 import '../store/app_state.dart';
 import 'auth_service.dart';
 import 'avatar_service.dart';
 import 'follow_service.dart';
 import 'profile_service.dart';
+import 'avatar_profile_error_handler.dart';
+import 'avatar_state_sync_service.dart';
+import 'avatar_posts_pagination_service.dart';
+import 'avatar_realtime_service_simple.dart';
+import 'avatar_database_optimization_service.dart';
+import 'avatar_performance_monitoring_service.dart';
 
 // Import ProfileViewMode from app_state.dart to avoid duplication
 
@@ -107,163 +112,233 @@ class AvatarProfileService {
   final FollowService _followService = FollowService();
   final ProfileService _profileService = ProfileService();
   final AppState _appState = AppState();
+  final AvatarProfileErrorHandler _errorHandler = AvatarProfileErrorHandler();
+  final AvatarStateSyncService _syncService = AvatarStateSyncService();
+  final AvatarPostsPaginationService _paginationService =
+      AvatarPostsPaginationService();
+  final AvatarRealtimeServiceSimple _realtimeService =
+      AvatarRealtimeServiceSimple();
+  final AvatarDatabaseOptimizationService _dbOptimizationService =
+      AvatarDatabaseOptimizationService();
+  final AvatarPerformanceMonitoringService _performanceService =
+      AvatarPerformanceMonitoringService();
 
   SupabaseClient get _supabase => _authService.supabase;
 
-  /// Get avatar profile data with view mode support
+  /// Get avatar profile data with view mode support (optimized)
   Future<AvatarProfileData> getAvatarProfile(
     String avatarId, {
     bool isOwnerView = false,
   }) async {
-    try {
-      // Get avatar data
-      final avatar = await _avatarService.getAvatarById(avatarId);
-      if (avatar == null) {
-        throw Exception('Avatar not found');
+    return _performanceService.trackOperation('getAvatarProfile', () async {
+      try {
+        // Use optimized database query for better performance
+        final profileData = await _dbOptimizationService
+            .getAvatarProfileOptimized(avatarId);
+
+        if (profileData.isEmpty) {
+          throw AvatarProfileErrorHandler.avatarNotFound(avatarId);
+        }
+
+        final avatarData = profileData['avatar'] as Map<String, dynamic>;
+        final statsData = profileData['stats'] as Map<String, dynamic>;
+
+        final avatar = AvatarModel.fromJson(avatarData);
+
+        // Determine view mode
+        final viewMode = determineViewMode(
+          avatarId,
+          _authService.currentUserId,
+        );
+
+        // Check permissions for owner view
+        if (isOwnerView && viewMode != ProfileViewMode.owner) {
+          throw AvatarProfileErrorHandler.permissionDenied(
+            'view owner profile',
+          );
+        }
+
+        // Create stats from optimized query
+        final stats = AvatarStats(
+          followersCount: statsData['followers_count'] ?? 0,
+          followingCount: 0, // Avatars don't follow others
+          postsCount: statsData['posts_count'] ?? 0,
+          totalLikes: statsData['total_likes'] ?? 0,
+          engagementRate: statsData['engagement_rate'] ?? 0.0,
+          lastActiveAt: avatar.updatedAt,
+        );
+
+        // Get recent posts using pagination service
+        final recentPosts = await _paginationService.loadAvatarPosts(
+          avatarId,
+          page: 0,
+          pageSize: 10,
+        );
+
+        // Get available actions based on view mode
+        final availableActions = _getAvailableActions(viewMode, avatarId);
+
+        // Get engagement metrics for owner view
+        AvatarEngagementMetrics? engagementMetrics;
+        if (viewMode == ProfileViewMode.owner) {
+          engagementMetrics = await _getAvatarEngagementMetrics(avatarId);
+        }
+
+        // Get other avatars for owner view using optimized query
+        List<AvatarModel>? otherAvatars;
+        if (viewMode == ProfileViewMode.owner) {
+          final userAvatarsData = await _dbOptimizationService
+              .getUserAvatarsOptimized(avatar.ownerUserId);
+          otherAvatars = userAvatarsData
+              .map((data) => AvatarModel.fromJson(data['avatar']))
+              .where((a) => a.id != avatarId)
+              .toList();
+        }
+
+        // Subscribe to real-time updates for this avatar
+        _realtimeService.subscribeToAllAvatarUpdates(avatarId);
+
+        return AvatarProfileData(
+          avatar: avatar,
+          stats: stats,
+          recentPosts: recentPosts,
+          viewMode: viewMode,
+          availableActions: availableActions,
+          engagementMetrics: engagementMetrics,
+          otherAvatars: otherAvatars,
+        );
+      } on AvatarProfileException {
+        rethrow;
+      } catch (e) {
+        _errorHandler.logError(e, context: 'getAvatarProfile');
+        if (e.toString().contains('network') ||
+            e.toString().contains('timeout')) {
+          throw AvatarProfileErrorHandler.networkError(
+            'loading avatar profile',
+            e,
+          );
+        }
+        throw AvatarProfileErrorHandler.databaseError(
+          'loading avatar profile',
+          e,
+        );
       }
-
-      // Determine view mode
-      final viewMode = determineViewMode(avatarId, _authService.currentUserId);
-
-      // Get avatar stats
-      final stats = await getAvatarStats(avatarId);
-
-      // Get recent posts
-      final recentPosts = await getAvatarPosts(avatarId, page: 1, limit: 10);
-
-      // Get available actions based on view mode
-      final availableActions = _getAvailableActions(viewMode, avatarId);
-
-      // Get engagement metrics for owner view
-      AvatarEngagementMetrics? engagementMetrics;
-      if (viewMode == ProfileViewMode.owner) {
-        engagementMetrics = await _getAvatarEngagementMetrics(avatarId);
-      }
-
-      // Get other avatars for owner view
-      List<AvatarModel>? otherAvatars;
-      if (viewMode == ProfileViewMode.owner) {
-        otherAvatars = await getUserAvatars(avatar.ownerUserId);
-        // Remove current avatar from the list
-        otherAvatars.removeWhere((a) => a.id == avatarId);
-      }
-
-      return AvatarProfileData(
-        avatar: avatar,
-        stats: stats,
-        recentPosts: recentPosts,
-        viewMode: viewMode,
-        availableActions: availableActions,
-        engagementMetrics: engagementMetrics,
-        otherAvatars: otherAvatars,
-      );
-    } catch (e) {
-      debugPrint('Error getting avatar profile: $e');
-      rethrow;
-    }
+    });
   }
 
-  /// Get avatar posts with pagination
+  /// Get avatar posts with optimized pagination
   Future<List<PostModel>> getAvatarPosts(
     String avatarId, {
     int page = 1,
     int limit = 20,
   }) async {
-    try {
-      final offset = (page - 1) * limit;
-
-      final response = await _supabase
-          .from('posts')
-          .select('*')
-          .eq('avatar_id', avatarId)
-          .eq('is_active', true)
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
-
-      return response
-          .map<PostModel>((json) => PostModel.fromJson(json))
-          .toList();
-    } catch (e) {
-      debugPrint('Error getting avatar posts: $e');
-      return [];
-    }
-  }
-
-  /// Get avatar statistics
-  Future<AvatarStats> getAvatarStats(String avatarId) async {
-    try {
-      // Get avatar data for basic stats
-      final avatar = await _avatarService.getAvatarById(avatarId);
-      if (avatar == null) {
-        throw Exception('Avatar not found');
+    return _performanceService.trackOperation('getAvatarPosts', () async {
+      try {
+        // Use pagination service for efficient loading
+        return await _paginationService.loadAvatarPosts(
+          avatarId,
+          page: page - 1, // Pagination service uses 0-based indexing
+          pageSize: limit,
+        );
+      } catch (e) {
+        debugPrint('Error getting avatar posts: $e');
+        return [];
       }
-
-      // Get follower count
-      final followersCount = await _followService.getFollowerCount(avatarId);
-
-      // Get posts count and total likes from posts
-      final postsResponse = await _supabase
-          .from('posts')
-          .select('likes_count')
-          .eq('avatar_id', avatarId)
-          .eq('is_active', true);
-
-      final postsCount = postsResponse.length;
-      final totalLikes = postsResponse.fold<int>(
-        0,
-        (sum, post) => sum + ((post['likes_count'] as int?) ?? 0),
-      );
-
-      // Following count is not applicable for avatars (avatars don't follow others)
-      const followingCount = 0;
-
-      return AvatarStats(
-        followersCount: followersCount,
-        followingCount: followingCount,
-        postsCount: postsCount,
-        totalLikes: totalLikes,
-        engagementRate: avatar.engagementRate,
-        lastActiveAt: avatar.updatedAt,
-      );
-    } catch (e) {
-      debugPrint('Error getting avatar stats: $e');
-      // Return default stats on error
-      return AvatarStats(
-        followersCount: 0,
-        followingCount: 0,
-        postsCount: 0,
-        totalLikes: 0,
-        engagementRate: 0.0,
-        lastActiveAt: DateTime.now(),
-      );
-    }
+    });
   }
 
-  /// Set active avatar for a user
+  /// Get avatar statistics with optimized queries and caching
+  Future<AvatarStats> getAvatarStats(String avatarId) async {
+    return _performanceService.trackOperation('getAvatarStats', () async {
+      try {
+        // Try to get from cache first
+        final cachedStats = _appState.getAvatarStats(avatarId);
+        if (cachedStats.isNotEmpty) {
+          _performanceService.recordCacheHit('avatar_stats');
+          return AvatarStats(
+            followersCount: cachedStats['followersCount'] ?? 0,
+            followingCount: cachedStats['followingCount'] ?? 0,
+            postsCount: cachedStats['postsCount'] ?? 0,
+            totalLikes: cachedStats['likesCount'] ?? 0,
+            engagementRate: cachedStats['engagementRate'] ?? 0.0,
+            lastActiveAt: cachedStats['lastViewedAt'] ?? DateTime.now(),
+          );
+        }
+
+        _performanceService.recordCacheMiss('avatar_stats');
+
+        // Use optimized database query
+        final profileData = await _dbOptimizationService
+            .getAvatarProfileOptimized(avatarId);
+
+        if (profileData.isEmpty) {
+          throw AvatarProfileErrorHandler.avatarNotFound(avatarId);
+        }
+
+        final statsData = profileData['stats'] as Map<String, dynamic>;
+        final avatarData = profileData['avatar'] as Map<String, dynamic>;
+
+        final avatar = AvatarModel.fromJson(avatarData);
+
+        return AvatarStats(
+          followersCount: statsData['followers_count'] ?? 0,
+          followingCount: 0, // Avatars don't follow others
+          postsCount: statsData['posts_count'] ?? 0,
+          totalLikes: statsData['total_likes'] ?? 0,
+          engagementRate: statsData['engagement_rate'] ?? 0.0,
+          lastActiveAt: avatar.updatedAt,
+        );
+      } on AvatarProfileException {
+        rethrow;
+      } catch (e) {
+        _errorHandler.logError(e, context: 'getAvatarStats');
+
+        // For stats, we can return default values instead of throwing
+        // This provides a better user experience
+        return AvatarStats(
+          followersCount: 0,
+          followingCount: 0,
+          postsCount: 0,
+          totalLikes: 0,
+          engagementRate: 0.0,
+          lastActiveAt: DateTime.now(),
+        );
+      }
+    });
+  }
+
+  /// Set active avatar for a user with optimistic updates and rollback
   Future<void> setActiveAvatar(String userId, String avatarId) async {
     try {
       // Verify avatar exists and belongs to user
       final avatar = await _avatarService.getAvatarById(avatarId);
       if (avatar == null) {
-        throw Exception('Avatar not found');
+        throw AvatarProfileErrorHandler.avatarNotFound(avatarId);
       }
 
       if (avatar.ownerUserId != userId) {
-        throw Exception('Avatar does not belong to user');
+        throw AvatarProfileErrorHandler.avatarOwnershipError(avatarId);
       }
 
-      // Update in database
-      await _supabase
-          .from('users')
-          .update({'active_avatar_id': avatarId})
-          .eq('id', userId);
-
-      // Update app state
-      _appState.setActiveAvatar(avatar);
-      _appState.setActiveAvatarForUser(userId, avatar);
-    } catch (e) {
-      debugPrint('Error setting active avatar: $e');
+      // Use optimistic update with rollback capability
+      await _syncService.optimisticSetActiveAvatar(userId, avatar, () async {
+        await _supabase
+            .from('users')
+            .update({'active_avatar_id': avatarId})
+            .eq('id', userId);
+      });
+    } on AvatarProfileException {
       rethrow;
+    } catch (e) {
+      _errorHandler.logError(e, context: 'setActiveAvatar');
+      if (e.toString().contains('network') ||
+          e.toString().contains('timeout')) {
+        throw AvatarProfileErrorHandler.networkError(
+          'setting active avatar',
+          e,
+        );
+      }
+      throw AvatarProfileErrorHandler.databaseError('setting active avatar', e);
     }
   }
 
@@ -301,28 +376,39 @@ class AvatarProfileService {
     }
   }
 
-  /// Get all avatars for a user
+  /// Get all avatars for a user with optimized queries
   Future<List<AvatarModel>> getUserAvatars(String userId) async {
-    try {
-      // First check app state
-      final cachedAvatars = _appState.getUserAvatars(userId);
-      if (cachedAvatars.isNotEmpty) {
-        return cachedAvatars;
+    return _performanceService.trackOperation('getUserAvatars', () async {
+      try {
+        // First check app state
+        final cachedAvatars = _appState.getUserAvatars(userId);
+        if (cachedAvatars.isNotEmpty) {
+          _performanceService.recordCacheHit('user_avatars');
+          return cachedAvatars;
+        }
+
+        _performanceService.recordCacheMiss('user_avatars');
+
+        // Use optimized database query
+        final userAvatarsData = await _dbOptimizationService
+            .getUserAvatarsOptimized(userId);
+
+        final avatars = userAvatarsData
+            .map((data) => AvatarModel.fromJson(data['avatar']))
+            .toList();
+
+        // Cache in app state and preload into LRU cache
+        _appState.preloadAvatars(avatars);
+        for (final avatar in avatars) {
+          _appState.setAvatar(avatar);
+        }
+
+        return avatars;
+      } catch (e) {
+        debugPrint('Error getting user avatars: $e');
+        return [];
       }
-
-      // Get from database via avatar service
-      final avatars = await _avatarService.getUserAvatars(userId);
-
-      // Cache in app state
-      for (final avatar in avatars) {
-        _appState.setAvatar(avatar);
-      }
-
-      return avatars;
-    } catch (e) {
-      debugPrint('Error getting user avatars: $e');
-      return [];
-    }
+    });
   }
 
   /// Determine view mode for an avatar profile
@@ -526,5 +612,147 @@ class AvatarProfileService {
   void _handleReport(String avatarId) {
     // TODO: Report avatar
     debugPrint('Report avatar: $avatarId');
+  }
+
+  // ========== PERFORMANCE OPTIMIZATION METHODS ==========
+
+  /// Preload avatar data for better performance
+  Future<void> preloadAvatarData(List<String> avatarIds) async {
+    if (avatarIds.isEmpty) return;
+
+    return _performanceService.trackOperation('preloadAvatarData', () async {
+      try {
+        // Use batch query for multiple avatars
+        final avatarsData = await _dbOptimizationService
+            .getMultipleAvatarsOptimized(avatarIds);
+
+        final avatars = avatarsData
+            .map((data) => AvatarModel.fromJson(data['avatar']))
+            .toList();
+
+        // Preload into cache
+        _appState.preloadAvatars(avatars);
+
+        // Cache in app state
+        for (final avatar in avatars) {
+          _appState.setAvatar(avatar);
+        }
+
+        // Subscribe to real-time updates for all avatars
+        for (final avatarId in avatarIds) {
+          _realtimeService.subscribeToAllAvatarUpdates(avatarId);
+        }
+      } catch (e) {
+        debugPrint('Error preloading avatar data: $e');
+      }
+    });
+  }
+
+  /// Get trending avatars with optimized queries
+  Future<List<AvatarModel>> getTrendingAvatars({
+    int limit = 10,
+    String timeframe = '7d',
+  }) async {
+    return _performanceService.trackOperation('getTrendingAvatars', () async {
+      try {
+        final trendingData = await _dbOptimizationService
+            .getTrendingAvatarsOptimized(limit: limit, timeframe: timeframe);
+
+        final avatars = trendingData
+            .map((data) => AvatarModel.fromJson(data['avatar']))
+            .toList();
+
+        // Cache trending avatars
+        _appState.preloadAvatars(avatars);
+        for (final avatar in avatars) {
+          _appState.setAvatar(avatar);
+        }
+
+        return avatars;
+      } catch (e) {
+        debugPrint('Error getting trending avatars: $e');
+        return [];
+      }
+    });
+  }
+
+  /// Search avatars with optimized full-text search
+  Future<List<AvatarModel>> searchAvatars(
+    String query, {
+    int page = 0,
+    int limit = 20,
+  }) async {
+    return _performanceService.trackOperation('searchAvatars', () async {
+      try {
+        final searchResults = await _dbOptimizationService
+            .searchAvatarsOptimized(query, offset: page * limit, limit: limit);
+
+        final avatars = searchResults
+            .map((data) => AvatarModel.fromJson(data['avatar']))
+            .toList();
+
+        // Cache search results
+        for (final avatar in avatars) {
+          _appState.setAvatar(avatar);
+        }
+
+        return avatars;
+      } catch (e) {
+        debugPrint('Error searching avatars: $e');
+        return [];
+      }
+    });
+  }
+
+  /// Get performance metrics for monitoring
+  Map<String, dynamic> getPerformanceMetrics() {
+    return _performanceService.getPerformanceReport();
+  }
+
+  /// Cleanup resources and subscriptions
+  void dispose() {
+    // Unsubscribe from all real-time updates
+    _realtimeService.dispose();
+
+    // Stop performance monitoring
+    _performanceService.dispose();
+  }
+
+  /// Refresh avatar data (force reload from database)
+  Future<void> refreshAvatarData(String avatarId) async {
+    return _performanceService.trackOperation('refreshAvatarData', () async {
+      try {
+        // Clear cache for this avatar
+        _appState.removeAvatar(avatarId);
+
+        // Refresh posts pagination
+        await _paginationService.refreshAvatarPosts(avatarId);
+
+        // Reload avatar profile
+        await getAvatarProfile(avatarId);
+      } catch (e) {
+        debugPrint('Error refreshing avatar data: $e');
+      }
+    });
+  }
+
+  /// Preload next page of posts for better UX
+  Future<void> preloadNextPostsPage(String avatarId) async {
+    try {
+      await _paginationService.preloadNextPage(avatarId);
+    } catch (e) {
+      // Silently fail for preloading
+      debugPrint('Error preloading next posts page: $e');
+    }
+  }
+
+  /// Check if more posts are available for pagination
+  bool hasMorePosts(String avatarId) {
+    return _paginationService.hasMorePosts(avatarId);
+  }
+
+  /// Get current page for avatar posts
+  int getCurrentPostsPage(String avatarId) {
+    return _paginationService.getCurrentPage(avatarId);
   }
 }

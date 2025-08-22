@@ -216,7 +216,7 @@ class MyApp extends StatelessWidget {
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
-                return snapshot.data ?? ProfileScreen(userId: userId);
+                return snapshot.data ?? const ProfileScreen();
               },
             ),
             settings: RouteSettings(

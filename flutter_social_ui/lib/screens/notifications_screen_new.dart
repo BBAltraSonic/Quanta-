@@ -6,7 +6,8 @@ import 'package:quanta/models/chat_message.dart';
 import 'package:quanta/services/enhanced_feeds_service.dart';
 import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/services/auth_service_wrapper.dart';
-import 'package:quanta/services/notification_service.dart' as notification_service;
+import 'package:quanta/services/notification_service.dart'
+    as notification_service;
 import 'package:quanta/services/enhanced_chat_service.dart';
 import 'package:quanta/services/messages_service.dart';
 import 'package:quanta/screens/chat_screen.dart';
@@ -14,6 +15,7 @@ import 'package:quanta/screens/post_detail_screen.dart';
 import 'package:quanta/screens/profile_screen.dart';
 import 'package:quanta/screens/search_screen_new.dart';
 import 'package:quanta/screens/public_chat_entries_screen.dart';
+import 'package:quanta/services/avatar_navigation_service.dart';
 import 'package:quanta/widgets/skeleton_widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -70,7 +72,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final AvatarService _avatarService = AvatarService();
   final AuthService _authService = AuthService();
-  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
+  final notification_service.NotificationService _notificationService =
+      notification_service.NotificationService();
   final EnhancedChatService _chatService = EnhancedChatService();
   final MessagesService _messagesService = MessagesService();
   late TabController _tabController;
@@ -88,7 +91,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   StreamSubscription<List<Conversation>>? _conversationsSub;
-  
+
   // Real-time subscription
   Stream<List<notification_service.NotificationModel>>? _notificationStream;
 
@@ -116,24 +119,26 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       _loadMessages();
     }
   }
-  
+
   void _setupRealtimeSubscription() {
     // Subscribe to conversations real-time updates
     try {
       _conversationsSub?.cancel();
-      _conversationsSub = _messagesService.getConversationsStream(limit: 20).listen((convos) {
-        if (!mounted) return;
-        setState(() {
-          // Preserve search state; only update base conversations
-          _conversations = convos;
-        });
-      });
+      _conversationsSub = _messagesService
+          .getConversationsStream(limit: 20)
+          .listen((convos) {
+            if (!mounted) return;
+            setState(() {
+              // Preserve search state; only update base conversations
+              _conversations = convos;
+            });
+          });
     } catch (e) {
       debugPrint('Error setting up conversations stream: $e');
     }
     try {
       _notificationStream = _notificationService.getNotificationStream();
-      
+
       if (_notificationStream != null) {
         _notificationStream!.listen(
           (notifications) {
@@ -150,20 +155,26 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       debugPrint('Error setting up real-time notifications: $e');
     }
   }
-  
-  void _updateNotificationsFromStream(List<notification_service.NotificationModel> notifications) {
-    final notificationItems = notifications.map((n) => NotificationItem(
-      id: n.id,
-      type: _mapNotificationType(n.type),
-      title: n.title,
-      message: n.message,
-      isRead: n.isRead,
-      timestamp: n.createdAt,
-      avatarId: n.relatedAvatarId,
-      postId: n.relatedPostId,
-      userId: n.relatedUserId,
-    )).toList();
-    
+
+  void _updateNotificationsFromStream(
+    List<notification_service.NotificationModel> notifications,
+  ) {
+    final notificationItems = notifications
+        .map(
+          (n) => NotificationItem(
+            id: n.id,
+            type: _mapNotificationType(n.type),
+            title: n.title,
+            message: n.message,
+            isRead: n.isRead,
+            timestamp: n.createdAt,
+            avatarId: n.relatedAvatarId,
+            postId: n.relatedPostId,
+            userId: n.relatedUserId,
+          ),
+        )
+        .toList();
+
     setState(() {
       _allNotifications = notificationItems;
     });
@@ -209,7 +220,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         style: TextStyle(color: kPrimaryColor),
                       ),
                     ),
-                  if (_tabController.index == 0 && _allNotifications.any((n) => !n.isRead))
+                  if (_tabController.index == 0 &&
+                      _allNotifications.any((n) => !n.isRead))
                     TextButton(
                       onPressed: _markAllAsRead,
                       child: Text(
@@ -379,12 +391,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Delete',
-                              style: TextStyle(color: Colors.red),
+                            Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                              size: 20,
                             ),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -393,7 +406,11 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                           value: 'mark_unread',
                           child: Row(
                             children: [
-                              Icon(Icons.mark_email_unread_outlined, color: kLightTextColor, size: 20),
+                              Icon(
+                                Icons.mark_email_unread_outlined,
+                                color: kLightTextColor,
+                                size: 20,
+                              ),
                               SizedBox(width: 8),
                               Text(
                                 'Mark as unread',
@@ -406,7 +423,11 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         value: 'mute_type',
                         child: Row(
                           children: [
-                            Icon(Icons.notifications_off_outlined, color: kLightTextColor, size: 20),
+                            Icon(
+                              Icons.notifications_off_outlined,
+                              color: kLightTextColor,
+                              size: 20,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'Mute this type',
@@ -429,7 +450,8 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                         ),
                       ),
                     ],
-                    onSelected: (value) => _handleNotificationAction(notification, value),
+                    onSelected: (value) =>
+                        _handleNotificationAction(notification, value),
                   ),
                 ],
               ),
@@ -509,19 +531,23 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
     try {
       final notifications = await _notificationService.getUserNotifications();
-      
+
       // Convert NotificationModel to NotificationItem for UI compatibility
-      final notificationItems = notifications.map((n) => NotificationItem(
-        id: n.id,
-        type: _mapNotificationType(n.type),
-        title: n.title,
-        message: n.message,
-        isRead: n.isRead,
-        timestamp: n.createdAt,
-        avatarId: n.relatedAvatarId,
-        postId: n.relatedPostId,
-        userId: n.relatedUserId, // Fix: Add missing relatedUserId mapping
-      )).toList();
+      final notificationItems = notifications
+          .map(
+            (n) => NotificationItem(
+              id: n.id,
+              type: _mapNotificationType(n.type),
+              title: n.title,
+              message: n.message,
+              isRead: n.isRead,
+              timestamp: n.createdAt,
+              avatarId: n.relatedAvatarId,
+              postId: n.relatedPostId,
+              userId: n.relatedUserId, // Fix: Add missing relatedUserId mapping
+            ),
+          )
+          .toList();
 
       setState(() {
         _allNotifications = notificationItems;
@@ -539,7 +565,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   }
 
   // Map notification service types to UI types
-  NotificationType _mapNotificationType(notification_service.NotificationType serviceType) {
+  NotificationType _mapNotificationType(
+    notification_service.NotificationType serviceType,
+  ) {
     switch (serviceType) {
       case notification_service.NotificationType.like:
         return NotificationType.like;
@@ -553,8 +581,6 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         return NotificationType.systemUpdate; // Correct system mapping
     }
   }
-
-
 
   Future<void> _refreshNotifications() async {
     setState(() => _isRefreshing = true);
@@ -654,9 +680,11 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
             metadata: notification.metadata,
           );
         }
-        _unreadNotifications = _allNotifications.where((n) => !n.isRead).toList();
+        _unreadNotifications = _allNotifications
+            .where((n) => !n.isRead)
+            .toList();
       });
-      
+
       // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -668,9 +696,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
   void _markAllAsRead() async {
     // Store original state for rollback
-    final originalNotifications = List<NotificationItem>.from(_allNotifications);
-    final originalUnreadNotifications = List<NotificationItem>.from(_unreadNotifications);
-    
+    final originalNotifications = List<NotificationItem>.from(
+      _allNotifications,
+    );
+    final originalUnreadNotifications = List<NotificationItem>.from(
+      _unreadNotifications,
+    );
+
     // Optimistically update UI first
     setState(() {
       _allNotifications = _allNotifications.map((notification) {
@@ -695,13 +727,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       await _notificationService.markAllAsRead();
     } catch (e) {
       debugPrint('Failed to mark all notifications as read: $e');
-      
+
       // Revert optimistic update on error
       setState(() {
         _allNotifications = originalNotifications;
         _unreadNotifications = originalUnreadNotifications;
       });
-      
+
       // Show error message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -766,10 +798,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
             children: [
               CircularProgressIndicator(color: kPrimaryColor),
               SizedBox(height: 16),
-              Text(
-                'Loading post...',
-                style: kBodyTextStyle,
-              ),
+              Text('Loading post...', style: kBodyTextStyle),
             ],
           ),
         ),
@@ -777,10 +806,10 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
       // Try to fetch the post first to validate it exists
       final post = await _feedsService.getPostById(postId);
-      
+
       // Close loading dialog
       if (mounted) Navigator.pop(context);
-      
+
       if (post != null) {
         // Navigate with the post data
         Navigator.of(context).push(
@@ -801,7 +830,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       debugPrint('Error navigating to post detail: $e');
       _showErrorMessage('Unable to open post. Please try again.');
     }
@@ -810,12 +839,17 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   // Navigate to ProfileScreen with userId
   void _navigateToProfile(String userId) async {
     try {
-      // Navigate directly to profile screen with userId
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => ProfileScreen(userId: userId),
-        ),
-      );
+      // Use avatar navigation service to resolve user ID to avatar profile
+      final avatarNavigationService = AvatarNavigationService();
+      final widget = await avatarNavigationService.resolveProfileRoute(null, userId);
+      
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => widget,
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error navigating to profile: $e');
       _showErrorMessage('Unable to open profile. Please try again.');
@@ -825,7 +859,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   // Show error message with retry option
   void _showErrorMessage(String message) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -833,10 +867,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
             Icon(Icons.error_outline, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: Colors.white),
-              ),
+              child: Text(message, style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -844,9 +875,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         duration: Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         action: SnackBarAction(
           label: 'RETRY',
           textColor: Colors.white,
@@ -894,20 +923,14 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: kLightTextColor),
-            ),
+            child: Text('Cancel', style: TextStyle(color: kLightTextColor)),
           ),
           TextButton(
             onPressed: () async {
               Navigator.of(context).pop();
               await _performDeleteNotification(notification);
             },
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -917,9 +940,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   // Perform actual notification deletion
   Future<void> _performDeleteNotification(NotificationItem notification) async {
     // Optimistically remove from UI
-    final originalAllNotifications = List<NotificationItem>.from(_allNotifications);
-    final originalUnreadNotifications = List<NotificationItem>.from(_unreadNotifications);
-    
+    final originalAllNotifications = List<NotificationItem>.from(
+      _allNotifications,
+    );
+    final originalUnreadNotifications = List<NotificationItem>.from(
+      _unreadNotifications,
+    );
+
     setState(() {
       _allNotifications.removeWhere((n) => n.id == notification.id);
       _unreadNotifications.removeWhere((n) => n.id == notification.id);
@@ -927,7 +954,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
 
     try {
       await _notificationService.deleteNotification(notification.id);
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -945,20 +972,18 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           margin: EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     } catch (e) {
       debugPrint('Failed to delete notification: $e');
-      
+
       // Revert optimistic update
       setState(() {
         _allNotifications = originalAllNotifications;
         _unreadNotifications = originalUnreadNotifications;
       });
-      
+
       _showErrorMessage('Failed to delete notification. Please try again.');
     }
   }
@@ -967,7 +992,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   void _markAsUnread(NotificationItem notification) async {
     // Optimistically update UI first
     setState(() {
-      final index = _allNotifications.indexWhere((n) => n.id == notification.id);
+      final index = _allNotifications.indexWhere(
+        (n) => n.id == notification.id,
+      );
       if (index != -1) {
         _allNotifications[index] = NotificationItem(
           id: notification.id,
@@ -1003,9 +1030,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         duration: Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -1013,13 +1038,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   // Mute notification type
   void _muteNotificationType(NotificationType type) {
     final typeDisplayName = _getNotificationTypeDisplayName(type);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: kCardColor,
         title: Text(
-          'Mute ${typeDisplayName} Notifications',
+          'Mute $typeDisplayName Notifications',
           style: kHeadingTextStyle.copyWith(fontSize: 18),
         ),
         content: Text(
@@ -1029,20 +1054,14 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: kLightTextColor),
-            ),
+            child: Text('Cancel', style: TextStyle(color: kLightTextColor)),
           ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
               _performMuteNotificationType(type, typeDisplayName);
             },
-            child: Text(
-              'Mute',
-              style: TextStyle(color: Colors.orange),
-            ),
+            child: Text('Mute', style: TextStyle(color: Colors.orange)),
           ),
         ],
       ),
@@ -1061,7 +1080,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                '${displayName} notifications muted',
+                '$displayName notifications muted',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -1071,16 +1090,14 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         duration: Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         action: SnackBarAction(
           label: 'UNDO',
           textColor: Colors.white,
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('${displayName} notifications unmuted'),
+                content: Text('$displayName notifications unmuted'),
                 backgroundColor: Colors.green[700],
               ),
             );
@@ -1093,7 +1110,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   // Copy notification link to clipboard
   void _copyNotificationLink(NotificationItem notification) async {
     String linkText = '';
-    
+
     // Generate appropriate link based on notification type
     switch (notification.type) {
       case NotificationType.like:
@@ -1122,7 +1139,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     if (linkText.isNotEmpty) {
       try {
         await Clipboard.setData(ClipboardData(text: linkText));
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1178,10 +1195,11 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
   }
 
   // ===== CONVERSATIONS FUNCTIONALITY =====
-  
+
   Widget _buildConversationsList(List<Conversation> conversations) {
-    final List<Conversation> data =
-        _searchController.text.isEmpty ? conversations : _searchResults;
+    final List<Conversation> data = _searchController.text.isEmpty
+        ? conversations
+        : _searchResults;
 
     return Column(
       children: [
@@ -1212,7 +1230,10 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                       },
                     )
                   : null,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
@@ -1251,12 +1272,12 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     final lastMessage = conversation.lastMessage;
     final messagePreview = lastMessage?.text ?? 'No messages yet';
     final hasUnread = conversation.unreadCount > 0;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: hasUnread ? kCardColor.withOpacity(0.9) : kCardColor,
         borderRadius: BorderRadius.circular(12),
-        border: hasUnread 
+        border: hasUnread
             ? Border.all(color: kPrimaryColor.withOpacity(0.3))
             : Border.all(color: Colors.white.withOpacity(0.1)),
       ),
@@ -1331,7 +1352,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                           child: Text(
                             conversation.avatar.name,
                             style: kBodyTextStyle.copyWith(
-                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                              fontWeight: hasUnread
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1341,7 +1364,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                           style: kCaptionTextStyle.copyWith(
                             color: hasUnread ? kPrimaryColor : kLightTextColor,
                             fontSize: 12,
-                            fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                            fontWeight: hasUnread
+                                ? FontWeight.w500
+                                : FontWeight.normal,
                           ),
                         ),
                       ],
@@ -1350,9 +1375,13 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     Text(
                       messagePreview,
                       style: kCaptionTextStyle.copyWith(
-                        color: hasUnread ? Colors.white.withOpacity(0.9) : kLightTextColor,
+                        color: hasUnread
+                            ? Colors.white.withOpacity(0.9)
+                            : kLightTextColor,
                         height: 1.3,
-                        fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                        fontWeight: hasUnread
+                            ? FontWeight.w500
+                            : FontWeight.normal,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -1362,7 +1391,10 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                       Padding(
                         padding: EdgeInsets.only(top: 6),
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: kPrimaryColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(10),
@@ -1394,7 +1426,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                       ),
                       constraints: BoxConstraints(minWidth: 18),
                       child: Text(
-                        conversation.unreadCount > 99 ? '99+' : conversation.unreadCount.toString(),
+                        conversation.unreadCount > 99
+                            ? '99+'
+                            : conversation.unreadCount.toString(),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 11,
@@ -1409,7 +1443,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: hasUnread ? kPrimaryColor : kPrimaryColor.withOpacity(0.3),
+                      color: hasUnread
+                          ? kPrimaryColor
+                          : kPrimaryColor.withOpacity(0.3),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1444,9 +1480,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
             onPressed: () {
               // Navigate to avatar discovery or search
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SearchScreenNew(),
-                ),
+                MaterialPageRoute(builder: (context) => SearchScreenNew()),
               );
             },
             icon: Icon(Icons.explore, color: kPrimaryColor),
@@ -1465,7 +1499,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     if (conversation.unreadCount > 0) {
       await _messagesService.markConversationAsRead(conversation.sessionId);
     }
-    
+
     // Navigate to chat screen
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1498,7 +1532,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: EdgeInsets.all(16),
@@ -1523,11 +1557,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                               size: 20,
                             ),
                           )
-                        : Icon(
-                            Icons.smart_toy,
-                            color: kPrimaryColor,
-                            size: 20,
-                          ),
+                        : Icon(Icons.smart_toy, color: kPrimaryColor, size: 20),
                   ),
                 ),
                 SizedBox(width: 12),
@@ -1537,11 +1567,15 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
                     children: [
                       Text(
                         conversation.avatar.name,
-                        style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                        style: kBodyTextStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         conversation.avatar.niche.displayName,
-                        style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                        style: kCaptionTextStyle.copyWith(
+                          color: kLightTextColor,
+                        ),
                       ),
                     ],
                   ),
@@ -1549,18 +1583,21 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
               ],
             ),
           ),
-          
+
           // Options
           ListTile(
             leading: Icon(Icons.share, color: kPrimaryColor),
             title: Text('Make Public', style: TextStyle(color: Colors.white)),
-            subtitle: Text('Share this conversation', style: TextStyle(color: kLightTextColor)),
+            subtitle: Text(
+              'Share this conversation',
+              style: TextStyle(color: kLightTextColor),
+            ),
             onTap: () {
               Navigator.pop(context);
               _showMakePublicDialog(conversation);
             },
           ),
-          
+
           ListTile(
             leading: Icon(Icons.notifications_off, color: Colors.orange),
             title: Text('Mute', style: TextStyle(color: Colors.white)),
@@ -1569,7 +1606,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
               _muteConversation(conversation);
             },
           ),
-          
+
           ListTile(
             leading: Icon(Icons.archive, color: Colors.blue),
             title: Text('Archive', style: TextStyle(color: Colors.white)),
@@ -1578,7 +1615,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
               _archiveConversation(conversation);
             },
           ),
-          
+
           ListTile(
             leading: Icon(Icons.delete, color: Colors.red),
             title: Text('Delete', style: TextStyle(color: Colors.red)),
@@ -1587,7 +1624,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
               _deleteConversation(conversation);
             },
           ),
-          
+
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],
       ),
@@ -1656,7 +1693,10 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     );
   }
 
-  Future<void> _makeConversationPublic(Conversation conversation, String visibility) async {
+  Future<void> _makeConversationPublic(
+    Conversation conversation,
+    String visibility,
+  ) async {
     try {
       final lastMsg = conversation.lastMessage;
       if (lastMsg == null) {
@@ -1719,7 +1759,10 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: kCardColor,
-        title: Text('Delete Conversation', style: kHeadingTextStyle.copyWith(fontSize: 18)),
+        title: Text(
+          'Delete Conversation',
+          style: kHeadingTextStyle.copyWith(fontSize: 18),
+        ),
         content: Text(
           'Are you sure you want to delete this conversation with ${conversation.avatar.name}? This action cannot be undone.',
           style: kBodyTextStyle,
@@ -1743,7 +1786,7 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
         setState(() {
           _conversations.removeWhere((c) => c.id == conversation.id);
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Conversation deleted'),
@@ -1774,7 +1817,9 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     _searchDebounce = Timer(Duration(milliseconds: 350), () async {
       setState(() => _isSearching = true);
       try {
-        final results = await _messagesService.searchConversations(value.trim());
+        final results = await _messagesService.searchConversations(
+          value.trim(),
+        );
         if (!mounted) return;
         setState(() {
           _searchResults = results;

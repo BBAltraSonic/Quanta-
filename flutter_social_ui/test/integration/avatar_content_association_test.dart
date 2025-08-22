@@ -1,9 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:quanta/services/avatar_content_service.dart';
-import 'package:quanta/services/enhanced_feeds_service.dart';
-import 'package:quanta/services/auth_service.dart';
-import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/avatar_model.dart';
 import 'package:quanta/store/app_state.dart';
@@ -13,16 +10,10 @@ void main() {
 
   group('Avatar Content Association Integration Tests', () {
     late AvatarContentService avatarContentService;
-    late EnhancedFeedsService feedsService;
-    late AuthService authService;
-    late AvatarService avatarService;
     late AppState appState;
 
     setUpAll(() async {
       avatarContentService = AvatarContentService();
-      feedsService = EnhancedFeedsService();
-      authService = AuthService();
-      avatarService = AvatarService();
       appState = AppState();
     });
 
@@ -40,8 +31,9 @@ void main() {
         // Create a test avatar
         final testAvatar = AvatarModel(
           id: avatarId,
-          ownerUserId: userId,
           name: 'Test Avatar',
+          ownerUserId: userId,
+          bio: 'Test avatar bio',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Test prompt',
@@ -84,8 +76,9 @@ void main() {
 
         final avatar1 = AvatarModel(
           id: avatar1Id,
-          ownerUserId: userId,
           name: 'Avatar 1',
+          ownerUserId: userId,
+          bio: 'Test bio for avatar 1',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Avatar 1 prompt',
@@ -95,8 +88,9 @@ void main() {
 
         final avatar2 = AvatarModel(
           id: avatar2Id,
-          ownerUserId: userId,
           name: 'Avatar 2',
+          ownerUserId: userId,
+          bio: 'Test bio for avatar 2',
           niche: AvatarNiche.art,
           personalityTraits: [PersonalityTrait.creative],
           personalityPrompt: 'Avatar 2 prompt',
@@ -159,8 +153,9 @@ void main() {
 
         final fromAvatar = AvatarModel(
           id: fromAvatarId,
-          ownerUserId: userId,
           name: 'From Avatar',
+          ownerUserId: userId,
+          bio: 'Test bio for from avatar',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'From avatar prompt',
@@ -170,8 +165,9 @@ void main() {
 
         final toAvatar = AvatarModel(
           id: toAvatarId,
-          ownerUserId: userId,
           name: 'To Avatar',
+          ownerUserId: userId,
+          bio: 'Test bio for to avatar',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.professional],
           personalityPrompt: 'To avatar prompt',
@@ -242,8 +238,9 @@ void main() {
 
         final avatarToDelete = AvatarModel(
           id: avatarId,
+          name: 'Avatar To Delete',
           ownerUserId: userId,
-          name: 'Avatar to Delete',
+          bio: 'Test bio for avatar to delete',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Avatar to delete prompt',
@@ -253,8 +250,9 @@ void main() {
 
         final backupAvatar = AvatarModel(
           id: backupAvatarId,
-          ownerUserId: userId,
           name: 'Backup Avatar',
+          ownerUserId: userId,
+          bio: 'Test bio for backup avatar',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.professional],
           personalityPrompt: 'Backup avatar prompt',
@@ -331,8 +329,9 @@ void main() {
 
         final userAvatar = AvatarModel(
           id: avatarId,
-          ownerUserId: userId,
           name: 'User Avatar',
+          ownerUserId: userId,
+          bio: 'Test bio for user avatar',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'User avatar prompt',
@@ -342,8 +341,9 @@ void main() {
 
         final otherAvatar = AvatarModel(
           id: otherAvatarId,
-          ownerUserId: otherUserId,
           name: 'Other Avatar',
+          ownerUserId: otherUserId,
+          bio: 'Test bio for other avatar',
           niche: AvatarNiche.art,
           personalityTraits: [PersonalityTrait.creative],
           personalityPrompt: 'Other avatar prompt',
@@ -415,8 +415,9 @@ void main() {
 
         final avatar1 = AvatarModel(
           id: avatar1Id,
-          ownerUserId: userId,
           name: 'Avatar 1',
+          ownerUserId: userId,
+          bio: 'Test bio for avatar 1',
           niche: AvatarNiche.tech,
           personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Avatar 1 prompt',
@@ -426,8 +427,9 @@ void main() {
 
         final avatar2 = AvatarModel(
           id: avatar2Id,
-          ownerUserId: userId,
           name: 'Avatar 2',
+          ownerUserId: userId,
+          bio: 'Test bio for avatar 2',
           niche: AvatarNiche.art,
           personalityTraits: [PersonalityTrait.creative],
           personalityPrompt: 'Avatar 2 prompt',

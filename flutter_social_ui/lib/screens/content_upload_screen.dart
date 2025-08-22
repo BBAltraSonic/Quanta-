@@ -8,6 +8,7 @@ import 'package:quanta/services/auth_service.dart';
 import 'package:quanta/services/content_moderation_service.dart';
 import 'package:quanta/services/avatar_content_service.dart';
 import 'package:quanta/screens/avatar_creation_wizard.dart';
+import 'package:quanta/store/app_state.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -29,6 +30,7 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
   final ContentModerationService _moderationService =
       ContentModerationService();
   final AvatarContentService _avatarContentService = AvatarContentService();
+  final AppState _appState = AppState();
 
   static const int _captionMaxLength = 2000;
 
@@ -75,15 +77,10 @@ class _ContentUploadScreenState extends State<ContentUploadScreen> {
       setState(() {
         _userAvatars = avatars;
         // Use active avatar from app state if available, otherwise use first avatar
-        final activeAvatar = _authService.currentUser != null
-            ? avatars
-                  .where(
-                    (a) => a.id == _authService.currentUser!.activeAvatarId,
-                  )
-                  .firstOrNull
-            : null;
-        _selectedAvatar =
-            activeAvatar ?? (avatars.isNotEmpty ? avatars.first : null);
+        final activeAvatar = _appState.activeAvatar;
+        _selectedAvatar = activeAvatar != null && avatars.contains(activeAvatar)
+            ? activeAvatar
+            : (avatars.isNotEmpty ? avatars.first : null);
         _loadingAvatars = false;
       });
     } catch (e) {

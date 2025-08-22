@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
 import '../models/comment.dart'; // Use the unified comment model
+import '../services/avatar_lru_cache_service.dart';
 
 /// Profile view mode for avatar-centric profiles
 enum ProfileViewMode {
@@ -17,6 +18,9 @@ class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;
   AppState._internal();
+
+  // LRU Cache service for performance optimization
+  final AvatarLRUCacheService _cacheService = AvatarLRUCacheService();
 
   // ========== USER DATA (Authoritative) ==========
   UserModel? _currentUser;
@@ -43,7 +47,21 @@ class AppState extends ChangeNotifier {
   Map<String, AvatarModel> get avatars => Map.unmodifiable(_avatars);
   AvatarModel? get activeAvatar => _activeAvatar;
 
-  AvatarModel? getAvatar(String avatarId) => _avatars[avatarId];
+  AvatarModel? getAvatar(String avatarId) {
+    // Try cache first
+    final cached = _cacheService.getCachedAvatar(avatarId);
+    if (cached != null) {
+      return cached;
+    }
+
+    // Fallback to in-memory store
+    final avatar = _avatars[avatarId];
+    if (avatar != null) {
+      _cacheService.cacheAvatar(avatarId, avatar);
+    }
+    return avatar;
+  }
+
   List<AvatarModel> getUserAvatars(String userId) =>
       (_userAvatars[userId] ?? [])
           .map((id) => _avatars[id])
@@ -137,6 +155,9 @@ class AppState extends ChangeNotifier {
   void setAvatar(AvatarModel avatar) {
     _avatars[avatar.id] = avatar;
 
+    // Update cache
+    _cacheService.cacheAvatar(avatar.id, avatar);
+
     // Update user's avatar list
     final userId = avatar.ownerUserId;
     if (!_userAvatars.containsKey(userId)) {
@@ -166,6 +187,9 @@ class AppState extends ChangeNotifier {
       if (_activeAvatar?.id == avatarId) {
         _activeAvatar = null;
       }
+
+      // Clean up cache
+      _cacheService.invalidateAvatar(avatarId);
 
       // Clean up avatar-specific state
       _avatarViewModes.remove(avatarId);
@@ -243,12 +267,26 @@ class AppState extends ChangeNotifier {
 
   /// Get avatar-specific posts
   List<PostModel> getAvatarPosts(String avatarId) {
+    // Try cache first
+    final cached = _cacheService.getCachedAvatarPosts(avatarId);
+    if (cached != null) {
+      return cached;
+    }
+
+    // Fallback to in-memory store
     final postIds = _avatarPosts[avatarId] ?? [];
-    return postIds
+    final posts = postIds
         .map((id) => _posts[id])
         .where((p) => p != null)
         .cast<PostModel>()
         .toList();
+
+    // Cache the result
+    if (posts.isNotEmpty) {
+      _cacheService.cacheAvatarPosts(avatarId, posts);
+    }
+
+    return posts;
   }
 
   /// Associate content with an avatar
@@ -321,17 +359,29 @@ class AppState extends ChangeNotifier {
 
   /// Get avatar stats for display
   Map<String, dynamic> getAvatarStats(String avatarId) {
+    // Try cache first
+    final cached = _cacheService.getCachedAvatarStats(avatarId);
+    if (cached != null) {
+      return cached;
+    }
+
+    // Compute stats
     final avatar = _avatars[avatarId];
     final posts = getAvatarPosts(avatarId);
     final followerCount = getAvatarFollowerCount(avatarId);
 
-    return {
+    final stats = {
       'followersCount': followerCount,
       'postsCount': posts.length,
       'likesCount': avatar?.likesCount ?? 0,
       'engagementRate': avatar?.engagementRate ?? 0.0,
       'lastViewedAt': getAvatarLastViewedAt(avatarId),
     };
+
+    // Cache the result
+    _cacheService.cacheAvatarStats(avatarId, stats);
+
+    return stats;
   }
 
   /// Check if user owns avatar
@@ -580,6 +630,20 @@ class AppState extends ChangeNotifier {
     _loadingStates.clear();
     _currentPages.clear();
     _hasMoreData.clear();
+
+    // Clear cache
+    _cacheService.clearAll();
+
     notifyListeners();
+  }
+
+  /// Get cache statistics for monitoring
+  Map<String, dynamic> getCacheStats() {
+    return _cacheService.getCacheStats();
+  }
+
+  /// Preload avatars for performance
+  void preloadAvatars(List<AvatarModel> avatars) {
+    _cacheService.preloadAvatars(avatars);
   }
 }

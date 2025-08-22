@@ -13,7 +13,6 @@ import '../services/enhanced_feeds_service.dart';
 import '../services/analytics_insights_service.dart';
 import '../services/user_role_service.dart';
 import '../services/avatar_profile_service.dart';
-import '../services/avatar_content_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
 import '../screens/avatar_management_screen.dart';
@@ -26,8 +25,7 @@ import '../store/app_state.dart';
 class ProfileScreen extends StatefulWidget {
   final String?
   avatarId; // Avatar ID to display, null means current user's active avatar
-  final String? userId; // Deprecated: kept for backward compatibility
-  const ProfileScreen({super.key, this.avatarId, this.userId});
+  const ProfileScreen({super.key, this.avatarId});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -38,7 +36,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
   final FollowService _followService = FollowService();
   final AnalyticsInsightsService _analyticsService = AnalyticsInsightsService();
-  final UserRoleService _roleService = UserRoleService();
   final AvatarProfileService _avatarProfileService = AvatarProfileService();
   final AppState _appState = AppState();
 
@@ -50,21 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   bool _isFollowing = false;
   bool _isFollowLoading = false;
-
-  // Legacy user data (for backward compatibility)
-  UserModel? _user;
-  final Map<String, dynamic> _stats =
-      {}; // Legacy stats for backward compatibility
-  final List<AvatarModel> _avatars =
-      []; // Legacy avatars list for backward compatibility
-
-  // Unused legacy variables (kept for backward compatibility)
-  // ignore: unused_field
-  bool _isCreator = false;
-  // ignore: unused_field
-  bool _isFan = false;
-  // ignore: unused_field
-  UserRole _userRole = UserRole.creator;
 
   // Posts content state
   List<PostModel> _avatarPosts = [];
@@ -91,7 +73,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
 
-  /// Load user posts from database
   /// Load avatar posts from database
   Future<void> _loadAvatarPosts({bool loadMore = false}) async {
     if (_isPostsLoading ||
@@ -133,47 +114,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Legacy method for loading user posts (backward compatibility)
-  Future<void> _loadUserPosts({bool loadMore = false}) async {
-    if (_isPostsLoading ||
-        (_avatarPosts.isNotEmpty && !loadMore && !_hasMorePosts)) {
-      return;
-    }
-
-    if (_user == null) return;
-
-    setState(() {
-      _isPostsLoading = true;
-    });
-
-    try {
-      // Use EnhancedFeedsService to get posts for this user
-      final feedsService = EnhancedFeedsService();
-      final posts = await feedsService.getUserPosts(
-        userId: _user!.id,
-        page: loadMore ? _postsPage + 1 : 1,
-        limit: _postsPerPage,
-      );
-
-      setState(() {
-        if (loadMore) {
-          _avatarPosts.addAll(posts);
-          _postsPage++;
-        } else {
-          _avatarPosts = posts;
-          _postsPage = 1;
-        }
-        _hasMorePosts = posts.length == _postsPerPage;
-        _isPostsLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isPostsLoading = false;
-      });
-      debugPrint('Error loading user posts: $e');
-    }
-  }
-
   Future<void> _loadProfileData() async {
     try {
       final currentUserId = _authService.currentUserId;
@@ -181,19 +121,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Determine which avatar to load
       String? targetAvatarId = widget.avatarId;
 
-      // If no avatar ID provided, use current user's active avatar or fallback to user-based loading
+      // If no avatar ID provided, use current user's active avatar
       if (targetAvatarId == null) {
         if (currentUserId != null) {
           final activeAvatar = await _avatarProfileService.getActiveAvatar(
             currentUserId,
           );
           targetAvatarId = activeAvatar?.id;
-        }
-
-        // Fallback to legacy user-based loading if no avatar found
-        if (targetAvatarId == null && widget.userId != null) {
-          await _loadLegacyUserProfile();
-          return;
         }
 
         // If still no avatar, show empty state
@@ -261,44 +195,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Legacy method for backward compatibility with user-based profiles
-  Future<void> _loadLegacyUserProfile() async {
-    try {
-      final currentUserId = _authService.currentUserId;
-      if (currentUserId == null) return;
-
-      final targetUserId = widget.userId ?? currentUserId;
-      final isOwnProfile = targetUserId == currentUserId;
-
-      // Load the profile data using legacy method
-      final profileData = await _profileService.getUserProfileData(
-        targetUserId,
-      );
-
-      if (mounted) {
-        setState(() {
-          _user = profileData['user'] as UserModel;
-          _userAvatars = profileData['avatars'] as List<AvatarModel>;
-          _currentAvatar = profileData['active_avatar'] as AvatarModel?;
-          _viewMode = isOwnProfile
-              ? ProfileViewMode.owner
-              : ProfileViewMode.public;
-          _isLoading = false;
-        });
-      }
-
-      // Load posts using legacy method
-      await _loadUserPosts();
-    } catch (e) {
-      debugPrint('Error loading legacy user profile: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   /// Check follow status for avatar-centric profiles
   Future<void> _checkAvatarFollowStatus(String avatarId) async {
     try {
@@ -318,31 +214,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isFollowLoading = false;
       });
       debugPrint('Error checking avatar follow status: $e');
-    }
-  }
-
-  /// Legacy method for checking follow status (backward compatibility)
-  Future<void> _checkFollowStatus(String targetUserId) async {
-    try {
-      setState(() {
-        _isFollowLoading = true;
-      });
-
-      if (_currentAvatar != null) {
-        // Check if current user is following the target user's active avatar
-        final isFollowing = await _followService.isFollowing(
-          _currentAvatar!.id,
-        );
-
-        setState(() {
-          _isFollowing = isFollowing;
-          _isFollowLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isFollowLoading = false;
-      });
     }
   }
 
@@ -425,20 +296,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Legacy method for refreshing follower count (backward compatibility)
-  Future<void> _refreshFollowerCount() async {
-    if (_user == null) return;
-
-    try {
-      final updatedStats = await _profileService.getUserStats(_user!.id);
-      setState(() {
-        // Legacy stats update - will be removed when fully migrated
-      });
-    } catch (e) {
-      // Silently fail, as this is just a refresh
-    }
-  }
-
   /// Handle avatar switching
   Future<void> _onAvatarSelected(AvatarModel selectedAvatar) async {
     if (_currentAvatar?.id == selectedAvatar.id) return;
@@ -475,18 +332,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _navigateToEditProfile() async {
-    if (_user == null) return;
-
-    final updatedUser = await Navigator.push<UserModel>(
-      context,
-      MaterialPageRoute(builder: (context) => EditProfileScreen(user: _user!)),
-    );
-
-    if (updatedUser != null) {
-      setState(() {
-        _user = updatedUser;
-      });
-    }
+    if (_currentAvatar == null) return;
+    
+    // Navigate to avatar edit screen
+    // For now, we'll navigate to the avatar management screen since we don't have
+    // a specific avatar edit screen yet. In a full implementation, this would
+    // navigate to an avatar-specific edit screen.
+    _navigateToAvatarManagement();
   }
 
   void _navigateToSettings() {
@@ -540,7 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Profile shared! Link: quanta.app/profile/${_user?.username ?? 'user'}',
+          'Profile shared! Link: quanta.app/profile/${_currentAvatar?.name ?? 'avatar'}',
         ),
         backgroundColor: kPrimaryColor,
         action: SnackBarAction(
@@ -569,30 +421,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return number.toString();
   }
 
-  /// Load analytics data for the user's profile
+  /// Load analytics data for the avatar's profile
   Future<void> _loadAnalyticsData() async {
-    if (_user == null) return;
+    if (_currentAvatar == null) return;
 
     try {
-      final analyticsData = await _analyticsService.getProfileAnalytics(
-        userId: _user!.id,
+      // Use avatar-specific analytics
+      final analyticsData = await _analyticsService.getAvatarAnalytics(
+        avatarId: _currentAvatar!.id,
         period: _selectedPeriod,
-        includeComparisons: true,
       );
 
+      // Extract metrics from the avatar analytics data
+      final metricsData = analyticsData['metrics'] as Map<String, dynamic>;
+      
+      // Convert metrics data to AnalyticsMetric objects
+      final metrics = <AnalyticsMetric>[];
+      metricsData.forEach((key, value) {
+        metrics.add(AnalyticsMetric(
+          key: key,
+          label: _getMetricLabel(key),
+          value: value is num ? value.toDouble() : 0.0,
+          type: _getMetricType(key),
+        ));
+      });
+
       setState(() {
-        _detailedMetrics = analyticsData['metrics'] as List<AnalyticsMetric>;
-        _insights = analyticsData['insights'] as List<AnalyticsInsight>;
-        _comparisons = analyticsData['comparisons'] as Map<String, dynamic>?;
+        _detailedMetrics = metrics;
+        // For now, we'll keep insights and comparisons as empty since the avatar analytics
+        // doesn't provide them in the same format as the user analytics
+        _insights = [];
+        _comparisons = null;
       });
     } catch (e) {
-      debugPrint('Error loading analytics data: $e');
+      debugPrint('Error loading avatar analytics data: $e');
       // Set empty analytics data on error
       setState(() {
         _detailedMetrics = [];
         _insights = [];
         _comparisons = null;
       });
+    }
+  }
+
+  /// Get human-readable label for a metric key
+  String _getMetricLabel(String key) {
+    switch (key) {
+      case 'total_posts':
+        return 'Total Posts';
+      case 'total_likes':
+        return 'Total Likes';
+      case 'total_comments':
+        return 'Total Comments';
+      case 'total_shares':
+        return 'Total Shares';
+      case 'engagement_rate':
+        return 'Engagement Rate';
+      case 'reach':
+        return 'Reach';
+      case 'impressions':
+        return 'Impressions';
+      default:
+        return key.replaceAll('_', ' ');
+    }
+  }
+
+  /// Get metric type for a metric key
+  MetricType _getMetricType(String key) {
+    switch (key) {
+      case 'engagement_rate':
+        return MetricType.percentage;
+      default:
+        return MetricType.count;
     }
   }
 
@@ -604,7 +504,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
 
       // Reload analytics data for the new period
-      if (_viewMode == ProfileViewMode.owner && _user != null) {
+      if (_viewMode == ProfileViewMode.owner && _currentAvatar != null) {
         _loadAnalyticsData();
       }
     }
@@ -631,33 +531,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return '${metric.value.toStringAsFixed(2)}/min';
       default:
         return metric.value.toString();
-    }
-  }
-
-  /// Load user role information
-  Future<void> _loadUserRoles(String userId) async {
-    try {
-      final isCreator = await _roleService.isCreator(userId);
-      final isFan = await _roleService.isFan(userId);
-      final userRole = await _roleService.getUserRole(userId);
-
-      if (mounted) {
-        setState(() {
-          _isCreator = isCreator;
-          _isFan = isFan;
-          _userRole = userRole;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading user roles: $e');
-      // Set default values on error
-      if (mounted) {
-        setState(() {
-          _isCreator = false;
-          _isFan = false;
-          _userRole = UserRole.creator;
-        });
-      }
     }
   }
 
@@ -969,14 +842,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _user?.profileImageUrl != null
-                          ? _user!.profileImageUrl!.startsWith('assets/')
+                      _currentAvatar?.avatarImageUrl != null
+                          ? _currentAvatar!.avatarImageUrl!.startsWith(
+                                  'assets/',
+                                )
                                 ? Image.asset(
-                                    _user!.profileImageUrl!,
+                                    _currentAvatar!.avatarImageUrl!,
                                     fit: BoxFit.cover,
                                   )
                                 : Image.network(
-                                    _user!.profileImageUrl!,
+                                    _currentAvatar!.avatarImageUrl!,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return const Image(
@@ -1052,7 +927,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-                        sliver: SliverToBoxAdapter(child: _userPostsMasonry()),
+                        sliver: SliverToBoxAdapter(child: _avatarPostsMasonry()),
                       ),
                     ],
                   ),
@@ -1064,14 +939,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Header (avatar name + bio + metrics + avatar switcher)
   Widget _headerBlock() {
-    // Use avatar data if available, fallback to user data for backward compatibility
-    final avatarName =
-        _currentAvatar?.name ?? _user?.displayName ?? _user?.username ?? 'User';
+    // Use avatar data only (no more user fallback)
+    final avatarName = _currentAvatar?.name ?? 'Avatar';
     final avatarBio = _currentAvatar?.bio ?? 'Virtual influencer creator';
-    final avatarImageUrl =
-        _currentAvatar?.avatarImageUrl ?? _user?.profileImageUrl;
+    final avatarImageUrl = _currentAvatar?.avatarImageUrl;
 
-    // Get stats from avatar profile data or fallback to legacy stats
+    // Get stats from avatar profile data
     final stats = _avatarProfileData?.stats;
     final postsCount = stats?.postsCount ?? 0;
     final followersCount = stats?.followersCount ?? 0;
@@ -1347,6 +1220,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBasicAnalyticsSection() {
+    // Get stats from avatar profile data
+    final stats = _avatarProfileData?.stats;
+    final postsCount = stats?.postsCount ?? 0;
+    final followersCount = stats?.followersCount ?? 0;
+
     return _HeaderCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1365,7 +1243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: _buildAnalyticsCard(
                   title: 'Posts',
-                  value: _formatNumber(_stats['posts_count'] ?? 0),
+                  value: _formatNumber(postsCount),
                   subtitle: 'Total content',
                   icon: Icons.grid_view,
                   color: Colors.blue,
@@ -1376,7 +1254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Expanded(
                 child: _buildAnalyticsCard(
                   title: 'Followers',
-                  value: _formatNumber(_stats['followers_count'] ?? 0),
+                  value: _formatNumber(followersCount),
                   subtitle: 'Total followers',
                   icon: Icons.people,
                   color: Colors.green,
@@ -1385,7 +1263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          if (_avatars.isNotEmpty) ...[
+          if (_userAvatars.length > 1) ...[
             const SizedBox(height: 16),
             const Text(
               'Top Performing Avatar',
@@ -1517,12 +1395,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBasicMetricsGrid() {
+    // Get stats from avatar profile data
+    final stats = _avatarProfileData?.stats;
+    final postsCount = stats?.postsCount ?? 0;
+    final followersCount = stats?.followersCount ?? 0;
+
     return Row(
       children: [
         Expanded(
           child: _buildAnalyticsCard(
             title: 'Posts',
-            value: _formatNumber(_stats['posts_count'] ?? 0),
+            value: _formatNumber(postsCount),
             subtitle: 'Total content',
             icon: Icons.grid_view,
             color: Colors.blue,
@@ -1533,7 +1416,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Expanded(
           child: _buildAnalyticsCard(
             title: 'Followers',
-            value: _formatNumber(_stats['followers_count'] ?? 0),
+            value: _formatNumber(followersCount),
             subtitle: 'Total followers',
             icon: Icons.people,
             color: Colors.green,
@@ -1871,7 +1754,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildTopAvatarCard() {
     final topAvatar =
-        _avatars.first; // In real app, this would be sorted by performance
+        _userAvatars.first; // In real app, this would be sorted by performance
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -2609,7 +2492,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// Avatar posts grid - displays posts for the current avatar
-  Widget _userPostsMasonry() {
+  Widget _avatarPostsMasonry() {
     // Show loading state while posts are loading
     if (_isPostsLoading && _avatarPosts.isEmpty) {
       return _buildPostsLoadingGrid();
@@ -2666,26 +2549,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     height: 180,
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SkeletonWidget(
-                          width: (rightColW - 12) / 2,
-                          height: 120,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SkeletonWidget(
-                          width: (rightColW - 12) / 2,
-                          height: 120,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -2695,71 +2558,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Build empty posts state for avatar
-  Widget _buildEmptyPostsState() {
-    final isOwner = _viewMode == ProfileViewMode.owner;
-    final avatarName = _currentAvatar?.name ?? 'This avatar';
-
+  /// Build empty state for avatars section
+  Widget _buildEmptyAvatarsState() {
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.grid_view, size: 64, color: Colors.white30),
+          Icon(
+            Icons.group_outlined,
+            size: 48,
+            color: Colors.white.withOpacity(0.5),
+          ),
           const SizedBox(height: 16),
-          Text(
-            isOwner ? 'No posts yet' : 'No posts to show',
-            style: const TextStyle(
+          const Text(
+            'No Avatars Yet',
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            isOwner
-                ? 'Share your first moment as ${_currentAvatar?.name ?? 'this avatar'} to get started!'
-                : '$avatarName hasn\'t posted anything yet.',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          const Text(
+            'Create your first avatar to get started',
+            style: TextStyle(
+              color: kLightTextColor,
+              fontSize: 14,
+            ),
             textAlign: TextAlign.center,
           ),
-          if (isOwner) ...[
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _navigateToCreatePost,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Post'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _navigateToAvatarManagement,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-          ],
+            child: const Text(
+              'Create Avatar',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// Build empty avatars state
-  Widget _buildEmptyAvatarsState() {
+  /// Build empty state for posts section
+  Widget _buildEmptyPostsState() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.person_outline, size: 64, color: Colors.white30),
+          Icon(
+            Icons.grid_view_outlined,
+            size: 48,
+            color: Colors.white.withOpacity(0.5),
+          ),
           const SizedBox(height: 16),
           Text(
             _viewMode == ProfileViewMode.owner
-                ? 'No avatars yet'
-                : 'No avatars to show',
+                ? 'No Posts Yet'
+                : 'No Posts Available',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -2769,27 +2643,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 8),
           Text(
             _viewMode == ProfileViewMode.owner
-                ? 'Create your first avatar to get started!'
-                : 'This user hasn\'t created any avatars yet.',
-            style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ? 'Create your first post to get started'
+                : 'This avatar hasn\'t posted anything yet',
+            style: const TextStyle(
+              color: kLightTextColor,
+              fontSize: 14,
+            ),
             textAlign: TextAlign.center,
           ),
           if (_viewMode == ProfileViewMode.owner) ...[
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _navigateToAvatarManagement,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Create Avatar'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _navigateToCreatePost,
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+              ),
+              child: const Text(
+                'Create Post',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -2798,8 +2674,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Build the actual database posts grid
+  /// Build posts grid from database
   Widget _buildDatabasePostsGrid() {
+    if (_avatarPosts.isEmpty) {
+      return _buildEmptyPostsState();
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalW = constraints.maxWidth;
@@ -2807,12 +2687,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final leftColW = (totalW - gap) * 0.35;
         final rightColW = totalW - leftColW - gap;
 
-        // Distribute avatar posts between left and right columns
+        // Split posts into left and right columns
         final leftPosts = <PostModel>[];
         final rightPosts = <PostModel>[];
 
         for (int i = 0; i < _avatarPosts.length; i++) {
-          if (i % 3 == 0) {
+          if (i % 2 == 0) {
             leftPosts.add(_avatarPosts[i]);
           } else {
             rightPosts.add(_avatarPosts[i]);
@@ -2821,95 +2701,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         return Column(
           children: [
+            // Load more button at the top for owner view
+            if (_viewMode == ProfileViewMode.owner &&
+                _hasMorePosts &&
+                _avatarPosts.length >= _postsPerPage) ...[
+              Center(
+                child: TextButton(
+                  onPressed: () => _loadAvatarPosts(loadMore: true),
+                  child: const Text(
+                    'Load More',
+                    style: TextStyle(color: kPrimaryColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Left column
-                SizedBox(
-                  width: leftColW,
+                Expanded(
+                  flex: 35,
                   child: Column(
                     children: leftPosts
-                        .map(
-                          (post) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildPostTile(
-                              post: post,
-                              height: 120,
-                              width: leftColW,
-                              radius: 18,
-                            ),
-                          ),
-                        )
+                        .map((post) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildPostItem(post),
+                            ))
                         .toList(),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: gap),
                 // Right column
-                SizedBox(
-                  width: rightColW,
+                Expanded(
+                  flex: 65,
                   child: Column(
-                    children: rightPosts.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final post = entry.value;
-                      final isFirst = index == 0;
-                      final height = isFirst ? 180.0 : 120.0;
-                      final radius = isFirst ? 22.0 : 18.0;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildPostTile(
-                          post: post,
-                          height: height,
-                          width: rightColW,
-                          radius: radius,
-                        ),
-                      );
-                    }).toList(),
+                    children: rightPosts
+                        .map((post) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildPostItem(post),
+                            ))
+                        .toList(),
                   ),
                 ),
               ],
             ),
-            // Load more indicator
-            if (_isPostsLoading)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
-                ),
-              ),
-            // Load more button
-            if (_hasMorePosts && !_isPostsLoading)
-              Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: OutlinedButton(
+            // Load more button at the bottom
+            if (_hasMorePosts &&
+                _avatarPosts.length >= _postsPerPage) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
                   onPressed: () => _loadAvatarPosts(loadMore: true),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.white30),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  child: const Text(
+                    'Load More',
+                    style: TextStyle(color: kPrimaryColor),
                   ),
-                  child: const Text('Load More'),
                 ),
               ),
+            ],
+            // Loading indicator for more posts
+            if (_isPostsLoading && _avatarPosts.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Center(
+                child: SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },
     );
   }
 
-  /// Build individual post tile from database data
-  Widget _buildPostTile({
-    required PostModel post,
-    required double height,
-    required double width,
-    required double radius,
-  }) {
+  /// Build individual post item
+  Widget _buildPostItem(PostModel post) {
     final isVideo = post.type == PostType.video;
     final imageUrl = post.thumbnailUrl ?? post.imageUrl;
 
@@ -2919,92 +2791,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.pushNamed(context, '/post_detail', arguments: post);
       },
       child: Container(
-        height: height,
-        width: width,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(radius),
-          color: Colors.grey[800], // Fallback color
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image or thumbnail
-            if (imageUrl != null)
-              imageUrl.startsWith('assets/')
-                  ? Image.asset(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildFallbackImage(),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildFallbackImage(),
-                    )
-            else
-              _buildFallbackImage(),
-            // Gradient overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.4), Colors.transparent],
-                ),
+            // Post image/thumbnail
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+              child: Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  if (imageUrl != null)
+                    imageUrl.startsWith('assets/')
+                        ? Image.asset(
+                            imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildFallbackImage(),
+                          )
+                  else
+                    _buildFallbackImage(),
+                  if (isVideo)
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          color: kPrimaryColor,
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            // Video play button
-            if (isVideo)
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+            // Post details
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (post.caption != null) ...[
+                    Text(
+                      post.caption!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, color: Colors.red, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatNumber(post.likesCount ?? 0),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(Icons.comment, color: Colors.white70, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatNumber(post.commentsCount ?? 0),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _formatPostDate(post.createdAt),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    Icons.play_arrow_rounded,
-                    color: kPrimaryColor,
-                    size: 28,
-                  ),
-                ),
-              ),
-            // Stats badge
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.favorite, color: Colors.white, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatNumber(post.likesCount ?? 0),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
           ],
@@ -3012,111 +2902,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-}
 
-// Card wrapper for the header that appears over the photo
-class _HeaderCard extends StatelessWidget {
-  final Widget child;
-  const _HeaderCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
+  /// Header card widget with consistent styling
+  Widget _HeaderCard({required Widget child}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-        border: Border.all(color: Colors.white10),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: child,
-    );
-  }
-}
-
-// Const-friendly metric chip used in header Wrap
-class _MetricChip extends StatelessWidget {
-  final String value;
-  final String label;
-  const _MetricChip({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        border: Border.all(color: Colors.white10),
-      ),
-      child: DefaultTextStyle(
-        style: const TextStyle(color: Colors.white),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w700,
-                fontSize: 12.5,
-              ),
-            ),
-          ],
-        ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
       ),
     );
   }
-}
 
-// Compact stat column used in dark header
-class _StatColumn extends StatelessWidget {
-  final String value;
-  final String label;
-  const _StatColumn({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
+  /// Stats column widget for header block
+  Widget _StatColumn({required String value, required String label}) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontWeight: FontWeight.w800,
             fontSize: 18,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white70,
+            color: kLightTextColor,
             fontSize: 12,
-            fontWeight: FontWeight.w600,
           ),
         ),
       ],

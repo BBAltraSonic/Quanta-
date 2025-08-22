@@ -69,8 +69,8 @@ void main() {
 
       activeAvatar = testAvatars[0];
     });
-   
- group('Dropdown Style Tests', () {
+
+    group('Dropdown Style Tests', () {
       testWidgets('should display dropdown with all avatars', (tester) async {
         await tester.pumpWidget(
           MaterialApp(
@@ -175,8 +175,8 @@ void main() {
         expect(find.textContaining('followers'), findsWidgets);
         expect(find.textContaining('posts'), findsWidgets);
       });
-    });   
- group('Modal Style Tests', () {
+    });
+    group('Modal Style Tests', () {
       testWidgets('should display modal trigger with active avatar info', (
         tester,
       ) async {
@@ -311,8 +311,9 @@ void main() {
         // Verify active avatar has check icon
         expect(find.byIcon(Icons.check_circle), findsOneWidget);
       });
-    });    g
-roup('Carousel Style Tests', () {
+    });
+
+    group('Carousel Style Tests', () {
       testWidgets('should display horizontal scrollable avatar list', (
         tester,
       ) async {
@@ -411,8 +412,9 @@ roup('Carousel Style Tests', () {
           );
         },
       );
-    });    gr
-oup('Empty State Tests', () {
+    });
+
+    group('Empty State Tests', () {
       testWidgets('should display empty state when no avatars provided', (
         tester,
       ) async {
@@ -534,8 +536,8 @@ oup('Empty State Tests', () {
         final renderBox = tester.renderObject<RenderBox>(containerFinder);
         expect(renderBox.size.height, customHeight);
       });
-    }); 
-   group('Avatar Image Tests', () {
+    });
+    group('Avatar Image Tests', () {
       testWidgets('should display initials when no avatar image', (
         tester,
       ) async {
@@ -564,9 +566,7 @@ oup('Empty State Tests', () {
         ); // Fitness Avatar -> F (duplicate with Fashion)
       });
 
-      testWidgets('should handle avatar images gracefully', (
-        tester,
-      ) async {
+      testWidgets('should handle avatar images gracefully', (tester) async {
         final avatarWithImage = testAvatars[0].copyWith(
           avatarImageUrl: 'test_image_url',
         );
@@ -586,9 +586,11 @@ oup('Empty State Tests', () {
 
         // Verify CircleAvatar is present and handles image URL
         expect(find.byType(CircleAvatar), findsOneWidget);
-        
+
         // Verify that the CircleAvatar has a backgroundImage when URL is provided
-        final circleAvatar = tester.widget<CircleAvatar>(find.byType(CircleAvatar));
+        final circleAvatar = tester.widget<CircleAvatar>(
+          find.byType(CircleAvatar),
+        );
         expect(circleAvatar.backgroundImage, isNotNull);
       });
     });

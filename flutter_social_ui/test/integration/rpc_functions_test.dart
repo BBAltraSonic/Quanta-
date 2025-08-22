@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../lib/config/db_config.dart';
+import 'package:quanta/config/db_config.dart';
+import 'package:quanta/utils/environment.dart';
 
 void main() {
   group('RPC Functions Integration Tests', () {
@@ -12,8 +13,8 @@ void main() {
     setUpAll(() async {
       // Initialize Supabase client for testing
       await Supabase.initialize(
-        url: DatabaseConfig.supabaseUrl,
-        anonKey: DatabaseConfig.supabaseAnonKey,
+        url: Environment.supabaseUrl,
+        anonKey: Environment.supabaseAnonKey,
       );
       supabase = Supabase.instance.client;
     });
@@ -24,7 +25,7 @@ void main() {
         email: 'test_${DateTime.now().millisecondsSinceEpoch}@test.com',
         password: 'test123456',
       );
-      
+
       expect(authResponse.user, isNotNull);
       testUserId = authResponse.user!.id;
 
@@ -37,24 +38,32 @@ void main() {
       });
 
       // Create test avatar
-      final avatarResponse = await supabase.from('avatars').insert({
-        'owner_user_id': testUserId,
-        'name': 'Test Avatar',
-        'bio': 'Test avatar for integration tests',
-        'niche': 'tech',
-        'personality_traits': ['friendly', 'helpful'],
-        'personality_prompt': 'You are a helpful test avatar.',
-      }).select().single();
+      final avatarResponse = await supabase
+          .from('avatars')
+          .insert({
+            'owner_user_id': testUserId,
+            'name': 'Test Avatar',
+            'bio': 'Test avatar for integration tests',
+            'niche': 'tech',
+            'personality_traits': ['friendly', 'helpful'],
+            'personality_prompt': 'You are a helpful test avatar.',
+          })
+          .select()
+          .single();
 
       testAvatarId = avatarResponse['id'];
 
       // Create test post
-      final postResponse = await supabase.from('posts').insert({
-        'avatar_id': testAvatarId,
-        'video_url': 'https://example.com/test_video.mp4',
-        'caption': 'Test post for RPC function testing',
-        'hashtags': ['test', 'integration'],
-      }).select().single();
+      final postResponse = await supabase
+          .from('posts')
+          .insert({
+            'avatar_id': testAvatarId,
+            'video_url': 'https://example.com/test_video.mp4',
+            'caption': 'Test post for RPC function testing',
+            'hashtags': ['test', 'integration'],
+          })
+          .select()
+          .single();
 
       testPostId = postResponse['id'];
     });
@@ -70,7 +79,7 @@ void main() {
       if (testUserId != null) {
         await supabase.from('users').delete().eq('id', testUserId!);
       }
-      
+
       // Sign out
       await supabase.auth.signOut();
     });
@@ -86,9 +95,10 @@ void main() {
         final initialViews = initialPost['views_count'] as int;
 
         // Call RPC function
-        final result = await supabase.rpc('increment_view_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'increment_view_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Verify response structure
         expect(result['success'], isTrue);
@@ -107,10 +117,11 @@ void main() {
 
       test('should fail for non-existent post', () async {
         final fakePostId = '00000000-0000-0000-0000-000000000000';
-        
-        final result = await supabase.rpc('increment_view_count', params: {
-          'target_post_id': fakePostId,
-        });
+
+        final result = await supabase.rpc(
+          'increment_view_count',
+          params: {'target_post_id': fakePostId},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Post not found'));
@@ -121,9 +132,10 @@ void main() {
         // Sign out to test unauthenticated access
         await supabase.auth.signOut();
 
-        final result = await supabase.rpc('increment_view_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'increment_view_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Authentication required'));
@@ -142,9 +154,10 @@ void main() {
         final initialLikes = initialPost['likes_count'] as int;
 
         // Call RPC function
-        final result = await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Verify response structure
         expect(result['success'], isTrue);
@@ -173,14 +186,16 @@ void main() {
 
       test('should fail when trying to like same post twice', () async {
         // Like the post first time
-        await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Try to like again
-        final result = await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('already liked'));
@@ -189,10 +204,11 @@ void main() {
 
       test('should fail for non-existent post', () async {
         final fakePostId = '00000000-0000-0000-0000-000000000000';
-        
-        final result = await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': fakePostId,
-        });
+
+        final result = await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': fakePostId},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Post not found'));
@@ -203,9 +219,10 @@ void main() {
         // Sign out to test unauthenticated access
         await supabase.auth.signOut();
 
-        final result = await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Authentication required'));
@@ -216,9 +233,10 @@ void main() {
     group('decrement_likes_count', () {
       test('should decrement likes count for previously liked post', () async {
         // First like the post
-        await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Get likes count after liking
         final likedPost = await supabase
@@ -229,9 +247,10 @@ void main() {
         final likedCount = likedPost['likes_count'] as int;
 
         // Call decrement RPC function
-        final result = await supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'decrement_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Verify response structure
         expect(result['success'], isTrue);
@@ -258,22 +277,27 @@ void main() {
         expect(likeRecord, isNull);
       });
 
-      test('should fail when trying to unlike a post that was not liked', () async {
-        final result = await supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+      test(
+        'should fail when trying to unlike a post that was not liked',
+        () async {
+          final result = await supabase.rpc(
+            'decrement_likes_count',
+            params: {'target_post_id': testPostId!},
+          );
 
-        expect(result['success'], isFalse);
-        expect(result['error'], contains('not liked'));
-        expect(result['code'], equals('NOT_LIKED'));
-      });
+          expect(result['success'], isFalse);
+          expect(result['error'], contains('not liked'));
+          expect(result['code'], equals('NOT_LIKED'));
+        },
+      );
 
       test('should fail for non-existent post', () async {
         final fakePostId = '00000000-0000-0000-0000-000000000000';
-        
-        final result = await supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': fakePostId,
-        });
+
+        final result = await supabase.rpc(
+          'decrement_likes_count',
+          params: {'target_post_id': fakePostId},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Post not found'));
@@ -284,9 +308,10 @@ void main() {
         // Sign out to test unauthenticated access
         await supabase.auth.signOut();
 
-        final result = await supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'decrement_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Authentication required'));
@@ -297,14 +322,16 @@ void main() {
     group('get_post_interaction_status', () {
       test('should return correct status for liked post', () async {
         // Like the post first
-        await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
 
         // Get interaction status
-        final result = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isTrue);
         expect(result['data'], isNotNull);
@@ -316,9 +343,10 @@ void main() {
       });
 
       test('should return correct status for non-liked post', () async {
-        final result = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isTrue);
         expect(result['data'], isNotNull);
@@ -331,10 +359,11 @@ void main() {
 
       test('should fail for non-existent post', () async {
         final fakePostId = '00000000-0000-0000-0000-000000000000';
-        
-        final result = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': fakePostId,
-        });
+
+        final result = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': fakePostId},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Post not found'));
@@ -345,9 +374,10 @@ void main() {
         // Sign out to test unauthenticated access
         await supabase.auth.signOut();
 
-        final result = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        final result = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
 
         expect(result['success'], isFalse);
         expect(result['error'], contains('Authentication required'));
@@ -358,61 +388,69 @@ void main() {
     group('Integration Flow Tests', () {
       test('should handle complete like/unlike flow correctly', () async {
         // Get initial state
-        var status = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        var status = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
         expect(status['data']['user_liked'], isFalse);
         final initialLikes = status['data']['likes_count'] as int;
 
         // Like the post
-        final likeResult = await supabase.rpc('increment_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final likeResult = await supabase.rpc(
+          'increment_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
         expect(likeResult['success'], isTrue);
         expect(likeResult['data']['likes_count'], equals(initialLikes + 1));
 
         // Check status after like
-        status = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        status = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
         expect(status['data']['user_liked'], isTrue);
         expect(status['data']['likes_count'], equals(initialLikes + 1));
 
         // Unlike the post
-        final unlikeResult = await supabase.rpc('decrement_likes_count', params: {
-          'target_post_id': testPostId!,
-        });
+        final unlikeResult = await supabase.rpc(
+          'decrement_likes_count',
+          params: {'target_post_id': testPostId!},
+        );
         expect(unlikeResult['success'], isTrue);
         expect(unlikeResult['data']['likes_count'], equals(initialLikes));
 
         // Check final status
-        status = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        status = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
         expect(status['data']['user_liked'], isFalse);
         expect(status['data']['likes_count'], equals(initialLikes));
       });
 
       test('should handle multiple view increments correctly', () async {
         // Get initial views
-        var status = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        var status = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
         final initialViews = status['data']['views_count'] as int;
 
         // Increment views multiple times
         for (int i = 1; i <= 3; i++) {
-          final result = await supabase.rpc('increment_view_count', params: {
-            'target_post_id': testPostId!,
-          });
+          final result = await supabase.rpc(
+            'increment_view_count',
+            params: {'target_post_id': testPostId!},
+          );
           expect(result['success'], isTrue);
           expect(result['data']['views_count'], equals(initialViews + i));
         }
 
         // Verify final count
-        status = await supabase.rpc('get_post_interaction_status', params: {
-          'target_post_id': testPostId!,
-        });
+        status = await supabase.rpc(
+          'get_post_interaction_status',
+          params: {'target_post_id': testPostId!},
+        );
         expect(status['data']['views_count'], equals(initialViews + 3));
       });
     });

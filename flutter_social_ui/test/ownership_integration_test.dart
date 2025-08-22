@@ -7,6 +7,7 @@ import 'package:quanta/widgets/ownership_aware_widgets.dart';
 import 'package:quanta/models/user_model.dart';
 import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/avatar_model.dart';
+import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/comment.dart';
 
 void main() {
@@ -43,16 +44,22 @@ void main() {
       final ownAvatar = AvatarModel(
         id: avatarId,
         name: 'My Avatar',
+        bio: 'My Avatar Bio',
         ownerUserId: currentUserId,
+        niche: AvatarNiche.tech,
+        personalityTraits: [PersonalityTrait.friendly],
+        personalityPrompt: 'Test prompt',
         isActive: true,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       final ownPost = PostModel(
         id: postId,
         avatarId: avatarId,
-        userId: currentUserId,
+        type: PostType.image,
         caption: 'My Post',
+        hashtags: ['#test'],
         likesCount: 10,
         commentsCount: 5,
         sharesCount: 2,
@@ -64,10 +71,12 @@ void main() {
       final ownComment = Comment(
         id: commentId,
         postId: postId,
-        userId: currentUserId,
+        authorId: currentUserId,
+        authorType: CommentAuthorType.user,
         text: 'My Comment',
         likesCount: 0,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
 
       stateAdapter.setAvatar(ownAvatar);
@@ -87,8 +96,9 @@ void main() {
         final otherPost = PostModel(
           id: 'other_post',
           avatarId: 'other_avatar',
-          userId: otherUserId,
+          type: PostType.image,
           caption: 'Other Post',
+          hashtags: ['#other'],
           likesCount: 0,
           commentsCount: 0,
           sharesCount: 0,
@@ -113,10 +123,12 @@ void main() {
         final otherComment = Comment(
           id: 'other_comment',
           postId: postId,
-          userId: otherUserId,
+          authorId: otherUserId,
+          authorType: CommentAuthorType.user,
           text: 'Other Comment',
           likesCount: 0,
           createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
 
         expect(ownershipManager.isOwnComment(ownComment), isTrue);
@@ -204,10 +216,7 @@ void main() {
     group('OwnershipGuardService Tests', () {
       test('allows authorized post edit', () async {
         // Should not throw for own post
-        await expectLater(
-          guardService.guardPostEdit(postId),
-          completes,
-        );
+        await expectLater(guardService.guardPostEdit(postId), completes);
       });
 
       test('blocks unauthorized post edit', () async {
@@ -215,8 +224,9 @@ void main() {
         final otherPost = PostModel(
           id: 'other_post_123',
           avatarId: 'other_avatar',
-          userId: otherUserId,
+          type: PostType.image,
           caption: 'Other Post',
+          hashtags: ['#other'],
           likesCount: 0,
           commentsCount: 0,
           sharesCount: 0,
@@ -246,9 +256,14 @@ void main() {
         final otherAvatar = AvatarModel(
           id: 'other_avatar_123',
           name: 'Other Avatar',
+          bio: 'Other Avatar Bio',
           ownerUserId: otherUserId,
+          niche: AvatarNiche.art,
+          personalityTraits: [PersonalityTrait.creative],
+          personalityPrompt: 'Other prompt',
           isActive: true,
           createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         stateAdapter.setAvatar(otherAvatar);
 
@@ -261,7 +276,7 @@ void main() {
 
       test('blocks self-report attempts', () async {
         final ownPost = stateAdapter.getPost(postId);
-        
+
         // Should throw SelfActionException when trying to report own content
         await expectLater(
           guardService.guardReportAction(ownPost, 'post'),
@@ -287,7 +302,7 @@ void main() {
 
       test('executes owner-only actions safely', () async {
         final ownPost = stateAdapter.getPost(postId);
-        
+
         String result = '';
         final actualResult = await guardService.executeOwnerOnlyAction<String>(
           action: () async {
@@ -326,54 +341,66 @@ void main() {
     });
 
     group('Widget Integration Tests', () {
-      testWidgets('OwnershipAwareWidget shows correct content for owned elements', (tester) async {
-        final ownPost = stateAdapter.getPost(postId);
-        
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: OwnershipAwareWidget(
-                element: ownPost,
-                ownedBuilder: (context, element) => const Text('Owned Content'),
-                otherBuilder: (context, element) => const Text('Other Content'),
+      testWidgets(
+        'OwnershipAwareWidget shows correct content for owned elements',
+        (tester) async {
+          final ownPost = stateAdapter.getPost(postId);
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: OwnershipAwareWidget(
+                  element: ownPost,
+                  ownedBuilder: (context, element) =>
+                      const Text('Owned Content'),
+                  otherBuilder: (context, element) =>
+                      const Text('Other Content'),
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        expect(find.text('Owned Content'), findsOneWidget);
-        expect(find.text('Other Content'), findsNothing);
-      });
+          expect(find.text('Owned Content'), findsOneWidget);
+          expect(find.text('Other Content'), findsNothing);
+        },
+      );
 
-      testWidgets('OwnershipAwareWidget shows correct content for other elements', (tester) async {
-        final otherUser = UserModel(
-          id: otherUserId,
-          username: 'otheruser',
-          displayName: 'Other User',
-          email: 'other@example.com',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: OwnershipAwareWidget(
-                element: otherUser,
-                ownedBuilder: (context, element) => const Text('Owned Content'),
-                otherBuilder: (context, element) => const Text('Other Content'),
+      testWidgets(
+        'OwnershipAwareWidget shows correct content for other elements',
+        (tester) async {
+          final otherUser = UserModel(
+            id: otherUserId,
+            username: 'otheruser',
+            displayName: 'Other User',
+            email: 'other@example.com',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: OwnershipAwareWidget(
+                  element: otherUser,
+                  ownedBuilder: (context, element) =>
+                      const Text('Owned Content'),
+                  otherBuilder: (context, element) =>
+                      const Text('Other Content'),
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        expect(find.text('Other Content'), findsOneWidget);
-        expect(find.text('Owned Content'), findsNothing);
-      });
+          expect(find.text('Other Content'), findsOneWidget);
+          expect(find.text('Owned Content'), findsNothing);
+        },
+      );
 
-      testWidgets('OwnershipVisibility shows content based on permissions', (tester) async {
+      testWidgets('OwnershipVisibility shows content based on permissions', (
+        tester,
+      ) async {
         final ownPost = stateAdapter.getPost(postId);
-        
+
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
@@ -397,58 +424,61 @@ void main() {
 
         // Should show edit button for own post
         expect(find.text('Edit Button'), findsOneWidget);
-        
+
         // Should not show follow button for own post
         expect(find.text('Follow Button'), findsNothing);
       });
 
-      testWidgets('OwnershipActionButtons shows correct actions for owned elements', (tester) async {
-        final ownPost = stateAdapter.getPost(postId);
-        
-        bool editCalled = false;
-        bool deleteCalled = false;
-        bool followCalled = false;
-        
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: OwnershipActionButtons(
-                element: ownPost,
-                onEdit: () => editCalled = true,
-                onDelete: () => deleteCalled = true,
-                onFollow: () => followCalled = true,
-                onUnfollow: () => followCalled = true,
+      testWidgets(
+        'OwnershipActionButtons shows correct actions for owned elements',
+        (tester) async {
+          final ownPost = stateAdapter.getPost(postId);
+
+          bool editCalled = false;
+          bool deleteCalled = false;
+          bool followCalled = false;
+
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: OwnershipActionButtons(
+                  element: ownPost,
+                  onEdit: () => editCalled = true,
+                  onDelete: () => deleteCalled = true,
+                  onFollow: () => followCalled = true,
+                  onUnfollow: () => followCalled = true,
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        // Should show edit and delete buttons for own post
-        expect(find.byIcon(Icons.edit), findsOneWidget);
-        expect(find.byIcon(Icons.delete), findsOneWidget);
-        
-        // Should not show follow button for own post
-        expect(find.byIcon(Icons.person_add), findsNothing);
+          // Should show edit and delete buttons for own post
+          expect(find.byIcon(Icons.edit), findsOneWidget);
+          expect(find.byIcon(Icons.delete), findsOneWidget);
 
-        // Test edit button functionality
-        await tester.tap(find.byIcon(Icons.edit));
-        expect(editCalled, isTrue);
+          // Should not show follow button for own post
+          expect(find.byIcon(Icons.person_add), findsNothing);
 
-        // Test delete button functionality
-        await tester.tap(find.byIcon(Icons.delete));
-        expect(deleteCalled, isTrue);
-      });
+          // Test edit button functionality
+          await tester.tap(find.byIcon(Icons.edit));
+          expect(editCalled, isTrue);
+
+          // Test delete button functionality
+          await tester.tap(find.byIcon(Icons.delete));
+          expect(deleteCalled, isTrue);
+        },
+      );
     });
 
     group('Error Handling Tests', () {
       test('handles unauthenticated user correctly', () {
         // Clear current user
         stateAdapter.setCurrentUser(null, null);
-        
+
         expect(ownershipManager.isAuthenticated, isFalse);
         expect(ownershipManager.isOwnProfile(currentUserId), isFalse);
         expect(ownershipManager.canEdit(stateAdapter.getPost(postId)), isFalse);
-        
+
         // Should return unauthenticated state
         expect(
           ownershipManager.getOwnershipState(stateAdapter.getPost(postId)),
@@ -469,7 +499,7 @@ void main() {
       test('throws appropriate exceptions for guard violations', () async {
         // Test unauthenticated user
         stateAdapter.setCurrentUser(null, null);
-        
+
         await expectLater(
           guardService.guardPostEdit(postId),
           throwsA(isA<UnauthenticatedActionException>()),
@@ -498,14 +528,14 @@ void main() {
       test('ownership checks use cached data efficiently', () {
         // Multiple calls should use cached data
         final post = stateAdapter.getPost(postId);
-        
+
         // First call
         final result1 = ownershipManager.isOwnPost(post);
-        
+
         // Subsequent calls should use cache
         final result2 = ownershipManager.isOwnPost(post);
         final result3 = ownershipManager.isOwnPost(post);
-        
+
         expect(result1, equals(result2));
         expect(result2, equals(result3));
         expect(result1, isTrue);
@@ -513,7 +543,7 @@ void main() {
 
       test('state adapter provides consistent ownership results', () {
         final post = stateAdapter.getPost(postId);
-        
+
         // Multiple ownership checks should be consistent
         expect(stateAdapter.isOwnElement(post), isTrue);
         expect(stateAdapter.canEdit(post), isTrue);
@@ -542,8 +572,9 @@ class TestDataHelper {
     return PostModel(
       id: id,
       avatarId: avatarId,
-      userId: userId,
+      type: PostType.image,
       caption: 'Test Post $id',
+      hashtags: ['#test'],
       likesCount: 0,
       commentsCount: 0,
       sharesCount: 0,
@@ -557,9 +588,14 @@ class TestDataHelper {
     return AvatarModel(
       id: id,
       name: 'Test Avatar $id',
+      bio: 'Test Avatar Bio $id',
       ownerUserId: ownerUserId,
+      niche: AvatarNiche.tech,
+      personalityTraits: [PersonalityTrait.friendly],
+      personalityPrompt: 'Test prompt $id',
       isActive: true,
       createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 
@@ -567,10 +603,12 @@ class TestDataHelper {
     return Comment(
       id: id,
       postId: postId,
-      userId: userId,
+      authorId: userId,
+      authorType: CommentAuthorType.user,
       text: 'Test Comment $id',
       likesCount: 0,
       createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
   }
 }

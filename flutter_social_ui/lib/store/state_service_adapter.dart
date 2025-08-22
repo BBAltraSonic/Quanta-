@@ -397,8 +397,7 @@ class StateServiceAdapter {
       }
     }
 
-    // Notify after all updates
-    _appState.notifyListeners();
+    // State changes will be notified automatically by AppState
   }
 
   /// Batch update for better performance
@@ -409,7 +408,7 @@ class StateServiceAdapter {
     try {
       updates();
     } finally {
-      // Ensure state is notified after batch operations
+      // State cstate is notified after batch operations
       _appState.notifyListeners();
     }
   }

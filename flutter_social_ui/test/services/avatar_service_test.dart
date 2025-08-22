@@ -5,10 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/services/auth_service.dart';
 import 'package:quanta/models/avatar_model.dart';
-import 'dart:io';
 
 // Generate mocks
-@GenerateMocks([SupabaseClient, AuthService, SupabaseStorageClient, StorageFileApi])
+@GenerateMocks([
+  SupabaseClient,
+  AuthService,
+  SupabaseStorageClient,
+  StorageFileApi,
+])
 import 'avatar_service_test.mocks.dart';
 
 void main() {
@@ -27,15 +31,15 @@ void main() {
       mockAuthService = MockAuthService();
       mockStorageClient = MockSupabaseStorageClient();
       mockStorageFileApi = MockStorageFileApi();
-      
+
       // Setup auth service mock
       when(mockAuthService.supabase).thenReturn(mockSupabaseClient);
       when(mockAuthService.currentUserId).thenReturn(testUserId);
-      
+
       // Setup storage mock
       when(mockSupabaseClient.storage).thenReturn(mockStorageClient);
       when(mockStorageClient.from('avatars')).thenReturn(mockStorageFileApi);
-      
+
       avatarService = AvatarService();
       // Note: In real implementation, you'd need dependency injection to inject mocks
     });
@@ -68,7 +72,9 @@ void main() {
         when(mockQueryBuilder.single()).thenAnswer((_) async => testAvatarData);
 
         // Also mock the getUserAvatar call (should return null for new user)
-        when(mockQueryBuilder.eq('owner_user_id', testUserId)).thenReturn(mockQueryBuilder);
+        when(
+          mockQueryBuilder.eq('owner_user_id', testUserId),
+        ).thenReturn(mockQueryBuilder);
         when(mockQueryBuilder.maybeSingle()).thenAnswer((_) async => null);
 
         // Act & Assert
@@ -79,7 +85,10 @@ void main() {
             name: 'Test Avatar',
             bio: 'Test bio that is long enough',
             niche: AvatarNiche.tech,
-            personalityTraits: [PersonalityTrait.friendly, PersonalityTrait.professional],
+            personalityTraits: [
+              PersonalityTrait.friendly,
+              PersonalityTrait.professional,
+            ],
           );
         }, returnsNormally);
       });
@@ -123,8 +132,12 @@ void main() {
         final mockQueryBuilder = MockPostgrestQueryBuilder();
         when(mockSupabaseClient.from('avatars')).thenReturn(mockQueryBuilder);
         when(mockQueryBuilder.select()).thenReturn(mockQueryBuilder);
-        when(mockQueryBuilder.eq('owner_user_id', testUserId)).thenReturn(mockQueryBuilder);
-        when(mockQueryBuilder.maybeSingle()).thenAnswer((_) async => existingAvatarData);
+        when(
+          mockQueryBuilder.eq('owner_user_id', testUserId),
+        ).thenReturn(mockQueryBuilder);
+        when(
+          mockQueryBuilder.maybeSingle(),
+        ).thenAnswer((_) async => existingAvatarData);
 
         // Act & Assert
         expect(
@@ -143,10 +156,15 @@ void main() {
       test('should upload image and return public URL', () async {
         // Arrange
         const testFilePath = 'test-user-id/avatar_123456789.jpg';
-        const testPublicUrl = 'https://storage.supabase.co/test-bucket/test-user-id/avatar_123456789.jpg';
-        
-        when(mockStorageFileApi.upload(any, any)).thenAnswer((_) async => 'upload-success');
-        when(mockStorageFileApi.getPublicUrl(testFilePath)).thenReturn(testPublicUrl);
+        const testPublicUrl =
+            'https://storage.supabase.co/test-bucket/test-user-id/avatar_123456789.jpg';
+
+        when(
+          mockStorageFileApi.upload(any, any),
+        ).thenAnswer((_) async => 'upload-success');
+        when(
+          mockStorageFileApi.getPublicUrl(testFilePath),
+        ).thenReturn(testPublicUrl);
 
         // Note: This test requires the service to be refactored to allow injection of mocks
         // The structure shows what should be tested
@@ -182,8 +200,12 @@ void main() {
         final mockQueryBuilder = MockPostgrestQueryBuilder();
         when(mockSupabaseClient.from('avatars')).thenReturn(mockQueryBuilder);
         when(mockQueryBuilder.select()).thenReturn(mockQueryBuilder);
-        when(mockQueryBuilder.eq('owner_user_id', testUserId)).thenReturn(mockQueryBuilder);
-        when(mockQueryBuilder.maybeSingle()).thenAnswer((_) async => testAvatarData);
+        when(
+          mockQueryBuilder.eq('owner_user_id', testUserId),
+        ).thenReturn(mockQueryBuilder);
+        when(
+          mockQueryBuilder.maybeSingle(),
+        ).thenAnswer((_) async => testAvatarData);
 
         // Act
         final result = await avatarService.getUserAvatar();
@@ -199,7 +221,9 @@ void main() {
         final mockQueryBuilder = MockPostgrestQueryBuilder();
         when(mockSupabaseClient.from('avatars')).thenReturn(mockQueryBuilder);
         when(mockQueryBuilder.select()).thenReturn(mockQueryBuilder);
-        when(mockQueryBuilder.eq('owner_user_id', testUserId)).thenReturn(mockQueryBuilder);
+        when(
+          mockQueryBuilder.eq('owner_user_id', testUserId),
+        ).thenReturn(mockQueryBuilder);
         when(mockQueryBuilder.maybeSingle()).thenAnswer((_) async => null);
 
         // Act
@@ -218,7 +242,10 @@ void main() {
       const testName = 'Test Avatar';
       const testBio = 'This is a test bio for the avatar';
       const testNiche = AvatarNiche.tech;
-      const testTraits = [PersonalityTrait.friendly, PersonalityTrait.professional];
+      const testTraits = [
+        PersonalityTrait.friendly,
+        PersonalityTrait.professional,
+      ];
 
       // Act
       final avatar = AvatarModel.create(
@@ -257,14 +284,20 @@ void main() {
         bio: 'I help people understand technology',
         backstory: testBackstory,
         niche: AvatarNiche.tech,
-        personalityTraits: [PersonalityTrait.professional, PersonalityTrait.helpful],
+        personalityTraits: [
+          PersonalityTrait.professional,
+          PersonalityTrait.friendly,
+        ],
         voiceStyle: testVoiceStyle,
         allowAutonomousPosting: true,
       );
 
       // Assert
       expect(avatar.personalityPrompt, contains('Tech Expert'));
-      expect(avatar.personalityPrompt, contains('I help people understand technology'));
+      expect(
+        avatar.personalityPrompt,
+        contains('I help people understand technology'),
+      );
       expect(avatar.personalityPrompt, contains('professional'));
       expect(avatar.personalityPrompt, contains('tech'));
       expect(avatar.voiceStyle, equals(testVoiceStyle));
@@ -337,7 +370,10 @@ void main() {
       expect(avatar.bio, equals('Avatar created from JSON'));
       expect(avatar.backstory, equals('Backstory from JSON'));
       expect(avatar.niche, equals(AvatarNiche.music));
-      expect(avatar.personalityTraits, containsAll([PersonalityTrait.creative, PersonalityTrait.energetic]));
+      expect(
+        avatar.personalityTraits,
+        containsAll([PersonalityTrait.creative, PersonalityTrait.energetic]),
+      );
       expect(avatar.avatarImageUrl, equals('https://example.com/avatar.jpg'));
       expect(avatar.voiceStyle, equals('Upbeat and musical'));
       expect(avatar.followersCount, equals(100));
@@ -371,11 +407,18 @@ void main() {
       expect(updatedAvatar.bio, equals('Original bio')); // Unchanged
       expect(updatedAvatar.niche, equals(AvatarNiche.tech)); // Unchanged
       expect(updatedAvatar.id, equals(originalAvatar.id)); // Unchanged
-      expect(updatedAvatar.createdAt, equals(originalAvatar.createdAt)); // Unchanged
-      expect(updatedAvatar.updatedAt, isNot(equals(originalAvatar.updatedAt))); // Should be updated
+      expect(
+        updatedAvatar.createdAt,
+        equals(originalAvatar.createdAt),
+      ); // Unchanged
+      expect(
+        updatedAvatar.updatedAt,
+        isNot(equals(originalAvatar.updatedAt)),
+      ); // Should be updated
     });
   });
 }
 
 // Mock classes for testing (these would normally be generated by mockito)
-class MockPostgrestQueryBuilder extends Mock implements PostgrestQueryBuilder<List<Map<String, dynamic>>> {}
+class MockPostgrestQueryBuilder extends Mock
+    implements PostgrestQueryBuilder<List<Map<String, dynamic>>> {}

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/avatar_model.dart';
 import '../screens/profile_screen.dart';
 import '../screens/avatar_creation_wizard.dart';
 import '../services/auth_service.dart';
@@ -202,7 +201,18 @@ class AvatarNavigationService {
   void _navigateToEmptyProfile(BuildContext context, String userId) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => ProfileScreen(userId: userId),
+        builder: (context) => FutureBuilder<Widget>(
+          future: resolveProfileRoute(null, userId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Colors.black,
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return snapshot.data ?? const ProfileScreen();
+          },
+        ),
         settings: RouteSettings(
           name: '/profile/user/$userId',
           arguments: {'userId': userId, 'navigationContext': 'empty_profile'},
