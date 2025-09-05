@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import '../../lib/widgets/error_widgets.dart';
+import 'package:quanta/widgets/error_widgets.dart';
 
 void main() {
   group('Error Widgets', () {

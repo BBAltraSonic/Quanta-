@@ -5,7 +5,6 @@ import 'package:quanta/services/performance_service.dart';
 import 'package:quanta/services/ui_performance_service.dart';
 import 'package:quanta/widgets/post_item.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

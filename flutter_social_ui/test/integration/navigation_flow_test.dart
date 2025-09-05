@@ -53,7 +53,7 @@ void main() {
     ) async {
       // Build ProfileScreen with user ID
       await tester.pumpWidget(
-        const MaterialApp(home: ProfileScreen(userId: 'test-user-id')),
+        const MaterialApp(home: ProfileScreen(avatarId: 'test-user-id')),
       );
       await tester.pumpAndSettle();
 
@@ -95,7 +95,7 @@ void main() {
             if (settings.name?.startsWith('/profile/user/') == true) {
               final userId = settings.name!.split('/').last;
               return MaterialPageRoute(
-                builder: (context) => ProfileScreen(userId: userId),
+                builder: (context) => ProfileScreen(avatarId: userId),
               );
             }
             return MaterialPageRoute(

@@ -13,11 +13,11 @@
 /// - Validates dependency sources and integrity
 /// - Generates security audit reports
 /// - Integrates with CI/CD pipelines
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:yaml/yaml.dart';
 import 'package:http/http.dart' as http;
+import 'logger.dart';
 
 class DependencyScanner {
   static const String _pubDevApi = 'https://pub.dev/api';
@@ -29,7 +29,7 @@ class DependencyScanner {
 
   /// Main entry point for dependency scanning
   Future<SecurityAuditReport> scanDependencies() async {
-    print('🔍 Starting dependency vulnerability scan...\n');
+    SecurityLogger.info('🔍 Starting dependency vulnerability scan...');
 
     final pubspecFile = File('pubspec.yaml');
     if (!pubspecFile.existsSync()) {
@@ -51,7 +51,9 @@ class DependencyScanner {
       });
     }
 
-    print('📦 Found ${dependencies.length} dependencies to analyze');
+    SecurityLogger.info(
+      '📦 Found ${dependencies.length} dependencies to analyze',
+    );
 
     // Load vulnerability database
     await _loadVulnerabilityDatabase();
@@ -73,7 +75,7 @@ class DependencyScanner {
 
   /// Load known vulnerability database
   Future<void> _loadVulnerabilityDatabase() async {
-    print('📥 Loading vulnerability database...');
+    SecurityLogger.info('📥 Loading vulnerability database...');
 
     // Load Flutter-specific vulnerabilities
     await _loadFlutterVulnerabilities();
@@ -81,7 +83,9 @@ class DependencyScanner {
     // Load common Dart package vulnerabilities
     await _loadDartVulnerabilities();
 
-    print('✅ Loaded ${_knownVulnerabilities.length} vulnerability records');
+    SecurityLogger.info(
+      '✅ Loaded ${_knownVulnerabilities.length} vulnerability records',
+    );
   }
 
   /// Load Flutter framework vulnerabilities
@@ -113,8 +117,8 @@ class DependencyScanner {
       try {
         await _fetchPackageVulnerabilities(packageName);
       } catch (e) {
-        print(
-          '⚠️ Warning: Could not fetch vulnerabilities for $packageName: $e',
+        SecurityLogger.warning(
+          'Could not fetch vulnerabilities for $packageName: $e',
         );
       }
     }
@@ -213,7 +217,7 @@ class DependencyScanner {
 
   /// Scan a specific package for vulnerabilities
   Future<void> _scanPackage(String packageName, String version) async {
-    print('🔎 Scanning $packageName@$version...');
+    SecurityLogger.debug('🔎 Scanning $packageName@$version...');
 
     // Check against known vulnerabilities
     for (final vuln in _knownVulnerabilities.values) {
@@ -306,7 +310,7 @@ class DependencyScanner {
 
   /// Check for outdated packages with security updates
   Future<void> _checkOutdatedPackages(Map<String, String> dependencies) async {
-    print('\n📅 Checking for outdated packages...');
+    SecurityLogger.info('📅 Checking for outdated packages...');
 
     for (final entry in dependencies.entries) {
       final packageInfo = _packageCache[entry.key];
@@ -378,12 +382,12 @@ class DependencyScanner {
         .where((i) => i.severity == SecuritySeverity.low)
         .toList();
 
-    print('\n📋 Security Audit Summary:');
-    print('   🔴 Critical: ${criticalIssues.length}');
-    print('   🟠 High: ${highIssues.length}');
-    print('   🟡 Medium: ${mediumIssues.length}');
-    print('   🟢 Low: ${lowIssues.length}');
-    print('   📊 Total Issues: ${_foundIssues.length}');
+    SecurityLogger.info('📋 Security Audit Summary:');
+    SecurityLogger.info('   🔴 Critical: ${criticalIssues.length}');
+    SecurityLogger.info('   🟠 High: ${highIssues.length}');
+    SecurityLogger.info('   🟡 Medium: ${mediumIssues.length}');
+    SecurityLogger.info('   🟢 Low: ${lowIssues.length}');
+    SecurityLogger.info('   📊 Total Issues: ${_foundIssues.length}');
 
     final report = SecurityAuditReport(
       scanDate: DateTime.now(),
@@ -445,8 +449,10 @@ class DependencyScanner {
 
     await reportFile.writeAsString(jsonEncode(report.toJson()));
 
-    print('\n💾 Report saved to: ${reportFile.path}');
-    print('📄 View detailed report at: ${reportFile.absolute.path}');
+    SecurityLogger.info('💾 Report saved to: ${reportFile.path}');
+    SecurityLogger.info(
+      '📄 View detailed report at: ${reportFile.absolute.path}',
+    );
   }
 }
 
@@ -572,19 +578,33 @@ class SecurityAuditReport {
 /// Main function to run dependency scanner
 Future<void> main() async {
   try {
+    // Validate environment
+    final pubspecFile = File('pubspec.yaml');
+    if (!pubspecFile.existsSync()) {
+      throw Exception('pubspec.yaml not found in current directory');
+    }
+
     final scanner = DependencyScanner();
     final report = await scanner.scanDependencies();
 
-    print('\n✅ Dependency scan completed successfully!');
+    // Validate report
+    if (report.totalIssues < 0 || report.totalPackages < 0) {
+      throw Exception('Invalid report generated');
+    }
+
+    SecurityLogger.info('✅ Dependency scan completed successfully!');
 
     if (report.criticalIssues > 0 || report.highIssues > 0) {
-      print('\n⚠️ Security issues found that require attention!');
+      SecurityLogger.warning(
+        '⚠️ Security issues found that require attention!',
+      );
       exit(1);
     }
 
     exit(0);
-  } catch (e) {
-    print('\n❌ Dependency scan failed: $e');
+  } catch (e, stackTrace) {
+    SecurityLogger.error('❌ Dependency scan failed: $e', error: e);
+    SecurityLogger.error('Stack trace: $stackTrace');
     exit(1);
   }
 }

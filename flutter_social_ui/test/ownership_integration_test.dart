@@ -7,7 +7,6 @@ import 'package:quanta/widgets/ownership_aware_widgets.dart';
 import 'package:quanta/models/user_model.dart';
 import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/avatar_model.dart';
-import 'package:quanta/models/post_model.dart';
 import 'package:quanta/models/comment.dart';
 
 void main() {

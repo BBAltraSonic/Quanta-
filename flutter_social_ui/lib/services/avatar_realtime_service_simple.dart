@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/avatar_model.dart';
-import '../models/post_model.dart';
 import '../store/app_state.dart';
 
 /// Simplified service for real-time avatar updates using Supabase subscriptions

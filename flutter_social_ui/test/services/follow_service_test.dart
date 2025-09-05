@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../../lib/services/follow_service.dart';
+import 'package:quanta/services/follow_service.dart';
 
 void main() {
   group('FollowService Avatar-Based Following Tests', () {

@@ -52,7 +52,7 @@ void main() {
         avatarId: testAvatar1.id,
         type: PostType.image,
         caption: 'Test post content',
-        hashtags: ['test'],
+        hashtags: ['#test'],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );

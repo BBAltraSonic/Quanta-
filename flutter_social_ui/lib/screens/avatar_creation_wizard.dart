@@ -9,11 +9,8 @@ import 'package:image_picker/image_picker.dart';
 
 class AvatarCreationWizard extends StatefulWidget {
   final bool returnResultOnCreate;
-  
-  const AvatarCreationWizard({
-    super.key,
-    this.returnResultOnCreate = false,
-  });
+
+  const AvatarCreationWizard({super.key, this.returnResultOnCreate = false});
 
   @override
   _AvatarCreationWizardState createState() => _AvatarCreationWizardState();
@@ -39,13 +36,13 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
 
   // Track if there are unsaved changes
   bool get _hasUnsavedChanges {
-    return _name.isNotEmpty || 
-           _bio.isNotEmpty || 
-           _selectedTraits.isNotEmpty || 
-           _avatarImage != null || 
-           (_backstory?.isNotEmpty ?? false) ||
-           (_voiceStyle?.isNotEmpty ?? false) ||
-           _allowAutonomousPosting;
+    return _name.isNotEmpty ||
+        _bio.isNotEmpty ||
+        _selectedTraits.isNotEmpty ||
+        _avatarImage != null ||
+        (_backstory?.isNotEmpty ?? false) ||
+        (_voiceStyle?.isNotEmpty ?? false) ||
+        _allowAutonomousPosting;
   }
 
   // Validation helpers
@@ -65,13 +62,19 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
 
   String? _getBackstoryError() {
     if (_backstory == null || _backstory!.isEmpty) return null;
-    if (_backstory!.trim().length > 1000) return 'Backstory must be less than 1000 characters';
+    if (_backstory!.trim().length > 1000) {
+      return 'Backstory must be less than 1000 characters';
+    }
     return null;
   }
 
   String? _getTraitsError() {
-    if (_selectedTraits.length < 3) return 'Please select at least 3 personality traits';
-    if (_selectedTraits.length > 5) return 'Please select no more than 5 personality traits';
+    if (_selectedTraits.length < 3) {
+      return 'Please select at least 3 personality traits';
+    }
+    if (_selectedTraits.length > 5) {
+      return 'Please select no more than 5 personality traits';
+    }
     return null;
   }
 
@@ -121,120 +124,121 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        await _handleClose();
-        return false; // We handle the pop ourselves
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (!didPop) {
+          await _handleClose();
+        }
       },
       child: Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        title: Text('Create Avatar (${_currentStep + 1}/4)'),
         backgroundColor: kBackgroundColor,
-        leading: IconButton(
-          icon: Icon(Icons.close),
-          onPressed: _handleClose,
+        appBar: AppBar(
+          title: Text('Create Avatar (${_currentStep + 1}/4)'),
+          backgroundColor: kBackgroundColor,
+          leading: IconButton(icon: Icon(Icons.close), onPressed: _handleClose),
+          actions: [
+            if (_currentStep > 0)
+              TextButton(
+                onPressed: _previousStep,
+                child: Text('Back', style: TextStyle(color: kPrimaryColor)),
+              ),
+          ],
         ),
-        actions: [
-          if (_currentStep > 0)
-            TextButton(
-              onPressed: _previousStep,
-              child: Text('Back', style: TextStyle(color: kPrimaryColor)),
+        body: Column(
+          children: [
+            // Progress indicator
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: LinearProgressIndicator(
+                value: (_currentStep + 1) / 4,
+                backgroundColor: kCardColor,
+                valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
+              ),
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Progress indicator
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: LinearProgressIndicator(
-              value: (_currentStep + 1) / 4,
-              backgroundColor: kCardColor,
-              valueColor: AlwaysStoppedAnimation<Color>(kPrimaryColor),
-            ),
-          ),
 
-          // Step content
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: NeverScrollableScrollPhysics(),
-              children: [
-                _buildBasicInfoStep(),
-                _buildPersonalityStep(),
-                _buildAppearanceStep(),
-                _buildPreviewStep(),
-              ],
+            // Step content
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: NeverScrollableScrollPhysics(),
+                children: [
+                  _buildBasicInfoStep(),
+                  _buildPersonalityStep(),
+                  _buildAppearanceStep(),
+                  _buildPreviewStep(),
+                ],
+              ),
             ),
-          ),
 
-          // Navigation buttons
-          Container(
-            padding: EdgeInsets.all(20),
-            child: Row(
-              children: [
-                if (_currentStep < 3)
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _canProceed() ? _nextStep : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimaryColor,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+            // Navigation buttons
+            Container(
+              padding: EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  if (_currentStep < 3)
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _canProceed() ? _nextStep : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        child: Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                if (_currentStep == 3)
-                  Expanded(
-                    child: _isCreating
-                        ? Container(
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: kCardColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: kPrimaryColor,
-                                strokeWidth: 2,
-                              ),
-                            ),
-                          )
-                        : ElevatedButton(
-                            onPressed: _createAvatar,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimaryColor,
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                  if (_currentStep == 3)
+                    Expanded(
                       child: _isCreating
-                          ? CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              'Create Avatar',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                          ? Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: kCardColor,
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: kPrimaryColor,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: _createAvatar,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryColor,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _isCreating
+                                  ? CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                  : Text(
+                                      'Create Avatar',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -461,19 +465,24 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                     children: [
                       Text(
                         'Allow Autonomous Posting',
-                        style: kBodyTextStyle.copyWith(fontWeight: FontWeight.bold),
+                        style: kBodyTextStyle.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         'Let your avatar create and post content automatically',
-                        style: kCaptionTextStyle.copyWith(color: kLightTextColor),
+                        style: kCaptionTextStyle.copyWith(
+                          color: kLightTextColor,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Switch(
                   value: _allowAutonomousPosting,
-                  onChanged: (value) => setState(() => _allowAutonomousPosting = value),
+                  onChanged: (value) =>
+                      setState(() => _allowAutonomousPosting = value),
                   activeColor: kPrimaryColor,
                 ),
               ],
@@ -640,7 +649,8 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                 ),
 
                 // Voice style and autonomous posting
-                if (_voiceStyle?.isNotEmpty == true || _allowAutonomousPosting) ...[
+                if (_voiceStyle?.isNotEmpty == true ||
+                    _allowAutonomousPosting) ...[
                   SizedBox(height: 16),
                   if (_voiceStyle?.isNotEmpty == true)
                     Container(
@@ -655,7 +665,9 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                         children: [
                           Text(
                             'Voice Style:',
-                            style: kCaptionTextStyle.copyWith(fontWeight: FontWeight.bold),
+                            style: kCaptionTextStyle.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           SizedBox(height: 4),
                           Text(_voiceStyle!, style: kCaptionTextStyle),
@@ -668,12 +680,16 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
                       padding: EdgeInsets.all(12),
                       margin: EdgeInsets.only(top: 8),
                       decoration: BoxDecoration(
-                        color: kPrimaryColor.withOpacity(0.1),
+                        color: kPrimaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.auto_awesome, size: 16, color: kPrimaryColor),
+                          Icon(
+                            Icons.auto_awesome,
+                            size: 16,
+                            color: kPrimaryColor,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Autonomous Posting Enabled',
@@ -697,14 +713,14 @@ class _AvatarCreationWizardState extends State<AvatarCreationWizard> {
   bool _canProceed() {
     switch (_currentStep) {
       case 0:
-        return _name.isNotEmpty && 
-               _bio.isNotEmpty && 
-               _getNameError() == null && 
-               _getBioError() == null;
+        return _name.isNotEmpty &&
+            _bio.isNotEmpty &&
+            _getNameError() == null &&
+            _getBioError() == null;
       case 1:
-        return _selectedTraits.length >= 3 && 
-               _selectedTraits.length <= 5 &&
-               _getBackstoryError() == null;
+        return _selectedTraits.length >= 3 &&
+            _selectedTraits.length <= 5 &&
+            _getBackstoryError() == null;
       case 2:
         return true; // Image is optional
       case 3:

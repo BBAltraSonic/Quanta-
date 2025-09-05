@@ -1,9 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
-import '../../lib/services/ai_comment_suggestion_service.dart';
-import '../../lib/models/post_model.dart';
-import '../../lib/models/comment.dart';
-import '../../lib/models/avatar_model.dart';
+import 'package:quanta/services/ai_comment_suggestion_service.dart';
+import 'package:quanta/models/post_model.dart';
+import 'package:quanta/models/comment.dart';
 
 void main() {
   group('AICommentSuggestionService', () {
@@ -13,13 +12,13 @@ void main() {
 
     setUp(() {
       service = AICommentSuggestionService();
-      
+
       testPost = PostModel(
         id: const Uuid().v4(),
         avatarId: const Uuid().v4(),
         type: PostType.image,
         caption: 'Beautiful sunset at the beach! 🌅',
-        hashtags: ['sunset', 'beach', 'nature'],
+        hashtags: ['#sunset', '#beach', '#nature'],
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         likesCount: 50,

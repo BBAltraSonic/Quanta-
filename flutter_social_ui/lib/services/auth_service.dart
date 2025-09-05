@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../utils/environment.dart';
-import '../config/app_config.dart';
+
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();

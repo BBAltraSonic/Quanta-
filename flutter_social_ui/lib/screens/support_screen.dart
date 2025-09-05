@@ -659,7 +659,7 @@ ${_descriptionController.text}
     }
   }
 
-  void _launchEmailWithTicket(String ticketInfo) async {
+  Future<void> _launchEmailWithTicket(String ticketInfo) async {
     final uri = Uri(
       scheme: 'mailto',
       path: 'support@quanta-app.com',

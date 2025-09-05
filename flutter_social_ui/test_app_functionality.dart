@@ -24,7 +24,7 @@ void main(List<String> arguments) async {
   // Test 5: Asset Validation
   await testAssets();
 
-  print('\n' + '=' * 50);
+  print('\n${'=' * 50}');
   print('✅ Testing completed! See results above.');
 }
 

@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../utils/ownership_manager.dart';
 import '../store/state_service_adapter.dart';
-import '../models/post_model.dart';
-import '../models/comment.dart';
-import '../models/avatar_model.dart';
-import '../models/user_model.dart';
+
+
+
+
 import '../widgets/ownership_aware_widgets.dart';
 
 /// Service to guard actions based on ownership permissions

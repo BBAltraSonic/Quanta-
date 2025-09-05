@@ -3,7 +3,6 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanta/services/avatar_posts_pagination_service.dart';
-import 'package:quanta/models/post_model.dart';
 
 // Generate mocks
 @GenerateMocks([SupabaseClient, PostgrestQueryBuilder, PostgrestFilterBuilder])

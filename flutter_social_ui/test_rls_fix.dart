@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lib/services/enhanced_feeds_service.dart';
 import 'lib/services/interaction_service.dart';
-import 'lib/config/db_config.dart';
+
 import 'lib/utils/environment.dart';
 
 void main() async {

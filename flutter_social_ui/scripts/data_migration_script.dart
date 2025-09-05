@@ -1,7 +1,7 @@
 #!/usr/bin/env dart
 
 import 'dart:io';
-import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../lib/services/data_migration_service.dart';
 import '../lib/services/auth_service.dart';

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:quanta/models/avatar_model.dart';
 import 'package:quanta/models/post_model.dart';
 import 'package:quanta/services/avatar_lru_cache_service.dart';
-import 'package:quanta/services/avatar_posts_pagination_service.dart';
 import 'package:quanta/store/app_state.dart';
 
 void main() {
@@ -30,11 +29,14 @@ void main() {
             id: 'avatar_$index',
             name: 'Avatar $index',
             bio: 'Bio for avatar $index',
-            avatarUrl: 'https://example.com/avatar_$index.jpg',
+            avatarImageUrl: 'https://example.com/avatar_$index.jpg',
             ownerUserId:
                 'user_${index % 100}', // 100 users with 10 avatars each
-            niche: 'entertainment',
-            personalityTraits: ['friendly', 'creative'],
+            niche: AvatarNiche.lifestyle,
+            personalityTraits: [
+              PersonalityTrait.friendly,
+              PersonalityTrait.creative,
+            ],
             personalityPrompt: 'Test personality prompt',
             createdAt: DateTime.now().subtract(Duration(days: index)),
             updatedAt: DateTime.now(),
@@ -67,10 +69,10 @@ void main() {
             id: 'avatar_$index',
             name: 'Avatar $index',
             bio: 'Bio for avatar $index',
-            avatarUrl: 'https://example.com/avatar_$index.jpg',
+            avatarImageUrl: 'https://example.com/avatar_$index.jpg',
             ownerUserId: 'user_$index',
-            niche: 'entertainment',
-            personalityTraits: ['friendly'],
+            niche: AvatarNiche.lifestyle,
+            personalityTraits: [PersonalityTrait.friendly],
             personalityPrompt: 'Test prompt',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -104,10 +106,10 @@ void main() {
             id: 'avatar_$i',
             name: 'Avatar $i',
             bio: 'Bio for avatar $i',
-            avatarUrl: 'https://example.com/avatar_$i.jpg',
+            avatarImageUrl: 'https://example.com/avatar_$i.jpg',
             ownerUserId: 'user_$i',
-            niche: 'entertainment',
-            personalityTraits: ['friendly'],
+            niche: AvatarNiche.lifestyle,
+            personalityTraits: [PersonalityTrait.friendly],
             personalityPrompt: 'Test prompt',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -140,10 +142,10 @@ void main() {
             id: 'avatar_$i',
             name: 'Avatar $i',
             bio: 'Bio for avatar $i',
-            avatarUrl: 'https://example.com/avatar_$i.jpg',
+            avatarImageUrl: 'https://example.com/avatar_$i.jpg',
             ownerUserId: 'user_${i % 50}', // 50 users with 20 avatars each
-            niche: 'entertainment',
-            personalityTraits: ['friendly'],
+            niche: AvatarNiche.lifestyle,
+            personalityTraits: [PersonalityTrait.friendly],
             personalityPrompt: 'Test prompt',
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -168,10 +170,10 @@ void main() {
               id: 'avatar_${userId}_$avatarIndex',
               name: 'Avatar $avatarIndex for User $userId',
               bio: 'Bio',
-              avatarUrl: 'https://example.com/avatar.jpg',
+              avatarImageUrl: 'https://example.com/avatar.jpg',
               ownerUserId: 'user_$userId',
-              niche: 'entertainment',
-              personalityTraits: ['friendly'],
+              niche: AvatarNiche.lifestyle,
+              personalityTraits: [PersonalityTrait.friendly],
               personalityPrompt: 'Test prompt',
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
@@ -200,10 +202,10 @@ void main() {
           id: 'test_avatar',
           name: 'Test Avatar',
           bio: 'Test bio',
-          avatarUrl: 'https://example.com/avatar.jpg',
+          avatarImageUrl: 'https://example.com/avatar.jpg',
           ownerUserId: 'test_user',
-          niche: 'entertainment',
-          personalityTraits: ['friendly'],
+          niche: AvatarNiche.lifestyle,
+          personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Test prompt',
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -216,11 +218,12 @@ void main() {
         for (int i = 0; i < 1000; i++) {
           final post = PostModel(
             id: 'post_$i',
-            content: 'Post content $i',
+            caption: 'Post content $i',
+            hashtags: [],
+            type: PostType.image,
             avatarId: 'test_avatar',
             createdAt: DateTime.now().subtract(Duration(minutes: i)),
             updatedAt: DateTime.now(),
-            postType: 'text',
           );
           appState.setPost(post);
         }
@@ -243,10 +246,10 @@ void main() {
           id: 'stats_avatar',
           name: 'Stats Avatar',
           bio: 'Test bio',
-          avatarUrl: 'https://example.com/avatar.jpg',
+          avatarImageUrl: 'https://example.com/avatar.jpg',
           ownerUserId: 'stats_user',
-          niche: 'entertainment',
-          personalityTraits: ['friendly'],
+          niche: AvatarNiche.lifestyle,
+          personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Test prompt',
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -257,7 +260,9 @@ void main() {
         for (int i = 0; i < 500; i++) {
           final post = PostModel(
             id: 'stats_post_$i',
-            content: 'Post content $i',
+            caption: 'Post content $i',
+            hashtags: [],
+            type: PostType.image,
             avatarId: 'stats_avatar',
             likesCount: i * 2,
             commentsCount: i,
@@ -265,7 +270,6 @@ void main() {
             viewsCount: i * 10,
             createdAt: DateTime.now().subtract(Duration(minutes: i)),
             updatedAt: DateTime.now(),
-            postType: 'text',
           );
           appState.setPost(post);
         }
@@ -289,10 +293,10 @@ void main() {
           id: 'cache_avatar',
           name: 'Cache Avatar',
           bio: 'Test bio',
-          avatarUrl: 'https://example.com/avatar.jpg',
+          avatarImageUrl: 'https://example.com/avatar.jpg',
           ownerUserId: 'cache_user',
-          niche: 'entertainment',
-          personalityTraits: ['friendly'],
+          niche: AvatarNiche.lifestyle,
+          personalityTraits: [PersonalityTrait.friendly],
           personalityPrompt: 'Test prompt',
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
@@ -331,10 +335,10 @@ void main() {
               id: avatarId,
               name: 'Avatar $avatarIndex for User $userId',
               bio: 'Bio',
-              avatarUrl: 'https://example.com/avatar.jpg',
+              avatarImageUrl: 'https://example.com/avatar.jpg',
               ownerUserId: 'user_$userId',
-              niche: 'entertainment',
-              personalityTraits: ['friendly'],
+              niche: AvatarNiche.lifestyle,
+              personalityTraits: [PersonalityTrait.friendly],
               personalityPrompt: 'Test prompt',
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
@@ -345,11 +349,12 @@ void main() {
             for (int postIndex = 0; postIndex < 20; postIndex++) {
               final post = PostModel(
                 id: 'memory_post_${userId}_${avatarIndex}_$postIndex',
-                content: 'Post content',
+                caption: 'Post content',
+                hashtags: [],
+                type: PostType.image,
                 avatarId: avatarId,
                 createdAt: DateTime.now(),
                 updatedAt: DateTime.now(),
-                postType: 'text',
               );
               appState.setPost(post);
             }
@@ -392,10 +397,10 @@ void main() {
                 id: 'concurrent_avatar_$i',
                 name: 'Concurrent Avatar $i',
                 bio: 'Bio',
-                avatarUrl: 'https://example.com/avatar.jpg',
+                avatarImageUrl: 'https://example.com/avatar.jpg',
                 ownerUserId: 'concurrent_user_$i',
-                niche: 'entertainment',
-                personalityTraits: ['friendly'],
+                niche: AvatarNiche.lifestyle,
+                personalityTraits: [PersonalityTrait.friendly],
                 personalityPrompt: 'Test prompt',
                 createdAt: DateTime.now(),
                 updatedAt: DateTime.now(),

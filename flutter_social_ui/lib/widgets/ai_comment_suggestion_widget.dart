@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/ai_comment_suggestion_service.dart';
 import '../models/avatar_model.dart';
-import 'user_avatar.dart';
+
 
 /// Widget for displaying AI comment suggestions with accept/decline options
 class AICommentSuggestionWidget extends StatefulWidget {

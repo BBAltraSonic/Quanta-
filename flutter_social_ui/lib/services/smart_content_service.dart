@@ -1,6 +1,6 @@
 import 'dart:math';
 import '../models/avatar_model.dart';
-import 'ai_service.dart';
+
 
 class ContentSuggestion {
   final String text;

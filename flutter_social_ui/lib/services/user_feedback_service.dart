@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../models/user_model.dart';
 import 'auth_service.dart';
 import 'analytics_service.dart';
 

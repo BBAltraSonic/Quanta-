@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:quanta/config/db_config.dart';
 import 'package:quanta/utils/environment.dart';
 
 void main() {
@@ -44,8 +43,11 @@ void main() {
             'owner_user_id': testUserId,
             'name': 'Test Avatar',
             'bio': 'Test avatar for integration tests',
-            'niche': 'tech',
-            'personality_traits': ['friendly', 'helpful'],
+            'niche': AvatarNiche.tech.toString().split('.').last,
+            'personality_traits': [
+              PersonalityTrait.friendly.toString().split('.').last,
+              PersonalityTrait.professional.toString().split('.').last,
+            ],
             'personality_prompt': 'You are a helpful test avatar.',
           })
           .select()

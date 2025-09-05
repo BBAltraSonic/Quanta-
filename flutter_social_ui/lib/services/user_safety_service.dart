@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/post_model.dart';
-import '../services/enhanced_feeds_service.dart';
+
 import '../services/auth_service.dart';
 import '../config/db_config.dart';
 

@@ -57,4 +57,382 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: kPrimaryColor, size: 20),\n                    const SizedBox(width: 8),\n                    const Text(\n                      'Last Updated: August 22, 2025',\n                      style: TextStyle(\n                        color: kTextColor,\n                        fontWeight: FontWeight.w600,\n                      ),\n                    ),\n                  ],\n                ),\n                const SizedBox(height: 8),\n                const Text(\n                  'This privacy policy explains how Quanta collects, uses, and protects your personal information.',\n                  style: TextStyle(color: kLightTextColor, fontSize: 14),\n                ),\n              ],\n            ),\n          ),\n          \n          // Privacy policy content\n          Expanded(\n            child: SingleChildScrollView(\n              controller: _scrollController,\n              padding: const EdgeInsets.symmetric(horizontal: 16),\n              child: Column(\n                crossAxisAlignment: CrossAxisAlignment.start,\n                children: [\n                  _buildSection(\n                    '1. Information We Collect',\n                    _informationWeCollect,\n                  ),\n                  _buildSection(\n                    '2. How We Use Your Information',\n                    _howWeUseInformation,\n                  ),\n                  _buildSection(\n                    '3. Information Sharing and Disclosure',\n                    _informationSharing,\n                  ),\n                  _buildSection(\n                    '4. Data Security',\n                    _dataSecurity,\n                  ),\n                  _buildSection(\n                    '5. Your Privacy Rights',\n                    _privacyRights,\n                  ),\n                  _buildSection(\n                    '6. International Data Transfers',\n                    _dataTransfers,\n                  ),\n                  _buildSection(\n                    '7. Children\\'s Privacy',\n                    _childrensPrivacy,\n                  ),\n                  _buildSection(\n                    '8. Data Retention',\n                    _dataRetention,\n                  ),\n                  _buildSection(\n                    '9. Updates to This Policy',\n                    _policyUpdates,\n                  ),\n                  _buildSection(\n                    '10. Contact Us',\n                    _contactInfo,\n                  ),\n                  const SizedBox(height: 32),\n                ],\n              ),\n            ),\n          ),\n          \n          // Action buttons\n          Container(\n            padding: const EdgeInsets.all(16),\n            decoration: BoxDecoration(\n              color: kCardColor,\n              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),\n            ),\n            child: Column(\n              children: [\n                Row(\n                  children: [\n                    Expanded(\n                      child: OutlinedButton(\n                        onPressed: () => _downloadPolicy(),\n                        style: OutlinedButton.styleFrom(\n                          foregroundColor: kPrimaryColor,\n                          side: BorderSide(color: kPrimaryColor),\n                        ),\n                        child: Row(\n                          mainAxisAlignment: MainAxisAlignment.center,\n                          children: [\n                            Icon(Icons.download, size: 18),\n                            const SizedBox(width: 8),\n                            const Text('Download'),\n                          ],\n                        ),\n                      ),\n                    ),\n                    const SizedBox(width: 12),\n                    Expanded(\n                      child: CustomButton(\n                        text: 'Contact Us',\n                        onPressed: () => _contactSupport(),\n                        icon: Icons.email,\n                      ),\n                    ),\n                  ],\n                ),\n              ],\n            ),\n          ),\n        ],\n      ),\n    );\n  }\n\n  Widget _buildSection(String title, String content) {\n    return Container(\n      margin: const EdgeInsets.only(bottom: 24),\n      padding: const EdgeInsets.all(20),\n      decoration: BoxDecoration(\n        color: kCardColor,\n        borderRadius: BorderRadius.circular(12),\n      ),\n      child: Column(\n        crossAxisAlignment: CrossAxisAlignment.start,\n        children: [\n          Text(\n            title,\n            style: const TextStyle(\n              color: kTextColor,\n              fontSize: 18,\n              fontWeight: FontWeight.w600,\n            ),\n          ),\n          const SizedBox(height: 16),\n          Text(\n            content,\n            style: const TextStyle(\n              color: kLightTextColor,\n              fontSize: 14,\n              height: 1.6,\n            ),\n          ),\n        ],\n      ),\n    );\n  }\n\n  void _sharePolicy() async {\n    // In a real app, you might use the share_plus package\n    const url = 'https://quanta-app.com/privacy';\n    try {\n      await launchUrl(Uri.parse(url));\n    } catch (e) {\n      if (mounted) {\n        ScaffoldMessenger.of(context).showSnackBar(\n          const SnackBar(\n            content: Text('Could not share privacy policy'),\n            backgroundColor: Colors.red,\n          ),\n        );\n      }\n    }\n  }\n\n  void _downloadPolicy() {\n    showDialog(\n      context: context,\n      builder: (context) => AlertDialog(\n        backgroundColor: kCardColor,\n        title: const Text(\n          'Download Privacy Policy',\n          style: TextStyle(color: kTextColor),\n        ),\n        content: const Text(\n          'To download a PDF version of our privacy policy, please visit our website at quanta-app.com/privacy',\n          style: TextStyle(color: kLightTextColor),\n        ),\n        actions: [\n          TextButton(\n            onPressed: () => Navigator.pop(context),\n            child: const Text('Close', style: TextStyle(color: kPrimaryColor)),\n          ),\n          TextButton(\n            onPressed: () {\n              Navigator.pop(context);\n              launchUrl(Uri.parse('https://quanta-app.com/privacy'));\n            },\n            child: const Text('Visit Website', style: TextStyle(color: kPrimaryColor)),\n          ),\n        ],\n      ),\n    );\n  }\n\n  void _contactSupport() async {\n    final uri = Uri(\n      scheme: 'mailto',\n      path: 'privacy@quanta-app.com',\n      query: 'subject=Privacy Policy Inquiry',\n    );\n\n    try {\n      await launchUrl(uri);\n    } catch (e) {\n      if (mounted) {\n        ScaffoldMessenger.of(context).showSnackBar(\n          const SnackBar(\n            content: Text('Could not open email app. Please email privacy@quanta-app.com'),\n            backgroundColor: Colors.red,\n          ),\n        );\n      }\n    }\n  }\n\n  // Privacy policy content sections\n  static const String _informationWeCollect = '''\nWe collect information you provide directly to us, such as when you:\n\n• Create an account or profile\n• Create and customize AI avatars\n• Upload content (videos, images, text)\n• Communicate with other users\n• Contact our support team\n• Participate in surveys or promotions\n\nThis may include your name, email address, username, profile information, avatar characteristics, and any content you create or share.\n\nWe also automatically collect certain information about your device and usage, including:\n\n• Device information (type, operating system, unique identifiers)\n• Usage data (app interactions, features used, session duration)\n• Technical data (IP address, browser type, app version)\n• Location information (if you grant permission)\n• Analytics and performance data''';\n\n  static const String _howWeUseInformation = '''\nWe use the information we collect to:\n\n• Provide and improve our services\n• Create and manage your account\n• Generate and customize AI avatars\n• Facilitate content creation and sharing\n• Enable social features and interactions\n• Provide customer support\n• Send important notifications\n• Analyze usage patterns and improve our app\n• Ensure platform safety and security\n• Comply with legal obligations\n\nWe may use your information to personalize your experience, including:\n\n• Customizing your feed and recommendations\n• Suggesting relevant content and users\n• Improving AI avatar responses\n• Enhancing app performance for your device''';\n\n  static const String _informationSharing = '''\nWe do not sell, trade, or otherwise transfer your personal information to third parties, except as described in this policy:\n\n• **Service Providers**: We may share information with trusted third-party service providers who assist us in operating our app, conducting business, or serving users.\n\n• **Legal Requirements**: We may disclose information when required by law, regulation, legal process, or governmental request.\n\n• **Safety and Security**: We may share information to protect the rights, property, or safety of Quanta, our users, or others.\n\n• **Business Transfers**: In the event of a merger, acquisition, or sale of assets, user information may be transferred.\n\n• **With Your Consent**: We may share information for any other purpose with your explicit consent.\n\nPublic Information:\n• Your profile information and content you share publicly will be visible to other users\n• AI avatar interactions may be visible to other users based on your privacy settings''';\n\n  static const String _dataSecurity = '''\nWe implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.\n\nOur security measures include:\n\n• Encryption of data in transit and at rest\n• Secure servers and databases\n• Access controls and authentication\n• Regular security assessments\n• Employee training on data protection\n• Incident response procedures\n\nHowever, no method of transmission over the internet or electronic storage is 100% secure. While we strive to protect your personal information, we cannot guarantee absolute security.\n\nYou can help protect your account by:\n\n• Using a strong, unique password\n• Enabling two-factor authentication (when available)\n• Not sharing your login credentials\n• Logging out of shared devices\n• Reporting suspicious activity''';\n\n  static const String _privacyRights = '''\nDepending on your location, you may have certain rights regarding your personal information:\n\n**Access**: Request information about the personal data we have about you\n\n**Correction**: Request that we correct inaccurate or incomplete information\n\n**Deletion**: Request deletion of your personal information (\"right to be forgotten\")\n\n**Portability**: Request a copy of your data in a machine-readable format\n\n**Restriction**: Request that we limit how we use your information\n\n**Objection**: Object to our processing of your information\n\n**Withdrawal**: Withdraw consent for processing (where applicable)\n\nTo exercise these rights, contact us at privacy@quanta-app.com. We will respond to your request within the timeframes required by applicable law.\n\n**California Residents**: You have additional rights under the California Consumer Privacy Act (CCPA)\n\n**European Residents**: You have rights under the General Data Protection Regulation (GDPR)''';\n\n  static const String _dataTransfers = '''\nQuanta is based in the United States. If you are accessing our services from outside the United States, please be aware that your information may be transferred to, stored, and processed in the United States and other countries.\n\nThese countries may have different data protection laws than your country of residence. By using our services, you consent to the transfer of your information to the United States and other countries.\n\nWhen we transfer personal information internationally, we implement appropriate safeguards, including:\n\n• Standard contractual clauses\n• Adequacy decisions\n• Certification mechanisms\n• Codes of conduct\n\nWe ensure that any international transfers comply with applicable data protection laws.''';\n\n  static const String _childrensPrivacy = '''\nQuanta is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.\n\nIf we become aware that we have collected personal information from a child under 13, we will take steps to delete such information promptly.\n\nUsers between 13 and 17 should have parental or guardian consent before using our services. Parents and guardians can contact us at privacy@quanta-app.com if they believe their child has provided personal information without consent.\n\nFor users in the European Union, the minimum age may be higher in accordance with local laws.''';\n\n  static const String _dataRetention = '''\nWe retain your personal information for as long as necessary to provide our services and fulfill the purposes described in this policy.\n\nSpecific retention periods:\n\n• **Account Information**: Retained while your account is active\n• **Content**: Retained according to your privacy settings and applicable law\n• **Usage Data**: Typically retained for 2-3 years for analytics purposes\n• **Support Communications**: Retained for 3 years for quality assurance\n\nWhen we no longer need your information, we will delete or anonymize it in accordance with our data retention policy and applicable law.\n\nYou can request deletion of your account and associated data at any time by contacting us at privacy@quanta-app.com.''';\n\n  static const String _policyUpdates = '''\nWe may update this privacy policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors.\n\nWhen we make changes:\n\n• We will post the updated policy on our app and website\n• We will update the \"Last Updated\" date at the top of this policy\n• For material changes, we may provide additional notice (such as email notification or in-app notification)\n\nWe encourage you to review this policy periodically to stay informed about how we protect your privacy.\n\nYour continued use of our services after any changes to this policy constitutes your acceptance of the updated terms.''';\n\n  static const String _contactInfo = '''\nIf you have any questions, concerns, or requests regarding this privacy policy or our data practices, please contact us:\n\n**Email**: privacy@quanta-app.com\n**Website**: https://quanta-app.com/privacy\n**Mail**: Quanta Privacy Team\\n        [Your Company Address]\\n        [City, State, ZIP Code]\n\n**Data Protection Officer**: For EU residents, you can contact our Data Protection Officer at dpo@quanta-app.com\n\n**Response Time**: We will respond to your privacy-related inquiries within 30 days (or as required by applicable law)\n\nYou also have the right to file a complaint with your local data protection authority if you believe we have not adequately addressed your concerns.''';\n}
+                    Icon(Icons.info_outline, color: kPrimaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Last Updated: August 22, 2025',
+                      style: TextStyle(
+                        color: kTextColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This privacy policy explains how Quanta collects, uses, and protects your personal information.',
+                  style: TextStyle(color: kLightTextColor, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+
+          // Privacy policy content
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSection(
+                    '1. Information We Collect',
+                    _informationWeCollect,
+                  ),
+                  _buildSection(
+                    '2. How We Use Your Information',
+                    _howWeUseInformation,
+                  ),
+                  _buildSection(
+                    '3. Information Sharing and Disclosure',
+                    _informationSharing,
+                  ),
+                  _buildSection('4. Data Security', _dataSecurity),
+                  _buildSection('5. Your Privacy Rights', _privacyRights),
+                  _buildSection(
+                    '6. International Data Transfers',
+                    _dataTransfers,
+                  ),
+                  _buildSection('7. Children\'s Privacy', _childrensPrivacy),
+                  _buildSection('8. Data Retention', _dataRetention),
+                  _buildSection('9. Updates to This Policy', _policyUpdates),
+                  _buildSection('10. Contact Us', _contactInfo),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+
+          // Action buttons
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _downloadPolicy(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: kPrimaryColor,
+                          side: BorderSide(color: kPrimaryColor),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.download, size: 18),
+                            const SizedBox(width: 8),
+                            const Text('Download'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        text: 'Contact Us',
+                        onPressed: () => _contactSupport(),
+                        icon: Icons.email,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, String content) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: kTextColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            content,
+            style: const TextStyle(
+              color: kLightTextColor,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sharePolicy() async {
+    // In a real app, you might use the share_plus package
+    const url = 'https://quanta-app.com/privacy';
+    try {
+      await launchUrl(Uri.parse(url));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not share privacy policy'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _downloadPolicy() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kCardColor,
+        title: const Text(
+          'Download Privacy Policy',
+          style: TextStyle(color: kTextColor),
+        ),
+        content: const Text(
+          'To download a PDF version of our privacy policy, please visit our website at quanta-app.com/privacy',
+          style: TextStyle(color: kLightTextColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: kPrimaryColor)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              launchUrl(Uri.parse('https://quanta-app.com/privacy'));
+            },
+            child: const Text(
+              'Visit Website',
+              style: TextStyle(color: kPrimaryColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _contactSupport() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'privacy@quanta-app.com',
+      query: 'subject=Privacy Policy Inquiry',
+    );
+
+    try {
+      await launchUrl(uri);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open email app. Please email privacy@quanta-app.com',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Privacy policy content sections
+  static const String _informationWeCollect = '''
+We collect information you provide directly to us, such as when you:
+
+• Create an account or profile
+• Create and customize AI avatars
+• Upload content (videos, images, text)
+• Communicate with other users
+• Contact our support team
+• Participate in surveys or promotions
+
+This may include your name, email address, username, profile information, avatar characteristics, and any content you create or share.
+
+We also automatically collect certain information about your device and usage, including:
+
+• Device information (type, operating system, unique identifiers)
+• Usage data (app interactions, features used, session duration)
+• Technical data (IP address, browser type, app version)
+• Location information (if you grant permission)
+• Analytics and performance data''';
+
+  static const String _howWeUseInformation = '''
+We use the information we collect to:
+
+• Provide and improve our services
+• Create and manage your account
+• Generate and customize AI avatars
+• Facilitate content creation and sharing
+• Enable social features and interactions
+• Provide customer support
+• Send important notifications
+• Analyze usage patterns and improve our app
+• Ensure platform safety and security
+• Comply with legal obligations
+
+We may use your information to personalize your experience, including:
+
+• Customizing your feed and recommendations
+• Suggesting relevant content and users
+• Improving AI avatar responses
+• Enhancing app performance for your device''';
+
+  static const String _informationSharing = '''
+We do not sell, trade, or otherwise transfer your personal information to third parties, except as described in this policy:
+
+• **Service Providers**: We may share information with trusted third-party service providers who assist us in operating our app, conducting business, or serving users.
+
+• **Legal Requirements**: We may disclose information when required by law, regulation, legal process, or governmental request.
+
+• **Safety and Security**: We may share information to protect the rights, property, or safety of Quanta, our users, or others.
+
+• **Business Transfers**: In the event of a merger, acquisition, or sale of assets, user information may be transferred.
+
+• **With Your Consent**: We may share information for any other purpose with your explicit consent.
+
+Public Information:
+• Your profile information and content you share publicly will be visible to other users
+• AI avatar interactions may be visible to other users based on your privacy settings''';
+
+  static const String _dataSecurity = '''
+We implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.
+
+Our security measures include:
+
+• Encryption of data in transit and at rest
+• Secure servers and databases
+• Access controls and authentication
+• Regular security assessments
+• Employee training on data protection
+• Incident response procedures
+
+However, no method of transmission over the internet or electronic storage is 100% secure. While we strive to protect your personal information, we cannot guarantee absolute security.
+
+You can help protect your account by:
+
+• Using a strong, unique password
+• Enabling two-factor authentication (when available)
+• Not sharing your login credentials
+• Logging out of shared devices
+• Reporting suspicious activity''';
+
+  static const String _privacyRights = '''
+Depending on your location, you may have certain rights regarding your personal information:
+
+**Access**: Request information about the personal data we have about you
+
+**Correction**: Request that we correct inaccurate or incomplete information
+
+**Deletion**: Request deletion of your personal information ("right to be forgotten")
+
+**Portability**: Request a copy of your data in a machine-readable format
+
+**Restriction**: Request that we limit how we use your information
+
+**Objection**: Object to our processing of your information
+
+**Withdrawal**: Withdraw consent for processing (where applicable)
+
+To exercise these rights, contact us at privacy@quanta-app.com. We will respond to your request within the timeframes required by applicable law.
+
+**California Residents**: You have additional rights under the California Consumer Privacy Act (CCPA)
+
+**European Residents**: You have rights under the General Data Protection Regulation (GDPR)''';
+
+  static const String _dataTransfers = '''
+Quanta is based in the United States. If you are accessing our services from outside the United States, please be aware that your information may be transferred to, stored, and processed in the United States and other countries.
+
+These countries may have different data protection laws than your country of residence. By using our services, you consent to the transfer of your information to the United States and other countries.
+
+When we transfer personal information internationally, we implement appropriate safeguards, including:
+
+• Standard contractual clauses
+• Adequacy decisions
+• Certification mechanisms
+• Codes of conduct
+
+We ensure that any international transfers comply with applicable data protection laws.''';
+
+  static const String _childrensPrivacy = '''
+Quanta is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.
+
+If we become aware that we have collected personal information from a child under 13, we will take steps to delete such information promptly.
+
+Users between 13 and 17 should have parental or guardian consent before using our services. Parents and guardians can contact us at privacy@quanta-app.com if they believe their child has provided personal information without consent.
+
+For users in the European Union, the minimum age may be higher in accordance with local laws.''';
+
+  static const String _dataRetention = '''
+We retain your personal information for as long as necessary to provide our services and fulfill the purposes described in this policy.
+
+Specific retention periods:
+
+• **Account Information**: Retained while your account is active
+• **Content**: Retained according to your privacy settings and applicable law
+• **Usage Data**: Typically retained for 2-3 years for analytics purposes
+• **Support Communications**: Retained for 3 years for quality assurance
+
+When we no longer need your information, we will delete or anonymize it in accordance with our data retention policy and applicable law.
+
+You can request deletion of your account and associated data at any time by contacting us at privacy@quanta-app.com.''';
+
+  static const String _policyUpdates = '''
+We may update this privacy policy from time to time to reflect changes in our practices, technology, legal requirements, or other factors.
+
+When we make changes:
+
+• We will post the updated policy on our app and website
+• We will update the "Last Updated" date at the top of this policy
+• For material changes, we may provide additional notice (such as email notification or in-app notification)
+
+We encourage you to review this policy periodically to stay informed about how we protect your privacy.
+
+Your continued use of our services after any changes to this policy constitutes your acceptance of the updated terms.''';
+
+  static const String _contactInfo = '''
+If you have any questions, concerns, or requests regarding this privacy policy or our data practices, please contact us:
+
+**Email**: privacy@quanta-app.com
+**Website**: https://quanta-app.com/privacy
+**Mail**: Quanta Privacy Team
+        [Your Company Address]
+        [City, State, ZIP Code]
+
+**Data Protection Officer**: For EU residents, you can contact our Data Protection Officer at dpo@quanta-app.com
+
+**Response Time**: We will respond to your privacy-related inquiries within 30 days (or as required by applicable law)
+
+You also have the right to file a complaint with your local data protection authority if you believe we have not adequately addressed your concerns.''';
+}

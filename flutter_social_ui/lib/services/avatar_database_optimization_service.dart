@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/avatar_model.dart';
-import '../models/post_model.dart';
+
+
 
 /// Service for optimized database queries for avatar operations
 class AvatarDatabaseOptimizationService {

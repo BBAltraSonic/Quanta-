@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+
 import '../models/avatar_model.dart';
 import '../store/app_state.dart';
 import '../services/auth_service.dart';

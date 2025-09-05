@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'lib/services/user_safety_service.dart';
 import 'lib/services/enhanced_feeds_service.dart';
-import 'lib/services/auth_service.dart';
-import 'lib/config/db_config.dart';
+
+
 
 /// Integration test for safety features migration
 /// This test verifies that the migration from SharedPreferences to Supabase works correctly

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/db_config.dart';
+
 import 'auth_service.dart';
 
 /// Analytics service for tracking user interactions and events

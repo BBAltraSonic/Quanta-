@@ -19,7 +19,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _usernameController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _authService = AuthService();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -48,13 +48,15 @@ class _SignupScreenState extends State<SignupScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         username: _usernameController.text.trim(),
-        displayName: _displayNameController.text.trim().isNotEmpty 
-            ? _displayNameController.text.trim() 
+        displayName: _displayNameController.text.trim().isNotEmpty
+            ? _displayNameController.text.trim()
             : null,
       );
 
       if (mounted) {
-        Navigator.of(context).pop(); // Go back to login or let auth wrapper handle
+        Navigator.of(
+          context,
+        ).pop(); // Go back to login or let auth wrapper handle
       }
     } catch (e) {
       setState(() {
@@ -94,7 +96,7 @@ class _SignupScreenState extends State<SignupScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-                
+
                 // Header
                 const Text(
                   'Join Quanta',
@@ -108,23 +110,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'Create your AI avatar and start your journey',
-                  style: TextStyle(
-                    color: kLightTextColor,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: kLightTextColor, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Error Message
                 if (_errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(kDefaultBorderRadius),
-                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -133,7 +134,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
@@ -141,7 +145,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Email Field
                 CustomTextField(
                   controller: _emailController,
@@ -153,15 +157,17 @@ class _SignupScreenState extends State<SignupScreen> {
                     if (value?.isEmpty ?? true) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value!)) {
                       return 'Please enter a valid email';
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Username Field
                 CustomTextField(
                   controller: _usernameController,
@@ -181,9 +187,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Display Name Field (Optional)
                 CustomTextField(
                   controller: _displayNameController,
@@ -191,9 +197,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   hintText: 'Your display name',
                   prefixIcon: Icons.person_outline,
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Password Field
                 CustomTextField(
                   controller: _passwordController,
@@ -203,7 +209,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: kLightTextColor,
                     ),
                     onPressed: () {
@@ -222,9 +230,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Confirm Password Field
                 CustomTextField(
                   controller: _confirmPasswordController,
@@ -234,7 +242,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscureConfirmPassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: kLightTextColor,
                     ),
                     onPressed: () {
@@ -253,18 +263,18 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Signup Button
                 CustomButton(
                   text: 'Create Account',
                   onPressed: _handleSignup,
                   isLoading: _isLoading,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Login Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -285,7 +295,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 32),
               ],
             ),

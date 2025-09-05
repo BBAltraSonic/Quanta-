@@ -7,10 +7,10 @@
 /// and API security vulnerabilities.
 ///
 /// Usage: dart scripts/security_audit/penetration_tester.dart
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'logger.dart';
 
 class PenetrationTester {
   final List<SecurityTest> _testResults = [];
@@ -19,7 +19,7 @@ class PenetrationTester {
 
   /// Main entry point for penetration testing
   Future<PenetrationTestReport> runPenetrationTests() async {
-    print('🎯 Starting basic penetration testing...\n');
+    SecurityLogger.info('🎯 Starting basic penetration testing...');
 
     await _loadTestConfiguration();
     await _validateTargetSystem();
@@ -38,17 +38,17 @@ class PenetrationTester {
 
   /// Load test configuration
   Future<void> _loadTestConfiguration() async {
-    print('⚙️ Loading test configuration...');
+    SecurityLogger.info('⚙️ Loading test configuration...');
 
     _baseUrl = Platform.environment['SUPABASE_URL'] ?? 'https://localhost:3000';
     _apiKey = Platform.environment['SUPABASE_ANON_KEY'] ?? '';
 
-    print('✅ Configuration loaded successfully');
+    SecurityLogger.info('✅ Configuration loaded successfully');
   }
 
   /// Validate target system accessibility
   Future<void> _validateTargetSystem() async {
-    print('🔍 Validating target system...');
+    SecurityLogger.info('🔍 Validating target system...');
 
     try {
       final response = await http
@@ -59,7 +59,7 @@ class PenetrationTester {
           .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        print('✅ Target system is accessible');
+        SecurityLogger.info('✅ Target system is accessible');
         _addTestResult(
           SecurityTest(
             category: 'System Validation',
@@ -86,7 +86,7 @@ class PenetrationTester {
 
   /// Test authentication mechanisms
   Future<void> _runAuthenticationTests() async {
-    print('\n🔐 Running authentication tests...');
+    SecurityLogger.info('🔐 Running authentication tests...');
 
     await _testWeakPasswordPolicy();
     await _testBruteForceProtection();
@@ -235,7 +235,7 @@ class PenetrationTester {
 
   /// Test input validation
   Future<void> _runInputValidationTests() async {
-    print('\n📝 Running input validation tests...');
+    SecurityLogger.info('📝 Running input validation tests...');
 
     await _testSQLInjection();
     await _testXSSVulnerabilities();
@@ -361,7 +361,7 @@ class PenetrationTester {
 
   /// Test API security
   Future<void> _runAPISecurityTests() async {
-    print('\n🌐 Running API security tests...');
+    SecurityLogger.info('🌐 Running API security tests...');
 
     await _testAPIRateLimiting();
     await _testCORSConfiguration();
@@ -415,15 +415,20 @@ class PenetrationTester {
   /// Test CORS configuration
   Future<void> _testCORSConfiguration() async {
     try {
-      final response = await http
-          .options(
-            Uri.parse('$_baseUrl/rest/v1/posts'),
-            headers: {
-              'Origin': 'https://evil.com',
-              'Access-Control-Request-Method': 'GET',
-            },
-          )
+      final client = http.Client();
+      final request = http.Request(
+        'OPTIONS',
+        Uri.parse('$_baseUrl/rest/v1/posts'),
+      );
+      request.headers.addAll({
+        'Origin': 'https://evil.com',
+        'Access-Control-Request-Method': 'GET',
+      });
+
+      final streamedResponse = await client
+          .send(request)
           .timeout(Duration(seconds: 10));
+      final response = await http.Response.fromStream(streamedResponse);
 
       final allowOrigin = response.headers['access-control-allow-origin'];
       if (allowOrigin == '*') {
@@ -463,7 +468,7 @@ class PenetrationTester {
 
   /// Test data exposure
   Future<void> _runDataExposureTests() async {
-    print('\n📊 Running data exposure tests...');
+    SecurityLogger.info('📊 Running data exposure tests...');
 
     await _testInformationDisclosure();
     await _testDirectObjectReferences();
@@ -580,11 +585,11 @@ class PenetrationTester {
         .where((t) => t.risk == RiskLevel.high)
         .length;
 
-    print('\n📋 Penetration Test Summary:');
-    print('   🔴 Critical: $criticalRisks');
-    print('   🟠 High: $highRisks');
-    print('   ❌ Failed Tests: $failedTests');
-    print('   📊 Total Tests: ${_testResults.length}');
+    SecurityLogger.info('📋 Penetration Test Summary:');
+    SecurityLogger.info('   🔴 Critical: $criticalRisks');
+    SecurityLogger.info('   🟠 High: $highRisks');
+    SecurityLogger.info('   ❌ Failed Tests: $failedTests');
+    SecurityLogger.info('   📊 Total Tests: ${_testResults.length}');
 
     return PenetrationTestReport(
       scanDate: DateTime.now(),
@@ -631,7 +636,7 @@ class PenetrationTester {
 
     await reportFile.writeAsString(jsonEncode(report.toJson()));
 
-    print('\n💾 Report saved to: ${reportFile.path}');
+    SecurityLogger.info('💾 Report saved to: ${reportFile.path}');
   }
 }
 
@@ -703,19 +708,41 @@ class PenetrationTestReport {
 /// Main function
 Future<void> main() async {
   try {
+    // Validate environment variables
+    final baseUrl = Platform.environment['SUPABASE_URL'];
+    final apiKey = Platform.environment['SUPABASE_ANON_KEY'];
+
+    if (baseUrl == null || baseUrl.isEmpty) {
+      SecurityLogger.warning(
+        '⚠️ Warning: SUPABASE_URL not set, using default localhost',
+      );
+    }
+
+    if (apiKey == null || apiKey.isEmpty) {
+      SecurityLogger.warning(
+        '⚠️ Warning: SUPABASE_ANON_KEY not set, some tests may fail',
+      );
+    }
+
     final tester = PenetrationTester();
     final report = await tester.runPenetrationTests();
 
-    print('\n✅ Penetration testing completed!');
+    // Validate report
+    if (report.totalTests < 0) {
+      throw Exception('Invalid report generated');
+    }
+
+    SecurityLogger.info('✅ Penetration testing completed!');
 
     if (report.criticalRisks > 0 || report.highRisks > 0) {
-      print('\n⚠️ Security vulnerabilities found!');
+      SecurityLogger.warning('⚠️ Security vulnerabilities found!');
       exit(1);
     }
 
     exit(0);
-  } catch (e) {
-    print('\n❌ Penetration testing failed: $e');
+  } catch (e, stackTrace) {
+    SecurityLogger.error('❌ Penetration testing failed: $e', error: e);
+    SecurityLogger.error('Stack trace: $stackTrace');
     exit(1);
   }
 }

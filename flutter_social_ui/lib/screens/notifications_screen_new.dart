@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:quanta/constants.dart';
 import 'package:quanta/models/avatar_model.dart';
-import 'package:quanta/models/chat_message.dart';
 import 'package:quanta/services/enhanced_feeds_service.dart';
 import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/services/auth_service_wrapper.dart';
@@ -12,7 +11,6 @@ import 'package:quanta/services/enhanced_chat_service.dart';
 import 'package:quanta/services/messages_service.dart';
 import 'package:quanta/screens/chat_screen.dart';
 import 'package:quanta/screens/post_detail_screen.dart';
-import 'package:quanta/screens/profile_screen.dart';
 import 'package:quanta/screens/search_screen_new.dart';
 import 'package:quanta/screens/public_chat_entries_screen.dart';
 import 'package:quanta/services/avatar_navigation_service.dart';
@@ -841,14 +839,15 @@ class _NotificationsScreenNewState extends State<NotificationsScreenNew>
     try {
       // Use avatar navigation service to resolve user ID to avatar profile
       final avatarNavigationService = AvatarNavigationService();
-      final widget = await avatarNavigationService.resolveProfileRoute(null, userId);
-      
+      final widget = await avatarNavigationService.resolveProfileRoute(
+        null,
+        userId,
+      );
+
       if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => widget,
-          ),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (context) => widget));
       }
     } catch (e) {
       debugPrint('Error navigating to profile: $e');

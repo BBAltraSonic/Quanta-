@@ -15,7 +15,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       expect(user.id, equals('user123'));
       expect(user.username, equals('testuser'));
     });
@@ -32,7 +32,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       expect(avatar.id, equals('avatar123'));
       expect(avatar.name, equals('Test Avatar'));
       expect(avatar.ownerUserId, equals('user123'));
@@ -48,7 +48,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       expect(post.id, equals('post123'));
       expect(post.avatarId, equals('avatar123'));
       expect(post.type, equals(PostType.image));
@@ -64,7 +64,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       expect(comment.id, equals('comment123'));
       expect(comment.postId, equals('post123'));
       expect(comment.authorId, equals('user123'));

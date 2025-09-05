@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'avatar_lru_cache_service.dart';
-import 'avatar_posts_pagination_service.dart';
 import 'avatar_realtime_service_simple.dart';
 
 /// Service for monitoring avatar-related performance metrics
