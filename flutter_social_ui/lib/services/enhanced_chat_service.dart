@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/chat_message.dart';
 import '../models/avatar_model.dart';
-import '../config/app_config.dart';
+
 import 'ai_service.dart';
 import 'auth_service.dart';
 

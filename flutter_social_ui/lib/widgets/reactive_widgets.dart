@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../store/app_state.dart';
+
 import '../store/state_service_adapter.dart';
 import '../models/post_model.dart';
 import '../models/avatar_model.dart';

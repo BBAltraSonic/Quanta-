@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service to handle auto-saving drafts and detecting unsaved changes
 class AutoSaveService {
   static const String _draftKeyPrefix = 'draft_';
   static const Duration _autoSaveInterval = Duration(seconds: 30);
-  
+
   final Map<String, Timer> _autoSaveTimers = {};
   final Map<String, Map<String, dynamic>> _originalValues = {};
   final Map<String, Map<String, dynamic>> _currentValues = {};
@@ -32,9 +33,9 @@ class AutoSaveService {
   bool hasUnsavedChanges(String screenId) {
     final original = _originalValues[screenId];
     final current = _currentValues[screenId];
-    
+
     if (original == null || current == null) return false;
-    
+
     return !_mapsEqual(original, current);
   }
 
@@ -42,16 +43,16 @@ class AutoSaveService {
   List<String> getChangedFields(String screenId) {
     final original = _originalValues[screenId];
     final current = _currentValues[screenId];
-    
+
     if (original == null || current == null) return [];
-    
+
     final changedFields = <String>[];
     for (final key in current.keys) {
       if (original[key] != current[key]) {
         changedFields.add(key);
       }
     }
-    
+
     return changedFields;
   }
 
@@ -59,16 +60,16 @@ class AutoSaveService {
   Future<void> saveDraft(String screenId) async {
     final current = _currentValues[screenId];
     if (current == null || !hasUnsavedChanges(screenId)) return;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final draftKey = '$_draftKeyPrefix$screenId';
-      
+
       final draftData = {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'data': current,
       };
-      
+
       await prefs.setString(draftKey, jsonEncode(draftData));
     } catch (e) {
       print('Error saving draft: $e');
@@ -80,23 +81,23 @@ class AutoSaveService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final draftKey = '$_draftKeyPrefix$screenId';
-      
+
       final draftString = prefs.getString(draftKey);
       if (draftString == null) return null;
-      
+
       final draftData = jsonDecode(draftString) as Map<String, dynamic>;
       final timestamp = draftData['timestamp'] as int;
       final data = draftData['data'] as Map<String, dynamic>;
-      
+
       // Check if draft is not too old (e.g., 7 days)
       final draftAge = DateTime.now().millisecondsSinceEpoch - timestamp;
       const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-      
+
       if (draftAge > maxAge) {
         await clearDraft(screenId);
         return null;
       }
-      
+
       return data;
     } catch (e) {
       print('Error loading draft: $e');
@@ -126,17 +127,17 @@ class AutoSaveService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final draftKey = '$_draftKeyPrefix$screenId';
-      
+
       final draftString = prefs.getString(draftKey);
       if (draftString == null) return null;
-      
+
       final draftData = jsonDecode(draftString) as Map<String, dynamic>;
       final timestamp = draftData['timestamp'] as int;
-      
+
       final draftTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
       final now = DateTime.now();
       final difference = now.difference(draftTime);
-      
+
       if (difference.inMinutes < 1) {
         return 'Just now';
       } else if (difference.inMinutes < 60) {
@@ -178,7 +179,9 @@ class AutoSaveService {
   }
 
   void _startAutoSave(String screenId) {
-    _autoSaveTimers[screenId] = Timer.periodic(_autoSaveInterval, (timer) async {
+    _autoSaveTimers[screenId] = Timer.periodic(_autoSaveInterval, (
+      timer,
+    ) async {
       await saveDraft(screenId);
     });
   }
@@ -193,13 +196,13 @@ class AutoSaveService {
 
   bool _mapsEqual(Map<String, dynamic> map1, Map<String, dynamic> map2) {
     if (map1.length != map2.length) return false;
-    
+
     for (final key in map1.keys) {
       if (!map2.containsKey(key)) return false;
-      
+
       final value1 = map1[key];
       final value2 = map2[key];
-      
+
       // Handle different types of comparisons
       if (value1 is String && value2 is String) {
         if (value1.trim() != value2.trim()) return false;
@@ -207,13 +210,13 @@ class AutoSaveService {
         return false;
       }
     }
-    
+
     return true;
   }
 }
 
 /// Mixin to add auto-save capabilities to StatefulWidgets
-mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
+mixin AutoSaveMixin on State {
   late String autoSaveId;
   final AutoSaveService _autoSaveService = AutoSaveService();
 
@@ -237,28 +240,24 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
 
   /// Initialize auto-save with current values
   void initializeAutoSave() {
-    _autoSaveService.initializeAutoSave(
-      autoSaveId,
-      getInitialAutoSaveValues(),
-    );
+    _autoSaveService.initializeAutoSave(autoSaveId, getInitialAutoSaveValues());
   }
 
   /// Update auto-save values
   void updateAutoSave() {
-    _autoSaveService.updateValues(
-      autoSaveId,
-      getCurrentAutoSaveValues(),
-    );
+    _autoSaveService.updateValues(autoSaveId, getCurrentAutoSaveValues());
   }
 
   /// Check if there are unsaved changes
   bool get hasUnsavedChanges => _autoSaveService.hasUnsavedChanges(autoSaveId);
 
   /// Get changed fields
-  List<String> get changedFields => _autoSaveService.getChangedFields(autoSaveId);
+  List<String> get changedFields =>
+      _autoSaveService.getChangedFields(autoSaveId);
 
   /// Load draft
-  Future<Map<String, dynamic>?> loadDraft() => _autoSaveService.loadDraft(autoSaveId);
+  Future<Map<String, dynamic>?> loadDraft() =>
+      _autoSaveService.loadDraft(autoSaveId);
 
   /// Clear draft
   Future<void> clearDraft() => _autoSaveService.clearDraft(autoSaveId);

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quanta/services/content_upload_service.dart';
 import 'package:quanta/models/post_model.dart';
+import 'package:quanta/models/avatar_model.dart';
 
 void main() {
   group('ContentUploadService Integration Tests', () {
@@ -13,7 +14,7 @@ void main() {
     test('should extract hashtags from caption', () {
       const caption = 'This is a test #flutter #ai #content creation';
       final hashtags = contentService.extractHashtags(caption);
-      
+
       expect(hashtags, contains('#flutter'));
       expect(hashtags, contains('#ai'));
       expect(hashtags, contains('#content'));
@@ -26,7 +27,7 @@ void main() {
         externalUrl: 'https://example.com/image.jpg',
         type: PostType.image,
       );
-      
+
       expect(validResult.isValid, true);
       expect(validResult.errors, isEmpty);
 
@@ -36,14 +37,14 @@ void main() {
         externalUrl: 'https://example.com/image.jpg',
         type: PostType.image,
       );
-      
+
       expect(invalidResult.isValid, false);
       expect(invalidResult.errors, contains('Caption is required'));
     });
 
     test('should get supported platforms', () {
       final platforms = contentService.getSupportedPlatforms();
-      
+
       expect(platforms, isNotEmpty);
       expect(platforms.any((p) => p.id == 'huggingface'), true);
       expect(platforms.any((p) => p.id == 'runway'), true);
@@ -56,15 +57,21 @@ void main() {
         name: 'Test Avatar',
         bio: 'Test bio',
         niche: AvatarNiche.tech,
-        personalityTraits: ['creative'],
-        personalityPrompt: 'Test prompt',
+        personalityTraits: [PersonalityTrait.creative],
+        customPersonalityPrompt: 'Test prompt',
       );
 
-      final suggestions = contentService.suggestHashtags('AI art creation', mockAvatar);
-      
+      final suggestions = contentService.suggestHashtags(
+        'AI art creation',
+        mockAvatar,
+      );
+
       expect(suggestions, isNotEmpty);
       expect(suggestions.any((tag) => tag.toLowerCase().contains('ai')), true);
-      expect(suggestions.any((tag) => tag.toLowerCase().contains('tech')), true);
+      expect(
+        suggestions.any((tag) => tag.toLowerCase().contains('tech')),
+        true,
+      );
     });
   });
 }

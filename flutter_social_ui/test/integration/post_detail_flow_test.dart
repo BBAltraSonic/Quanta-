@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:quanta/main.dart' as app;
 import 'package:quanta/screens/post_detail_screen.dart';
-import 'package:quanta/widgets/comments_modal.dart';
+
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

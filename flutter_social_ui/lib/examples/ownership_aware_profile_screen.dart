@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../constants.dart';
 import '../models/user_model.dart';
 import '../models/avatar_model.dart';
 import '../models/post_model.dart';
@@ -11,10 +9,7 @@ import '../services/ownership_guard_service.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../screens/settings_screen.dart';
 import '../screens/edit_profile_screen.dart';
-import '../screens/avatar_management_screen.dart';
-import '../screens/chat_screen.dart';
 import '../screens/create_post_screen.dart';
-import '../widgets/skeleton_widgets.dart';
 
 /// Example of an ownership-aware profile screen that adapts UI based on ownership
 /// Shows edit/settings for own profile vs follow/block for others

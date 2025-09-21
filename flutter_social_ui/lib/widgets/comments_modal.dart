@@ -5,7 +5,7 @@ import '../models/post_model.dart';
 import '../services/comment_service.dart';
 import '../services/auth_service.dart';
 import '../services/ai_comment_suggestion_service.dart';
-import '../services/analytics_service.dart';
+
 import 'comment_tile.dart';
 import 'user_avatar.dart';
 import 'ai_comment_suggestion_widget.dart';

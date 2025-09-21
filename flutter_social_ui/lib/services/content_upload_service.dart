@@ -11,10 +11,10 @@ import '../config/db_config.dart';
 import '../utils/environment.dart';
 import 'auth_service.dart';
 
-
 /// Service for handling content uploads and management
 class ContentUploadService {
-  static final ContentUploadService _instance = ContentUploadService._internal();
+  static final ContentUploadService _instance =
+      ContentUploadService._internal();
   factory ContentUploadService() => _instance;
   ContentUploadService._internal();
 
@@ -26,7 +26,7 @@ class ContentUploadService {
     // For now, this is a placeholder that doesn't throw an error
     return;
   }
-  
+
   /// Create a new post
   Future<PostModel?> createPost({
     required String avatarId,
@@ -36,6 +36,23 @@ class ContentUploadService {
     List<String>? hashtags,
   }) async {
     try {
+      // Verify avatar ownership before creating post
+      final userId = _authService.currentUserId;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Verify the avatar belongs to the current user
+      final avatarResponse = await _authService.supabase
+          .from('avatars')
+          .select('owner_user_id')
+          .eq('id', avatarId)
+          .single();
+
+      if (avatarResponse['owner_user_id'] != userId) {
+        throw Exception('Avatar does not belong to current user');
+      }
+
       return await _uploadContentSupabase(
         avatarId: avatarId,
         caption: caption,
@@ -78,7 +95,9 @@ class ContentUploadService {
   /// Prefer using createPost/importExternalContent which handle this.
   Future<String> uploadMediaFile(File file, PostType type) async {
     try {
-      throw Exception('Use createPost() or importExternalContent(); avatarId is required for storage path.');
+      throw Exception(
+        'Use createPost() or importExternalContent(); avatarId is required for storage path.',
+      );
     } catch (e) {
       debugPrint('Error uploading media file: $e');
       rethrow;
@@ -162,30 +181,34 @@ class ContentUploadService {
     final suggestions = <String>[];
     final lowerCaption = caption.toLowerCase();
     final niche = avatar.niche.displayName.toLowerCase();
-    
+
     // Add niche-specific hashtags
     suggestions.add('#${niche.replaceAll(' ', '')}');
-    
+
     // Content-based suggestions
     if (lowerCaption.contains(RegExp(r'\b(ai|artificial|intelligence)\b'))) {
-      suggestions.addAll(['#AI', '#ArtificialIntelligence', '#MachineLearning']);
+      suggestions.addAll([
+        '#AI',
+        '#ArtificialIntelligence',
+        '#MachineLearning',
+      ]);
     }
-    
+
     if (lowerCaption.contains(RegExp(r'\b(art|creative|design)\b'))) {
       suggestions.addAll(['#Art', '#Creative', '#Design', '#Digital']);
     }
-    
+
     if (lowerCaption.contains(RegExp(r'\b(tech|technology|innovation)\b'))) {
       suggestions.addAll(['#Tech', '#Technology', '#Innovation', '#Future']);
     }
-    
+
     if (lowerCaption.contains(RegExp(r'\b(video|animation|motion)\b'))) {
       suggestions.addAll(['#Video', '#Animation', '#Motion', '#Visual']);
     }
-    
+
     // General popular hashtags
     suggestions.addAll(['#Avatar', '#Virtual', '#Digital', '#Content']);
-    
+
     // Remove duplicates and return limited set
     return suggestions.toSet().take(10).toList();
   }
@@ -198,49 +221,51 @@ class ContentUploadService {
     required PostType type,
   }) async {
     final errors = <String>[];
-    
+
     // Caption validation
     if (caption.trim().isEmpty) {
       errors.add('Caption is required');
     } else if (caption.length > 2000) {
       errors.add('Caption must be less than 2000 characters');
     }
-    
+
     // Media validation
     if (mediaFile == null && externalUrl == null) {
       errors.add('Either upload a file or provide an external URL');
     }
-    
+
     if (mediaFile != null) {
       final fileSize = mediaFile.lengthSync();
-      final maxSize = type == PostType.video 
-          ? Environment.maxVideoSizeMB * 1024 * 1024 
+      final maxSize = type == PostType.video
+          ? Environment.maxVideoSizeMB * 1024 * 1024
           : Environment.maxImageSizeMB * 1024 * 1024;
-      
+
       if (fileSize > maxSize) {
-        errors.add('File size exceeds limit (${type == PostType.video ? '${Environment.maxVideoSizeMB}MB' : '${Environment.maxImageSizeMB}MB'})');
+        errors.add(
+          'File size exceeds limit (${type == PostType.video ? '${Environment.maxVideoSizeMB}MB' : '${Environment.maxImageSizeMB}MB'})',
+        );
       }
-      
+
       final extension = mediaFile.path.split('.').last.toLowerCase();
-      final validExtensions = type == PostType.video 
+      final validExtensions = type == PostType.video
           ? ['mp4', 'mov', 'avi', 'webm']
           : ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-      
+
       if (!validExtensions.contains(extension)) {
-        errors.add('Invalid file type. Supported: ${validExtensions.join(', ')}');
+        errors.add(
+          'Invalid file type. Supported: ${validExtensions.join(', ')}',
+        );
       }
-      
+
       // Note: Video duration validation removed (no compression service)
     }
-    
-    if (externalUrl != null && !(Uri.tryParse(externalUrl)?.isAbsolute ?? false)) {
+
+    if (externalUrl != null &&
+        !(Uri.tryParse(externalUrl)?.isAbsolute ?? false)) {
       errors.add('Invalid URL format');
     }
-    
-    return ValidationResult(
-      isValid: errors.isEmpty,
-      errors: errors,
-    );
+
+    return ValidationResult(isValid: errors.isEmpty, errors: errors);
   }
 
   // Supabase implementations
@@ -267,7 +292,9 @@ class ContentUploadService {
       );
 
       if (!validation.isValid) {
-        throw Exception('Content validation failed: ${validation.errors.join(', ')}');
+        throw Exception(
+          'Content validation failed: ${validation.errors.join(', ')}',
+        );
       }
 
       String? mediaUrl;
@@ -280,7 +307,7 @@ class ContentUploadService {
           file: mediaFile,
           type: type,
         );
-        
+
         // Generate thumbnail for videos
         if (type == PostType.video) {
           thumbnailUrl = await _generateAndUploadThumbnail(mediaFile, avatarId);
@@ -296,11 +323,13 @@ class ContentUploadService {
       // Create post record in database
       const uuid = Uuid();
       final postId = uuid.v4();
-      
+
       final postData = {
         'id': postId,
         'avatar_id': avatarId,
-        'type': type == PostType.video ? DbConfig.videoType : DbConfig.imageType,
+        'type': type == PostType.video
+            ? DbConfig.videoType
+            : DbConfig.imageType,
         'status': DbConfig.publishedStatus,
         'caption': caption,
         'hashtags': hashtags ?? [],
@@ -399,11 +428,11 @@ class ContentUploadService {
       // Upload to Supabase storage with proper content type
       final bytes = await file.readAsBytes();
       debugPrint('Read ${bytes.length} bytes from file');
-      
+
       await _authService.supabase.storage
           .from(DbConfig.postsBucket)
           .uploadBinary(
-            storagePath, 
+            storagePath,
             bytes,
             fileOptions: FileOptions(
               contentType: contentType,
@@ -426,7 +455,10 @@ class ContentUploadService {
   }
 
   /// Generate and upload video thumbnail with better error handling
-  Future<String?> _generateAndUploadThumbnail(File videoFile, String avatarId) async {
+  Future<String?> _generateAndUploadThumbnail(
+    File videoFile,
+    String avatarId,
+  ) async {
     try {
       final userId = _authService.currentUser?.id;
       if (userId == null) {
@@ -435,7 +467,7 @@ class ContentUploadService {
       }
 
       debugPrint('Generating thumbnail for video: ${videoFile.path}');
-      
+
       // Generate thumbnail with error handling
       final thumbnailBytes = await VideoThumbnail.thumbnailData(
         video: videoFile.path,
@@ -471,10 +503,11 @@ class ContentUploadService {
         // Try alternative upload method
         await _authService.supabase.storage
             .from(DbConfig.postsBucket)
-            .uploadBinary(storagePath, thumbnailBytes, fileOptions: FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ));
+            .uploadBinary(
+              storagePath,
+              thumbnailBytes,
+              fileOptions: FileOptions(contentType: 'image/jpeg', upsert: true),
+            );
       }
 
       // Get public URL
@@ -490,7 +523,6 @@ class ContentUploadService {
       return null;
     }
   }
-
 
   Future<PostModel> _importExternalContentSupabase({
     required String avatarId,
@@ -520,23 +552,28 @@ class ContentUploadService {
       );
 
       if (!platform.supportedTypes.contains(type)) {
-        throw Exception('Platform $sourcePlatform does not support ${type.name} content');
+        throw Exception(
+          'Platform $sourcePlatform does not support ${type.name} content',
+        );
       }
 
       // Create post record with external URL
       const uuid = Uuid();
       final postId = uuid.v4();
-      
+
       final postData = {
         'id': postId,
         'avatar_id': avatarId,
-        'type': type == PostType.video ? DbConfig.videoType : DbConfig.imageType,
+        'type': type == PostType.video
+            ? DbConfig.videoType
+            : DbConfig.imageType,
         'status': DbConfig.publishedStatus,
         'caption': caption,
         'hashtags': extractHashtags(caption),
         'video_url': type == PostType.video ? sourceUrl : null,
         'image_url': type == PostType.image ? sourceUrl : null,
-        'thumbnail_url': null, // External content doesn't have thumbnails generated
+        'thumbnail_url':
+            null, // External content doesn't have thumbnails generated
         'views_count': 0,
         'likes_count': 0,
         'comments_count': 0,
@@ -589,8 +626,5 @@ class ValidationResult {
   final bool isValid;
   final List<String> errors;
 
-  ValidationResult({
-    required this.isValid,
-    required this.errors,
-  });
+  ValidationResult({required this.isValid, required this.errors});
 }

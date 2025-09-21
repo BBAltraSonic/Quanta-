@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/avatar_model.dart';
 import '../models/user_model.dart';
-import '../config/app_config.dart';
+
 import 'auth_service.dart';
 import 'avatar_service.dart';
 import 'ownership_guard_service.dart';

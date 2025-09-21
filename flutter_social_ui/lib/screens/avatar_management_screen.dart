@@ -60,7 +60,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
         setState(() {
           _activeAvatarId = avatarId;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Active avatar updated'),
@@ -81,16 +81,15 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
     final result = await Navigator.push<AvatarModel>(
       context,
       MaterialPageRoute(
-        builder: (context) => const AvatarCreationWizard(
-          returnResultOnCreate: true,
-        ),
+        builder: (context) =>
+            const AvatarCreationWizard(returnResultOnCreate: true),
       ),
     );
 
     if (result != null) {
       // Refresh avatars list
       await _loadAvatars();
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -120,11 +119,16 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
                   radius: 30,
                   backgroundImage: avatar.avatarImageUrl != null
                       ? avatar.avatarImageUrl!.startsWith('assets/')
-                          ? AssetImage(avatar.avatarImageUrl!) as ImageProvider
-                          : NetworkImage(avatar.avatarImageUrl!)
+                            ? AssetImage(avatar.avatarImageUrl!)
+                                  as ImageProvider
+                            : NetworkImage(avatar.avatarImageUrl!)
                       : null,
                   child: avatar.avatarImageUrl == null
-                      ? const Icon(Icons.person, size: 30, color: kLightTextColor)
+                      ? const Icon(
+                          Icons.person,
+                          size: 30,
+                          color: kLightTextColor,
+                        )
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -156,10 +160,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
             const SizedBox(height: 16),
             Text(
               avatar.bio,
-              style: const TextStyle(
-                color: kLightTextColor,
-                fontSize: 16,
-              ),
+              style: const TextStyle(color: kLightTextColor, fontSize: 16),
             ),
             if (avatar.backstory != null) ...[
               const SizedBox(height: 16),
@@ -174,10 +175,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
               const SizedBox(height: 8),
               Text(
                 avatar.backstory!,
-                style: const TextStyle(
-                  color: kLightTextColor,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: kLightTextColor, fontSize: 14),
               ),
             ],
             const SizedBox(height: 16),
@@ -211,10 +209,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
                   label: 'Followers',
                   value: _formatNumber(avatar.followersCount),
                 ),
-                _StatChip(
-                  label: 'Posts',
-                  value: avatar.postsCount.toString(),
-                ),
+                _StatChip(label: 'Posts', value: avatar.postsCount.toString()),
                 _StatChip(
                   label: 'Engagement',
                   value: '${avatar.engagementRate.toStringAsFixed(1)}%',
@@ -239,10 +234,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -255,10 +247,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
         elevation: 0,
         title: const Text(
           'My Avatars',
-          style: TextStyle(
-            color: kTextColor,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w600),
         ),
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
@@ -275,169 +264,187 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
       body: _isLoading
           ? SkeletonLoader.avatarManagementGrid(itemCount: 4)
           : _avatars.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _avatars.length,
-                  itemBuilder: (context, index) {
-                    final avatar = _avatars[index];
-                    final isActive = avatar.id == _activeAvatarId;
-                    
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: kCardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: isActive
-                            ? Border.all(color: kPrimaryColor, width: 2)
-                            : null,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        leading: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundImage: avatar.avatarImageUrl != null
-                                  ? avatar.avatarImageUrl!.startsWith('assets/')
-                                      ? AssetImage(avatar.avatarImageUrl!) as ImageProvider
-                                      : NetworkImage(avatar.avatarImageUrl!)
-                                  : null,
-                              child: avatar.avatarImageUrl == null
-                                  ? const Icon(Icons.person, size: 30, color: kLightTextColor)
-                                  : null,
-                            ),
-                            if (isActive)
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _avatars.length,
+              itemBuilder: (context, index) {
+                final avatar = _avatars[index];
+                final isActive = avatar.id == _activeAvatarId;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: kCardColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: isActive
+                        ? Border.all(color: kPrimaryColor, width: 2)
+                        : null,
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundImage: avatar.avatarImageUrl != null
+                              ? avatar.avatarImageUrl!.startsWith('assets/')
+                                    ? AssetImage(avatar.avatarImageUrl!)
+                                          as ImageProvider
+                                    : NetworkImage(avatar.avatarImageUrl!)
+                              : null,
+                          child: avatar.avatarImageUrl == null
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 30,
+                                  color: kLightTextColor,
+                                )
+                              : null,
+                        ),
+                        if (isActive)
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: kPrimaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
                                 ),
                               ),
-                          ],
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            avatar.name,
+                            style: TextStyle(
+                              color: isActive ? kPrimaryColor : kTextColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        title: Row(
+                        if (isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kPrimaryColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Active',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text(
+                          avatar.bio,
+                          style: const TextStyle(
+                            color: kLightTextColor,
+                            fontSize: 14,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
                           children: [
-                            Expanded(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kPrimaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                               child: Text(
-                                avatar.name,
-                                style: TextStyle(
-                                  color: isActive ? kPrimaryColor : kTextColor,
-                                  fontWeight: FontWeight.bold,
+                                avatar.nicheDisplayName,
+                                style: const TextStyle(
+                                  color: kPrimaryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            if (isActive)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kPrimaryColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Active',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
+                            const SizedBox(width: 8),
                             Text(
-                              avatar.bio,
+                              '${_formatNumber(avatar.followersCount)} followers',
                               style: const TextStyle(
                                 color: kLightTextColor,
-                                fontSize: 14,
+                                fontSize: 12,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 8),
-                            Row(
+                          ],
+                        ),
+                      ],
+                    ),
+                    trailing: PopupMenuButton(
+                      color: kCardColor,
+                      icon: const Icon(Icons.more_vert, color: kLightTextColor),
+                      itemBuilder: (context) => [
+                        if (!isActive)
+                          PopupMenuItem(
+                            onTap: () => _setActiveAvatar(avatar.id),
+                            child: const Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    avatar.nicheDisplayName,
-                                    style: const TextStyle(
-                                      color: kPrimaryColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                Icon(
+                                  Icons.check_circle,
+                                  color: kPrimaryColor,
+                                  size: 20,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text(
-                                  '${_formatNumber(avatar.followersCount)} followers',
-                                  style: const TextStyle(
-                                    color: kLightTextColor,
-                                    fontSize: 12,
-                                  ),
+                                  'Set as Active',
+                                  style: TextStyle(color: kTextColor),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                        trailing: PopupMenuButton(
-                          color: kCardColor,
-                          icon: const Icon(Icons.more_vert, color: kLightTextColor),
-                          itemBuilder: (context) => [
-                            if (!isActive)
-                              PopupMenuItem(
-                                onTap: () => _setActiveAvatar(avatar.id),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: kPrimaryColor, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('Set as Active', style: TextStyle(color: kTextColor)),
-                                  ],
-                                ),
+                          ),
+                        PopupMenuItem(
+                          onTap: () => _showAvatarDetails(avatar),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info, color: kTextColor, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'View Details',
+                                style: TextStyle(color: kTextColor),
                               ),
-                            PopupMenuItem(
-                              onTap: () => _showAvatarDetails(avatar),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.info, color: kTextColor, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('View Details', style: TextStyle(color: kTextColor)),
-                                ],
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        onTap: () => _showAvatarDetails(avatar),
-                      ),
-                    );
-                  },
-                ),
+                      ],
+                    ),
+                    onTap: () => _showAvatarDetails(avatar),
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewAvatar,
         backgroundColor: kPrimaryColor,
@@ -457,7 +464,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: kPrimaryColor.withOpacity(0.1),
+                color: kPrimaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -479,10 +486,7 @@ class _AvatarManagementScreenState extends State<AvatarManagementScreen> {
             const Text(
               'Create your first AI avatar to start building your virtual influencer presence!',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: kLightTextColor,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: kLightTextColor, fontSize: 16),
             ),
             const SizedBox(height: 32),
             CustomButton(
@@ -501,17 +505,14 @@ class _StatChip extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatChip({
-    required this.label,
-    required this.value,
-  });
+  const _StatChip({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: kPrimaryColor.withOpacity(0.1),
+        color: kPrimaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -526,10 +527,7 @@ class _StatChip extends StatelessWidget {
           ),
           Text(
             label,
-            style: const TextStyle(
-              color: kLightTextColor,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: kLightTextColor, fontSize: 12),
           ),
         ],
       ),

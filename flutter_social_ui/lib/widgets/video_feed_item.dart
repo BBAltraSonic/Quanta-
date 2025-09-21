@@ -6,7 +6,7 @@ import '../models/post_model.dart';
 import '../models/avatar_model.dart';
 import '../models/user_model.dart';
 import '../widgets/feeds_video_player.dart';
-import 'package:video_player/video_player.dart';
+
 import '../services/enhanced_video_service.dart';
 import '../widgets/comments_modal.dart';
 import '../constants.dart';

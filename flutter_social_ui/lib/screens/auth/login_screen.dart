@@ -3,7 +3,6 @@ import '../../constants.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/skeleton_widgets.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 

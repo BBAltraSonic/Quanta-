@@ -1,0 +1,338 @@
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/avatar_model.dart';
+import '../models/post_model.dart';
+import '../store/app_state.dart';
+
+/// Service for real-time avatar updates using Supabase subscriptions
+class AvatarRealtimeService {
+  static final AvatarRealtimeService _instance =
+      AvatarRealtimeService._internal();
+  factory AvatarRealtimeService() => _instance;
+  AvatarRealtimeService._internal();
+
+  final SupabaseClient _supabase = Supabase.instance.client;
+  final AppState _appState = AppState();
+
+  // Active subscriptions
+  final Map<String, RealtimeChannel> _avatarSubscriptions = {};
+  final Map<String, RealtimeChannel> _avatarPostsSubscriptions = {};
+  final Map<String, RealtimeChannel> _avatarStatsSubscriptions = {};
+
+  // Stream controllers for external listeners
+  final Map<String, StreamController<AvatarModel>> _avatarStreamControllers =
+      {};
+  final Map<String, StreamController<List<PostModel>>>
+  _avatarPostsStreamControllers = {};
+
+  /// Subscribe to avatar updates
+  Stream<AvatarModel> subscribeToAvatar(String avatarId) {
+    // Return existing stream if already subscribed
+    if (_avatarStreamControllers.containsKey(avatarId)) {
+      return _avatarStreamControllers[avatarId]!.stream;
+    }
+
+    // Create new stream controller
+    final controller = StreamController<AvatarModel>.broadcast();
+    _avatarStreamControllers[avatarId] = controller;
+
+    // Create Supabase subscription
+    final channel = _supabase.channel('avatar_$avatarId');
+
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'avatars',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: avatarId,
+          ),
+          callback: (payload) {
+            _handleAvatarChange(avatarId, payload, controller);
+          },
+        )
+        .subscribe();
+
+    _avatarSubscriptions[avatarId] = channel;
+
+    return controller.stream;
+  }
+
+  /// Subscribe to avatar posts updates
+  Stream<List<PostModel>> subscribeToAvatarPosts(String avatarId) {
+    // Return existing stream if already subscribed
+    if (_avatarPostsStreamControllers.containsKey(avatarId)) {
+      return _avatarPostsStreamControllers[avatarId]!.stream;
+    }
+
+    // Create new stream controller
+    final controller = StreamController<List<PostModel>>.broadcast();
+    _avatarPostsStreamControllers[avatarId] = controller;
+
+    // Create Supabase subscription
+    final channel = _supabase.channel('avatar_posts_$avatarId');
+
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'posts',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'avatar_id',
+            value: avatarId,
+          ),
+          callback: (payload) {
+            _handleAvatarPostsChange(avatarId, payload, controller);
+          },
+        )
+        .subscribe();
+
+    _avatarPostsSubscriptions[avatarId] = channel;
+
+    return controller.stream;
+  }
+
+  /// Subscribe to avatar follower count updates
+  void subscribeToAvatarStats(String avatarId) {
+    // Don't create duplicate subscriptions
+    if (_avatarStatsSubscriptions.containsKey(avatarId)) {
+      return;
+    }
+
+    // Create Supabase subscription for follows table
+    final channel = _supabase.channel('avatar_stats_$avatarId');
+
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'follows',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'avatar_id',
+            value: avatarId,
+          ),
+          callback: (payload) {
+            _handleAvatarStatsChange(avatarId, payload);
+          },
+        )
+        .subscribe();
+
+    _avatarStatsSubscriptions[avatarId] = channel;
+  }
+
+  /// Unsubscribe from avatar updates
+  void unsubscribeFromAvatar(String avatarId) {
+    // Close stream controller
+    _avatarStreamControllers[avatarId]?.close();
+    _avatarStreamControllers.remove(avatarId);
+
+    // Unsubscribe from Supabase
+    _avatarSubscriptions[avatarId]?.unsubscribe();
+    _avatarSubscriptions.remove(avatarId);
+  }
+
+  /// Unsubscribe from avatar posts updates
+  void unsubscribeFromAvatarPosts(String avatarId) {
+    // Close stream controller
+    _avatarPostsStreamControllers[avatarId]?.close();
+    _avatarPostsStreamControllers.remove(avatarId);
+
+    // Unsubscribe from Supabase
+    _avatarPostsSubscriptions[avatarId]?.unsubscribe();
+    _avatarPostsSubscriptions.remove(avatarId);
+  }
+
+  /// Unsubscribe from avatar stats updates
+  void unsubscribeFromAvatarStats(String avatarId) {
+    _avatarStatsSubscriptions[avatarId]?.unsubscribe();
+    _avatarStatsSubscriptions.remove(avatarId);
+  }
+
+  /// Unsubscribe from all avatar updates
+  void unsubscribeFromAllAvatarUpdates(String avatarId) {
+    unsubscribeFromAvatar(avatarId);
+    unsubscribeFromAvatarPosts(avatarId);
+    unsubscribeFromAvatarStats(avatarId);
+  }
+
+  /// Subscribe to all updates for an avatar (convenience method)
+  void subscribeToAllAvatarUpdates(String avatarId) {
+    subscribeToAvatar(avatarId);
+    subscribeToAvatarPosts(avatarId);
+    subscribeToAvatarStats(avatarId);
+  }
+
+  /// Handle avatar data changes
+  void _handleAvatarChange(
+    String avatarId,
+    PostgresChangePayload payload,
+    StreamController<AvatarModel> controller,
+  ) {
+    try {
+      final eventType = payload['eventType'] as String?;
+      final newRecord = payload['new'] as Map<String, dynamic>?;
+      final oldRecord = payload['old'] as Map<String, dynamic>?;
+
+      switch (eventType) {
+        case 'INSERT':
+        case 'UPDATE':
+          if (newRecord != null) {
+            final avatar = AvatarModel.fromJson(newRecord);
+
+            // Update AppState
+            _appState.setAvatar(avatar);
+
+            // Notify stream listeners
+            controller.add(avatar);
+          }
+          break;
+        case 'DELETE':
+          if (oldRecord != null) {
+            // Remove from AppState
+            _appState.removeAvatar(avatarId);
+
+            // Close the stream as the avatar no longer exists
+            controller.close();
+            _avatarStreamControllers.remove(avatarId);
+          }
+          break;
+      }
+    } catch (e) {
+      print('Error handling avatar change for $avatarId: $e');
+      controller.addError(e);
+    }
+  }
+
+  /// Handle avatar posts changes
+  void _handleAvatarPostsChange(
+    String avatarId,
+    PostgresChangePayload payload,
+    StreamController<List<PostModel>> controller,
+  ) {
+    try {
+      final eventType = payload['eventType'] as String?;
+      final newRecord = payload['new'] as Map<String, dynamic>?;
+      final oldRecord = payload['old'] as Map<String, dynamic>?;
+
+      switch (eventType) {
+        case 'INSERT':
+          if (newRecord != null) {
+            final post = PostModel.fromJson(newRecord);
+
+            // Update AppState
+            _appState.setPost(post);
+            _appState.associateContentWithAvatar(avatarId, post.id);
+
+            // Notify stream listeners with updated posts list
+            final updatedPosts = _appState.getAvatarPosts(avatarId);
+            controller.add(updatedPosts);
+          }
+          break;
+        case 'UPDATE':
+          if (newRecord != null) {
+            final post = PostModel.fromJson(newRecord);
+
+            // Update AppState
+            _appState.setPost(post);
+
+            // Notify stream listeners with updated posts list
+            final updatedPosts = _appState.getAvatarPosts(avatarId);
+            controller.add(updatedPosts);
+          }
+          break;
+        case 'DELETE':
+          if (oldRecord != null) {
+            final postId = oldRecord['id'] as String;
+
+            // Remove from AppState
+            _appState.removePost(postId);
+            _appState.removeContentFromAvatar(avatarId, postId);
+
+            // Notify stream listeners with updated posts list
+            final updatedPosts = _appState.getAvatarPosts(avatarId);
+            controller.add(updatedPosts);
+          }
+          break;
+      }
+    } catch (e) {
+      print('Error handling avatar posts change for $avatarId: $e');
+      controller.addError(e);
+    }
+  }
+
+  /// Handle avatar stats changes (follower count updates)
+  void _handleAvatarStatsChange(
+    String avatarId,
+    PostgresChangePayload payload,
+  ) {
+    try {
+      // Refresh follower count from database
+      _refreshAvatarFollowerCount(avatarId);
+    } catch (e) {
+      print('Error handling avatar stats change for $avatarId: $e');
+    }
+  }
+
+  /// Refresh avatar follower count from database
+  Future<void> _refreshAvatarFollowerCount(String avatarId) async {
+    try {
+      final response = await _supabase
+          .from('follows')
+          .select('id')
+          .eq('avatar_id', avatarId);
+
+      final count = (response as List).length;
+
+      // Update AppState
+      _appState.updateAvatarFollowerCount(avatarId, count);
+    } catch (e) {
+      print('Error refreshing follower count for avatar $avatarId: $e');
+    }
+  }
+
+  /// Get subscription statistics for monitoring
+  Map<String, dynamic> getSubscriptionStats() {
+    return {
+      'activeAvatarSubscriptions': _avatarSubscriptions.length,
+      'activeAvatarPostsSubscriptions': _avatarPostsSubscriptions.length,
+      'activeAvatarStatsSubscriptions': _avatarStatsSubscriptions.length,
+      'totalActiveSubscriptions':
+          _avatarSubscriptions.length +
+          _avatarPostsSubscriptions.length +
+          _avatarStatsSubscriptions.length,
+    };
+  }
+
+  /// Cleanup all subscriptions (call on app dispose)
+  void dispose() {
+    // Close all stream controllers
+    for (final controller in _avatarStreamControllers.values) {
+      controller.close();
+    }
+    for (final controller in _avatarPostsStreamControllers.values) {
+      controller.close();
+    }
+
+    // Unsubscribe from all Supabase channels
+    for (final channel in _avatarSubscriptions.values) {
+      channel.unsubscribe();
+    }
+    for (final channel in _avatarPostsSubscriptions.values) {
+      channel.unsubscribe();
+    }
+    for (final channel in _avatarStatsSubscriptions.values) {
+      channel.unsubscribe();
+    }
+
+    // Clear all maps
+    _avatarStreamControllers.clear();
+    _avatarPostsStreamControllers.clear();
+    _avatarSubscriptions.clear();
+    _avatarPostsSubscriptions.clear();
+    _avatarStatsSubscriptions.clear();
+  }
+}

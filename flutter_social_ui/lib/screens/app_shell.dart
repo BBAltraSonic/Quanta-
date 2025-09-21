@@ -8,7 +8,9 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:quanta/screens/search_screen_new.dart';
 import 'package:quanta/screens/notifications_screen_new.dart';
 import 'package:quanta/services/analytics_service.dart';
-import 'package:quanta/services/notification_service.dart' as notification_service;
+import 'package:quanta/services/notification_service.dart'
+    as notification_service;
+import 'package:quanta/services/avatar_navigation_service.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -20,7 +22,10 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   int _unreadCount = 0;
-  final notification_service.NotificationService _notificationService = notification_service.NotificationService();
+  final notification_service.NotificationService _notificationService =
+      notification_service.NotificationService();
+  final AvatarNavigationService _avatarNavigationService =
+      AvatarNavigationService();
   Stream<List<notification_service.NotificationModel>>? _notificationStream;
 
   // Navigation tabs with enhanced PostDetailScreen as home:
@@ -38,18 +43,18 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _initializeNotifications();
   }
-  
+
   void _initializeNotifications() async {
     try {
       // Initialize notification service
       await _notificationService.initialize();
-      
+
       // Get initial unread count
       final count = await _notificationService.getUnreadCount();
       setState(() {
         _unreadCount = count;
       });
-      
+
       // Set up real-time subscription for badge updates
       _notificationStream = _notificationService.getNotificationStream();
       if (_notificationStream != null) {
@@ -73,17 +78,42 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onItemTapped(int index) {
+    // Handle avatar-centric navigation for profile tab
+    if (index == 4) {
+      // Profile tab - use avatar navigation service
+      _avatarNavigationService.navigateToProfile(context);
+
+      // Track profile navigation
+      AnalyticsService().trackEvent(AnalyticsEvents.tabSwitch, {
+        'from_tab': _getScreenName(_selectedIndex),
+        'to_tab': 'Profile',
+        'tab_index': index,
+        'navigation_type': 'avatar_centric',
+      });
+      return;
+    }
+
     setState(() {
       _selectedIndex = index;
     });
-    
+
     // Track tab navigation
-    final screenNames = ['Home', 'Search', 'Create', 'Notifications', 'Profile'];
     AnalyticsService().trackEvent(AnalyticsEvents.tabSwitch, {
-      'from_tab': screenNames[_selectedIndex],
-      'to_tab': screenNames[index],
+      'from_tab': _getScreenName(_selectedIndex),
+      'to_tab': _getScreenName(index),
       'tab_index': index,
     });
+  }
+
+  String _getScreenName(int index) {
+    const screenNames = [
+      'Home',
+      'Search',
+      'Create',
+      'Notifications',
+      'Profile',
+    ];
+    return index < screenNames.length ? screenNames[index] : 'Unknown';
   }
 
   @override
@@ -139,10 +169,7 @@ class _AppShellState extends State<AppShell> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white, width: 1),
               ),
-              constraints: BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
+              constraints: BoxConstraints(minWidth: 16, minHeight: 16),
               child: Text(
                 _unreadCount > 99 ? '99+' : _unreadCount.toString(),
                 style: TextStyle(

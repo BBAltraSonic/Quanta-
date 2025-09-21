@@ -26,7 +26,8 @@ class StateServiceAdapter {
   Map<String, AvatarModel> get avatars => _appState.avatars;
   AvatarModel? get activeAvatar => _appState.activeAvatar;
   AvatarModel? getAvatar(String avatarId) => _appState.getAvatar(avatarId);
-  List<AvatarModel> getUserAvatars(String userId) => _appState.getUserAvatars(userId);
+  List<AvatarModel> getUserAvatars(String userId) =>
+      _appState.getUserAvatars(userId);
 
   /// Get posts from central state
   Map<String, PostModel> get posts => _appState.posts;
@@ -37,12 +38,14 @@ class StateServiceAdapter {
   /// Get comments from central state
   Map<String, Comment> get comments => _appState.comments;
   Comment? getComment(String commentId) => _appState.getComment(commentId);
-  List<Comment> getPostComments(String postId) => _appState.getPostComments(postId);
+  List<Comment> getPostComments(String postId) =>
+      _appState.getPostComments(postId);
 
   /// Get interaction states from central state
   bool isPostLiked(String postId) => _appState.isPostLiked(postId);
   bool isCommentLiked(String commentId) => _appState.isCommentLiked(commentId);
-  bool isFollowingAvatar(String avatarId) => _appState.isFollowingAvatar(avatarId);
+  bool isFollowingAvatar(String avatarId) =>
+      _appState.isFollowingAvatar(avatarId);
   bool isPostBookmarked(String postId) => _appState.isPostBookmarked(postId);
 
   /// Get UI state from central state
@@ -92,7 +95,8 @@ class StateServiceAdapter {
   }
 
   /// Update post engagement
-  void updatePostEngagement(String postId, {
+  void updatePostEngagement(
+    String postId, {
     int? likesCount,
     int? commentsCount,
     int? sharesCount,
@@ -123,8 +127,16 @@ class StateServiceAdapter {
   }
 
   /// Set comment like status
-  void setCommentLikeStatus(String commentId, bool isLiked, {int? newLikesCount}) {
-    _appState.setCommentLikeStatus(commentId, isLiked, newLikesCount: newLikesCount);
+  void setCommentLikeStatus(
+    String commentId,
+    bool isLiked, {
+    int? newLikesCount,
+  }) {
+    _appState.setCommentLikeStatus(
+      commentId,
+      isLiked,
+      newLikesCount: newLikesCount,
+    );
   }
 
   /// Set follow status
@@ -194,77 +206,78 @@ class StateServiceAdapter {
     final currentLiked = isCommentLiked(commentId);
     final comment = getComment(commentId);
     if (comment != null) {
-      final newCount = currentLiked ? comment.likesCount - 1 : comment.likesCount + 1;
+      final newCount = currentLiked
+          ? comment.likesCount - 1
+          : comment.likesCount + 1;
       setCommentLikeStatus(commentId, !currentLiked, newLikesCount: newCount);
     }
   }
 
   // ========== MISSING METHODS FOR FEEDS SERVICE ==========
-  
+
   /// Get cached posts for a specific feed
   List<PostModel>? getCachedPostsForFeed(String feedType) {
     // For now, return feed posts - can be expanded to support different feed types
     return _appState.feedPosts.isNotEmpty ? _appState.feedPosts : null;
   }
-  
+
   /// Cache posts from service
   void cachePosts(List<PostModel> posts) {
     for (final post in posts) {
       setPost(post);
     }
   }
-  
+
   /// Set feed posts for specific page
   void setFeedPostsForPage(List<PostModel> posts, int page) {
     // For now, just set posts - can be expanded to support page-specific caching
     setPosts(posts);
   }
-  
+
   /// Set feed loading state
   void setFeedLoadingState(String feedType, bool isLoading) {
     setLoadingState(feedType, isLoading);
   }
-  
+
   /// Set feed error
   void setFeedError(String feedType, String? error) {
     setError(error);
   }
-  
+
   /// Set post liked status (alias for setPostLikeStatus)
   void setPostLikedStatus(String postId, bool isLiked) {
     setPostLikeStatus(postId, isLiked);
   }
-  
+
   /// Check if avatar is followed (alias for isFollowingAvatar)
   bool isAvatarFollowed(String avatarId) {
     return isFollowingAvatar(avatarId);
   }
-  
+
   /// Set avatar followed status (alias for setFollowStatus)
   void setAvatarFollowedStatus(String avatarId, bool isFollowing) {
     setFollowStatus(avatarId, isFollowing);
   }
-  
+
   /// Set post bookmarked status (alias for setBookmarkStatus)
   void setPostBookmarkedStatus(String postId, bool isBookmarked) {
     setBookmarkStatus(postId, isBookmarked);
   }
-  
+
   /// Get cached post by ID
   PostModel? getCachedPost(String postId) {
     return getPost(postId);
   }
-  
+
   /// Get cached avatar by ID
   AvatarModel? getCachedAvatar(String avatarId) {
     return getAvatar(avatarId);
   }
-  
+
   /// Get cached comment by ID
   Comment? getCachedComment(String commentId) {
     return getComment(commentId);
   }
-  
 
   // Placeholder for notifyListeners - this would typically be handled by
   // the underlying ChangeNotifier, but for now just adding as no-op
@@ -299,56 +312,74 @@ class StateServiceAdapter {
   AppState get appState => _appState;
 
   // ========== OWNERSHIP DETECTION METHODS ==========
-  
+
   final OwnershipManager _ownershipManager = OwnershipManager();
 
   /// Check if the current user owns a profile
   bool isOwnProfile(String? userId) => _ownershipManager.isOwnProfile(userId);
-  
+
   /// Check if the current user owns a post
   bool isOwnPost(PostModel? post) => _ownershipManager.isOwnPost(post);
-  
+
   /// Check if the current user owns a post by ID
-  bool isOwnPostById(String? postId) => _ownershipManager.isOwnPostById(postId, postId != null ? getPost(postId) : null);
-  
+  bool isOwnPostById(String? postId) => _ownershipManager.isOwnPostById(
+    postId,
+    postId != null ? getPost(postId) : null,
+  );
+
   /// Check if the current user owns an avatar
-  bool isOwnAvatar(String? avatarId) => _ownershipManager.isOwnAvatar(avatarId, avatar: avatarId != null ? getAvatar(avatarId) : null);
-  
+  bool isOwnAvatar(String? avatarId) => _ownershipManager.isOwnAvatar(
+    avatarId,
+    avatar: avatarId != null ? getAvatar(avatarId) : null,
+  );
+
   /// Check if the current user owns a comment
-  bool isOwnComment(Comment? comment) => _ownershipManager.isOwnComment(comment);
-  
+  bool isOwnComment(Comment? comment) =>
+      _ownershipManager.isOwnComment(comment);
+
   /// Check if the current user owns a comment by ID
-  bool isOwnCommentById(String? commentId) => _ownershipManager.isOwnCommentById(commentId, commentId != null ? getComment(commentId) : null);
-  
+  bool isOwnCommentById(String? commentId) =>
+      _ownershipManager.isOwnCommentById(
+        commentId,
+        commentId != null ? getComment(commentId) : null,
+      );
+
   /// Generic ownership check for any element
   bool isOwnElement(dynamic element) => _ownershipManager.isOwnElement(element);
-  
+
   /// Check if element belongs to another user
-  bool isOtherElement(dynamic element) => _ownershipManager.isOtherElement(element);
-  
+  bool isOtherElement(dynamic element) =>
+      _ownershipManager.isOtherElement(element);
+
   /// Check if user can edit an element
   bool canEdit(dynamic element) => _ownershipManager.canEdit(element);
-  
+
   /// Check if user can delete an element
   bool canDelete(dynamic element) => _ownershipManager.canDelete(element);
-  
+
   /// Check if user can view private details
-  bool canViewPrivateDetails(dynamic element) => _ownershipManager.canViewPrivateDetails(element);
-  
+  bool canViewPrivateDetails(dynamic element) =>
+      _ownershipManager.canViewPrivateDetails(element);
+
   /// Check if user can modify settings
-  bool canModifySettings(dynamic element) => _ownershipManager.canModifySettings(element);
-  
+  bool canModifySettings(dynamic element) =>
+      _ownershipManager.canModifySettings(element);
+
   /// Check if user can follow the element owner
-  bool canFollowElement(dynamic element) => _ownershipManager.canFollowElement(element);
-  
+  bool canFollowElement(dynamic element) =>
+      _ownershipManager.canFollowElement(element);
+
   /// Check if user can report the element
-  bool canReportElement(dynamic element) => _ownershipManager.canReportElement(element);
-  
+  bool canReportElement(dynamic element) =>
+      _ownershipManager.canReportElement(element);
+
   /// Get detailed ownership state
-  OwnershipState getOwnershipState(dynamic element) => _ownershipManager.getOwnershipState(element);
-  
+  OwnershipState getOwnershipState(dynamic element) =>
+      _ownershipManager.getOwnershipState(element);
+
   /// Debug ownership information
-  void debugOwnership(dynamic element, {String? context}) => _ownershipManager.debugOwnership(element, context: context);
+  void debugOwnership(dynamic element, {String? context}) =>
+      _ownershipManager.debugOwnership(element, context: context);
 
   // ========== CACHE WARMING METHODS ==========
 
@@ -397,8 +428,7 @@ class StateServiceAdapter {
       }
     }
 
-    // Notify after all updates
-    _appState.notifyListeners();
+    // State changes will be notified automatically by AppState
   }
 
   /// Batch update for better performance
@@ -409,8 +439,7 @@ class StateServiceAdapter {
     try {
       updates();
     } finally {
-      // Ensure state is notified after batch operations
-      _appState.notifyListeners();
+      // State changes will be notified automatically by AppState
     }
   }
 }

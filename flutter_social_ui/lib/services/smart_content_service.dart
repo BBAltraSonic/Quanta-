@@ -1,10 +1,6 @@
-import 'dart:convert';
 import 'dart:math';
-import 'package:http/http.dart' as http;
 import '../models/avatar_model.dart';
-import '../models/post_model.dart';
-import '../utils/environment.dart';
-import 'ai_service.dart';
+
 
 class ContentSuggestion {
   final String text;
@@ -88,8 +84,6 @@ class SmartContentService {
   static final SmartContentService _instance = SmartContentService._internal();
   factory SmartContentService() => _instance;
   SmartContentService._internal();
-
-  final AIService _aiService = AIService();
 
   // Trending hashtags database (in production, this would come from analytics)
   static const Map<String, List<String>> _trendingHashtags = {
