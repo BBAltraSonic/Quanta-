@@ -4,18 +4,15 @@ import '../constants.dart';
 import '../models/analytics_insight_model.dart';
 import '../services/analytics_insights_service.dart';
 import '../services/auth_service.dart';
-import '../widgets/skeleton_widgets.dart';
 
 class AnalyticsSettingsScreen extends StatefulWidget {
   final String userId;
 
-  const AnalyticsSettingsScreen({
-    super.key,
-    required this.userId,
-  });
+  const AnalyticsSettingsScreen({super.key, required this.userId});
 
   @override
-  State<AnalyticsSettingsScreen> createState() => _AnalyticsSettingsScreenState();
+  State<AnalyticsSettingsScreen> createState() =>
+      _AnalyticsSettingsScreenState();
 }
 
 class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
@@ -25,10 +22,10 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
 
   late TabController _tabController;
   AnalyticsPeriod _selectedPeriod = AnalyticsPeriod.month;
-  
+
   bool _isLoading = true;
   bool _isOwner = false;
-  
+
   // Analytics data
   List<AnalyticsMetric> _metrics = [];
   List<AnalyticsInsight> _insights = [];
@@ -80,7 +77,9 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
       setState(() {
         _metrics = analyticsData['metrics'] as List<AnalyticsMetric>;
         _insights = analyticsData['insights'] as List<AnalyticsInsight>;
-        _chartData = analyticsData['chart_data'] as Map<String, List<AnalyticsDataPoint>>;
+        _chartData =
+            analyticsData['chart_data']
+                as Map<String, List<AnalyticsDataPoint>>;
         _comparisons = analyticsData['comparisons'] as Map<String, dynamic>?;
         _isLoading = false;
       });
@@ -104,10 +103,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
   }
@@ -115,7 +111,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
   void _handleInsightAction(AnalyticsInsight insight) {
     // Handle insight actions (same as profile screen implementation)
     final actionType = insight.actionData?['type'] as String?;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -153,10 +149,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
               ...insight.data.entries.map(
                 (e) => Text(
                   '${e.key}: ${e.value}',
-                  style: const TextStyle(
-                    color: kLightTextColor,
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(color: kLightTextColor, fontSize: 13),
                 ),
               ),
             ],
@@ -225,11 +218,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.lock,
-                size: 64,
-                color: kLightTextColor,
-              ),
+              Icon(Icons.lock, size: 64, color: kLightTextColor),
               SizedBox(height: 16),
               Text(
                 'Access Denied',
@@ -268,33 +257,35 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
           PopupMenuButton<AnalyticsPeriod>(
             icon: const Icon(Icons.date_range, color: kTextColor),
             onSelected: _onPeriodChanged,
-            itemBuilder: (context) => AnalyticsPeriod.values.map(
-              (period) => PopupMenuItem(
-                value: period,
-                child: Row(
-                  children: [
-                    Icon(
-                      _selectedPeriod == period 
-                          ? Icons.check_circle 
-                          : Icons.circle_outlined,
-                      color: _selectedPeriod == period 
-                          ? kPrimaryColor 
-                          : kLightTextColor,
-                      size: 20,
+            itemBuilder: (context) => AnalyticsPeriod.values
+                .map(
+                  (period) => PopupMenuItem(
+                    value: period,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _selectedPeriod == period
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
+                          color: _selectedPeriod == period
+                              ? kPrimaryColor
+                              : kLightTextColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          period.label,
+                          style: TextStyle(
+                            color: _selectedPeriod == period
+                                ? kPrimaryColor
+                                : kTextColor,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      period.label,
-                      style: TextStyle(
-                        color: _selectedPeriod == period 
-                            ? kPrimaryColor 
-                            : kTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ).toList(),
+                  ),
+                )
+                .toList(),
           ),
         ],
         bottom: TabBar(
@@ -375,15 +366,15 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
         // Period selector
         _buildPeriodSelector(),
         const SizedBox(height: 16),
-        
+
         // Key metrics grid
         _buildMetricsGrid(),
         const SizedBox(height: 24),
-        
+
         // Performance chart
         _buildPerformanceChart(),
         const SizedBox(height: 24),
-        
+
         // Quick insights
         _buildQuickInsights(),
       ],
@@ -452,7 +443,9 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isSelected ? Colors.white : kLightTextColor,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
@@ -601,15 +594,20 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
                 ),
                 titlesData: FlTitlesData(
                   show: true,
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 30,
                       interval: engagementData.length / 5,
                       getTitlesWidget: (double value, TitleMeta meta) {
-                        if (value.toInt() >= engagementData.length) return Container();
+                        if (value.toInt() >= engagementData.length)
+                          return Container();
                         final date = engagementData[value.toInt()].timestamp;
                         return SideTitleWidget(
                           axisSide: meta.axisSide,
@@ -645,7 +643,11 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
                 minX: 0,
                 maxX: engagementData.length - 1.0,
                 minY: 0,
-                maxY: engagementData.map((e) => e.value).reduce((a, b) => a > b ? a : b) + 1,
+                maxY:
+                    engagementData
+                        .map((e) => e.value)
+                        .reduce((a, b) => a > b ? a : b) +
+                    1,
                 lineBarsData: [
                   LineChartBarData(
                     spots: engagementData
@@ -655,10 +657,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
                         .toList(),
                     isCurved: true,
                     gradient: LinearGradient(
-                      colors: [
-                        kPrimaryColor,
-                        kPrimaryColor.withOpacity(0.3),
-                      ],
+                      colors: [kPrimaryColor, kPrimaryColor.withOpacity(0.3)],
                     ),
                     barWidth: 3,
                     isStrokeCapRound: true,
@@ -703,66 +702,64 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
           ),
         ),
         const SizedBox(height: 12),
-        ...topInsights.map((insight) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: kCardColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: insight.priority.color.withOpacity(0.3),
+        ...topInsights.map(
+          (insight) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kCardColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: insight.priority.color.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: insight.type.color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    insight.type.icon,
+                    color: insight.type.color,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        insight.title.replaceAll(RegExp(r'[^\w\s]'), ''),
+                        style: const TextStyle(
+                          color: kTextColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        insight.description,
+                        style: const TextStyle(
+                          color: kLightTextColor,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (insight.isActionable)
+                  Icon(Icons.chevron_right, color: kLightTextColor, size: 20),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: insight.type.color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  insight.type.icon,
-                  color: insight.type.color,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      insight.title.replaceAll(RegExp(r'[^\w\s]'), ''),
-                      style: const TextStyle(
-                        color: kTextColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      insight.description,
-                      style: const TextStyle(
-                        color: kLightTextColor,
-                        fontSize: 12,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              if (insight.isActionable)
-                Icon(
-                  Icons.chevron_right,
-                  color: kLightTextColor,
-                  size: 20,
-                ),
-            ],
-          ),
-        )),
+        ),
       ],
     );
   }
@@ -786,44 +783,48 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
             ),
           ),
           const SizedBox(height: 16),
-          ..._metrics.map((metric) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        metric.label,
-                        style: const TextStyle(
-                          color: kTextColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (metric.changeText != null)
+          ..._metrics.map(
+            (metric) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          metric.changeText!,
-                          style: TextStyle(
-                            color: metric.isPositiveChange ? Colors.green : Colors.red,
-                            fontSize: 12,
+                          metric.label,
+                          style: const TextStyle(
+                            color: kTextColor,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                    ],
+                        if (metric.changeText != null)
+                          Text(
+                            metric.changeText!,
+                            style: TextStyle(
+                              color: metric.isPositiveChange
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  _formatMetricValue(metric),
-                  style: const TextStyle(
-                    color: kTextColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  Text(
+                    _formatMetricValue(metric),
+                    style: const TextStyle(
+                      color: kTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );
@@ -863,7 +864,8 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
   Widget _buildBenchmarkComparison() {
     if (_comparisons == null) return const SizedBox.shrink();
 
-    final industryAverages = _comparisons!['industry_averages'] as Map<String, dynamic>?;
+    final industryAverages =
+        _comparisons!['industry_averages'] as Map<String, dynamic>?;
     final userPercentile = _comparisons!['user_percentile'] as int?;
     final category = _comparisons!['category'] as String?;
 
@@ -901,26 +903,33 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
             ),
           const SizedBox(height: 16),
           if (industryAverages != null)
-            ...industryAverages.entries.map((entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    entry.key.replaceAll('_', ' ').split(' ').map((word) => 
-                        word[0].toUpperCase() + word.substring(1)).join(' '),
-                    style: const TextStyle(color: kLightTextColor),
-                  ),
-                  Text(
-                    '${entry.value}${entry.key.contains('rate') ? '%' : ''}',
-                    style: const TextStyle(
-                      color: kTextColor,
-                      fontWeight: FontWeight.w600,
+            ...industryAverages.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      entry.key
+                          .replaceAll('_', ' ')
+                          .split(' ')
+                          .map(
+                            (word) => word[0].toUpperCase() + word.substring(1),
+                          )
+                          .join(' '),
+                      style: const TextStyle(color: kLightTextColor),
                     ),
-                  ),
-                ],
+                    Text(
+                      '${entry.value}${entry.key.contains('rate') ? '%' : ''}',
+                      style: const TextStyle(
+                        color: kTextColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
         ],
       ),
     );
@@ -1025,14 +1034,14 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
       decoration: BoxDecoration(
         color: kCardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: insight.priority.color.withOpacity(0.3),
-        ),
+        border: Border.all(color: insight.priority.color.withOpacity(0.3)),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: insight.isActionable ? () => _handleInsightAction(insight) : null,
+          onTap: insight.isActionable
+              ? () => _handleInsightAction(insight)
+              : null,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -1079,19 +1088,13 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
                       ),
                     ),
                     if (insight.isActionable)
-                      const Icon(
-                        Icons.chevron_right,
-                        color: kLightTextColor,
-                      ),
+                      const Icon(Icons.chevron_right, color: kLightTextColor),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   insight.description,
-                  style: const TextStyle(
-                    color: kLightTextColor,
-                    height: 1.5,
-                  ),
+                  style: const TextStyle(color: kLightTextColor, height: 1.5),
                 ),
                 if (insight.isActionable && insight.actionLabel != null) ...[
                   const SizedBox(height: 16),
@@ -1125,11 +1128,7 @@ class _AnalyticsSettingsScreenState extends State<AnalyticsSettingsScreen>
       ),
       child: const Column(
         children: [
-          Icon(
-            Icons.lightbulb_outline,
-            size: 64,
-            color: kLightTextColor,
-          ),
+          Icon(Icons.lightbulb_outline, size: 64, color: kLightTextColor),
           SizedBox(height: 16),
           Text(
             'No Insights Available',

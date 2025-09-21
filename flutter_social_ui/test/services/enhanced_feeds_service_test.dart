@@ -4,7 +4,6 @@ import 'package:mockito/annotations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanta/services/enhanced_feeds_service.dart';
 import 'package:quanta/services/auth_service.dart';
-import 'package:quanta/models/post_model.dart';
 import 'package:quanta/config/db_config.dart';
 
 // Generate mocks
@@ -21,7 +20,7 @@ void main() {
       mockSupabaseClient = MockSupabaseClient();
       mockAuthService = MockAuthService();
       feedsService = EnhancedFeedsService();
-      
+
       // Mock authenticated user
       when(mockAuthService.currentUserId).thenReturn('test-user-id');
       when(mockAuthService.isAuthenticated).thenReturn(true);
@@ -31,53 +30,58 @@ void main() {
       test('should toggle like optimistically and revert on failure', () async {
         // Arrange
         const postId = 'test-post-id';
-        
+
         // Mock initial state - post is not liked
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .select()
-            .eq('post_id', postId)
-            .eq('user_id', 'test-user-id')
-            .maybeSingle())
-            .thenAnswer((_) async => null);
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.likesTable)
+              .select()
+              .eq('post_id', postId)
+              .eq('user_id', 'test-user-id')
+              .maybeSingle(),
+        ).thenAnswer((_) async => null);
+
         // Mock successful like creation
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .insert(any))
-            .thenAnswer((_) async => []);
-        
+        when(
+          mockSupabaseClient.from(DbConfig.likesTable).insert(any),
+        ).thenAnswer((_) async => []);
+
         // Mock RPC call for incrementing likes count
-        when(mockSupabaseClient.rpc('increment_likes_count', params: any))
-            .thenAnswer((_) async => null);
+        when(
+          mockSupabaseClient.rpc('increment_likes_count', params: any),
+        ).thenAnswer((_) async => null);
 
         // Act
         final result = await feedsService.toggleLike(postId);
 
         // Assert
         expect(result, isTrue);
-        verify(mockSupabaseClient.from(DbConfig.likesTable).insert(any)).called(1);
-        verify(mockSupabaseClient.rpc('increment_likes_count', params: any)).called(1);
+        verify(
+          mockSupabaseClient.from(DbConfig.likesTable).insert(any),
+        ).called(1);
+        verify(
+          mockSupabaseClient.rpc('increment_likes_count', params: any),
+        ).called(1);
       });
 
       test('should handle like toggle failure gracefully', () async {
         // Arrange
         const postId = 'test-post-id';
-        
+
         // Mock initial state - post is not liked
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .select()
-            .eq('post_id', postId)
-            .eq('user_id', 'test-user-id')
-            .maybeSingle())
-            .thenAnswer((_) async => null);
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.likesTable)
+              .select()
+              .eq('post_id', postId)
+              .eq('user_id', 'test-user-id')
+              .maybeSingle(),
+        ).thenAnswer((_) async => null);
+
         // Mock failure on like creation
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .insert(any))
-            .thenThrow(Exception('Network error'));
+        when(
+          mockSupabaseClient.from(DbConfig.likesTable).insert(any),
+        ).thenThrow(Exception('Network error'));
 
         // Act & Assert
         expect(() => feedsService.toggleLike(postId), throwsException);
@@ -86,27 +90,30 @@ void main() {
       test('should unlike when post is already liked', () async {
         // Arrange
         const postId = 'test-post-id';
-        
+
         // Mock initial state - post is liked
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .select()
-            .eq('post_id', postId)
-            .eq('user_id', 'test-user-id')
-            .maybeSingle())
-            .thenAnswer((_) async => {'id': 'like-id'});
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.likesTable)
+              .select()
+              .eq('post_id', postId)
+              .eq('user_id', 'test-user-id')
+              .maybeSingle(),
+        ).thenAnswer((_) async => {'id': 'like-id'});
+
         // Mock successful like deletion
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .delete()
-            .eq('post_id', postId)
-            .eq('user_id', 'test-user-id'))
-            .thenAnswer((_) async => []);
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.likesTable)
+              .delete()
+              .eq('post_id', postId)
+              .eq('user_id', 'test-user-id'),
+        ).thenAnswer((_) async => []);
+
         // Mock RPC call for decrementing likes count
-        when(mockSupabaseClient.rpc('decrement_likes_count', params: any))
-            .thenAnswer((_) async => null);
+        when(
+          mockSupabaseClient.rpc('decrement_likes_count', params: any),
+        ).thenAnswer((_) async => null);
 
         // Act
         final result = await feedsService.toggleLike(postId);
@@ -114,7 +121,9 @@ void main() {
         // Assert
         expect(result, isFalse);
         verify(mockSupabaseClient.from(DbConfig.likesTable).delete()).called(1);
-        verify(mockSupabaseClient.rpc('decrement_likes_count', params: any)).called(1);
+        verify(
+          mockSupabaseClient.rpc('decrement_likes_count', params: any),
+        ).called(1);
       });
     });
 
@@ -131,18 +140,20 @@ void main() {
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         };
-        
+
         // Mock successful comment creation
-        when(mockSupabaseClient
-            .from(DbConfig.commentsTable)
-            .insert(any)
-            .select()
-            .single())
-            .thenAnswer((_) async => mockCommentResponse);
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.commentsTable)
+              .insert(any)
+              .select()
+              .single(),
+        ).thenAnswer((_) async => mockCommentResponse);
+
         // Mock RPC call for incrementing comments count
-        when(mockSupabaseClient.rpc('increment_comments_count', params: any))
-            .thenAnswer((_) async => null);
+        when(
+          mockSupabaseClient.rpc('increment_comments_count', params: any),
+        ).thenAnswer((_) async => null);
 
         // Act
         final result = await feedsService.addComment(postId, commentText);
@@ -151,22 +162,27 @@ void main() {
         expect(result, isNotNull);
         expect(result!.text, equals(commentText));
         expect(result.postId, equals(postId));
-        verify(mockSupabaseClient.from(DbConfig.commentsTable).insert(any)).called(1);
-        verify(mockSupabaseClient.rpc('increment_comments_count', params: any)).called(1);
+        verify(
+          mockSupabaseClient.from(DbConfig.commentsTable).insert(any),
+        ).called(1);
+        verify(
+          mockSupabaseClient.rpc('increment_comments_count', params: any),
+        ).called(1);
       });
 
       test('should handle comment creation failure', () async {
         // Arrange
         const postId = 'test-post-id';
         const commentText = 'Test comment';
-        
+
         // Mock failure on comment creation
-        when(mockSupabaseClient
-            .from(DbConfig.commentsTable)
-            .insert(any)
-            .select()
-            .single())
-            .thenThrow(Exception('Network error'));
+        when(
+          mockSupabaseClient
+              .from(DbConfig.commentsTable)
+              .insert(any)
+              .select()
+              .single(),
+        ).thenThrow(Exception('Network error'));
 
         // Act
         final result = await feedsService.addComment(postId, commentText);
@@ -180,57 +196,63 @@ void main() {
       test('should follow avatar successfully', () async {
         // Arrange
         const avatarId = 'test-avatar-id';
-        
+
         // Mock initial state - not following
-        when(mockSupabaseClient
-            .from(DbConfig.followsTable)
-            .select()
-            .eq('avatar_id', avatarId)
-            .eq('user_id', 'test-user-id')
-            .maybeSingle())
-            .thenAnswer((_) async => null);
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.followsTable)
+              .select()
+              .eq('avatar_id', avatarId)
+              .eq('user_id', 'test-user-id')
+              .maybeSingle(),
+        ).thenAnswer((_) async => null);
+
         // Mock successful follow creation
-        when(mockSupabaseClient
-            .from(DbConfig.followsTable)
-            .insert(any))
-            .thenAnswer((_) async => []);
+        when(
+          mockSupabaseClient.from(DbConfig.followsTable).insert(any),
+        ).thenAnswer((_) async => []);
 
         // Act
         final result = await feedsService.toggleFollow(avatarId);
 
         // Assert
         expect(result, isTrue);
-        verify(mockSupabaseClient.from(DbConfig.followsTable).insert(any)).called(1);
+        verify(
+          mockSupabaseClient.from(DbConfig.followsTable).insert(any),
+        ).called(1);
       });
 
       test('should unfollow when already following', () async {
         // Arrange
         const avatarId = 'test-avatar-id';
-        
+
         // Mock initial state - already following
-        when(mockSupabaseClient
-            .from(DbConfig.followsTable)
-            .select()
-            .eq('avatar_id', avatarId)
-            .eq('user_id', 'test-user-id')
-            .maybeSingle())
-            .thenAnswer((_) async => {'id': 'follow-id'});
-        
+        when(
+          mockSupabaseClient
+              .from(DbConfig.followsTable)
+              .select()
+              .eq('avatar_id', avatarId)
+              .eq('user_id', 'test-user-id')
+              .maybeSingle(),
+        ).thenAnswer((_) async => {'id': 'follow-id'});
+
         // Mock successful unfollow
-        when(mockSupabaseClient
-            .from(DbConfig.followsTable)
-            .delete()
-            .eq('avatar_id', avatarId)
-            .eq('user_id', 'test-user-id'))
-            .thenAnswer((_) async => []);
+        when(
+          mockSupabaseClient
+              .from(DbConfig.followsTable)
+              .delete()
+              .eq('avatar_id', avatarId)
+              .eq('user_id', 'test-user-id'),
+        ).thenAnswer((_) async => []);
 
         // Act
         final result = await feedsService.toggleFollow(avatarId);
 
         // Assert
         expect(result, isFalse);
-        verify(mockSupabaseClient.from(DbConfig.followsTable).delete()).called(1);
+        verify(
+          mockSupabaseClient.from(DbConfig.followsTable).delete(),
+        ).called(1);
       });
     });
 
@@ -242,13 +264,14 @@ void main() {
           {'post_id': 'post1'},
           {'post_id': 'post3'},
         ];
-        
-        when(mockSupabaseClient
-            .from(DbConfig.likesTable)
-            .select('post_id')
-            .eq('user_id', 'test-user-id')
-            .inFilter('post_id', postIds))
-            .thenAnswer((_) async => mockLikedPosts);
+
+        when(
+          mockSupabaseClient
+              .from(DbConfig.likesTable)
+              .select('post_id')
+              .eq('user_id', 'test-user-id')
+              .inFilter('post_id', postIds),
+        ).thenAnswer((_) async => mockLikedPosts);
 
         // Act
         final result = await feedsService.getLikedStatusBatch(postIds);
@@ -267,8 +290,16 @@ void main() {
         when(mockAuthService.isAuthenticated).thenReturn(false);
 
         // Act & Assert
-        expect(() => feedsService.toggleLike('post-id'), 
-               throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('not authenticated'))));
+        expect(
+          () => feedsService.toggleLike('post-id'),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              contains('not authenticated'),
+            ),
+          ),
+        );
       });
     });
   });

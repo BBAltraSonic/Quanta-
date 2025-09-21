@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../models/post_model.dart';
-import '../models/avatar_model.dart';
-import '../models/user_model.dart';
 import '../services/enhanced_feeds_service.dart';
 import '../services/enhanced_video_service.dart';
 import '../store/state_service_adapter.dart';
 import '../widgets/video_feed_item.dart';
 import '../widgets/skeleton_widgets.dart';
 
-/// @deprecated This feed screen is deprecated. 
+/// @deprecated This feed screen is deprecated.
 /// Use PostDetailScreen instead, which now has feature parity and is the default home screen.
 /// This file will be removed in a future version.
 class FeedsScreen extends StatefulWidget {
@@ -23,7 +21,9 @@ class FeedsScreen extends StatefulWidget {
 class _FeedsScreenState extends State<FeedsScreen>
     with AutomaticKeepAliveClientMixin {
   final PageController _pageController = PageController();
-  final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  final RefreshController _refreshController = RefreshController(
+    initialRefresh: false,
+  );
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final EnhancedVideoService _videoService = EnhancedVideoService();
   final StateServiceAdapter _stateAdapter = StateServiceAdapter();
@@ -36,7 +36,8 @@ class _FeedsScreenState extends State<FeedsScreen>
   // Central state getters - single source of truth
   List<PostModel> get _posts => _stateAdapter.feedPosts;
   bool get _isLoading => _stateAdapter.getLoadingState(_feedContext);
-  bool get _isLoadingMore => _stateAdapter.getLoadingState('${_feedContext}_more');
+  bool get _isLoadingMore =>
+      _stateAdapter.getLoadingState('${_feedContext}_more');
   String? get _errorMessage => _stateAdapter.error;
   bool get _hasError => _errorMessage != null;
   int get _currentPage => _stateAdapter.getCurrentPage(_feedContext);
@@ -76,8 +77,12 @@ class _FeedsScreenState extends State<FeedsScreen>
 
         // Update central state
         _stateAdapter.setPosts(posts, context: _feedContext);
-        _stateAdapter.setPaginationState(_feedContext, 0, posts.length >= _pageSize);
-        
+        _stateAdapter.setPaginationState(
+          _feedContext,
+          0,
+          posts.length >= _pageSize,
+        );
+
         // Preload videos for better performance
         _preloadVideosAroundCurrent();
       } else {
@@ -113,7 +118,11 @@ class _FeedsScreenState extends State<FeedsScreen>
         final existingPosts = List<PostModel>.from(_posts);
         existingPosts.addAll(newPosts);
         _stateAdapter.setPosts(existingPosts, context: _feedContext);
-        _stateAdapter.setPaginationState(_feedContext, _currentPage + 1, newPosts.length >= _pageSize);
+        _stateAdapter.setPaginationState(
+          _feedContext,
+          _currentPage + 1,
+          newPosts.length >= _pageSize,
+        );
 
         _preloadVideosAroundCurrent();
       }
@@ -134,7 +143,7 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Load metadata (avatars, users) for posts
   Future<void> _loadPostMetadata(List<PostModel> posts) async {
     final avatarIds = posts.map((post) => post.avatarId).toSet();
-    
+
     for (final avatarId in avatarIds) {
       // Check central state first
       if (_stateAdapter.getAvatar(avatarId) == null) {
@@ -167,7 +176,7 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Preload videos around current index for smooth playback
   void _preloadVideosAroundCurrent() {
     if (_posts.isEmpty) return; // Early return if no posts
-    
+
     final preloadRange = 2; // Preload 2 videos before and after current
     final maxIndex = _posts.length - 1;
     final startIndex = (_currentIndex - preloadRange).clamp(0, maxIndex);
@@ -184,7 +193,7 @@ class _FeedsScreenState extends State<FeedsScreen>
   /// Handle page change
   void _onPageChanged(int index) {
     if (_posts.isEmpty || index >= _posts.length) return;
-    
+
     setState(() {
       _currentIndex = index;
     });
@@ -219,9 +228,13 @@ class _FeedsScreenState extends State<FeedsScreen>
 
         // Update state through state adapter
         _stateAdapter.setPosts(posts, context: _feedContext);
-        _stateAdapter.setPaginationState(_feedContext, 0, posts.length >= _pageSize);
+        _stateAdapter.setPaginationState(
+          _feedContext,
+          0,
+          posts.length >= _pageSize,
+        );
         _stateAdapter.clearError();
-        
+
         setState(() {
           _currentIndex = 0;
         });
@@ -248,17 +261,21 @@ class _FeedsScreenState extends State<FeedsScreen>
     try {
       // Optimistic update
       _stateAdapter.optimisticTogglePostLike(post.id);
-      
+
       // API call
       final isLiked = await _feedsService.toggleLike(post.id);
-      
+
       // Sync with actual result
       final updatedPost = _stateAdapter.getPost(post.id);
       if (updatedPost != null) {
-        final newLikesCount = isLiked 
-            ? post.likesCount + 1 
+        final newLikesCount = isLiked
+            ? post.likesCount + 1
             : post.likesCount - 1;
-        _stateAdapter.setPostLikeStatus(post.id, isLiked, newLikesCount: newLikesCount);
+        _stateAdapter.setPostLikeStatus(
+          post.id,
+          isLiked,
+          newLikesCount: newLikesCount,
+        );
       }
 
       // Haptic feedback
@@ -266,7 +283,7 @@ class _FeedsScreenState extends State<FeedsScreen>
     } catch (e) {
       // Revert optimistic update on error
       _stateAdapter.optimisticTogglePostLike(post.id);
-      
+
       debugPrint('Error toggling like: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -282,10 +299,10 @@ class _FeedsScreenState extends State<FeedsScreen>
     try {
       // Optimistic update
       _stateAdapter.optimisticToggleFollow(avatarId);
-      
+
       // API call
       final isFollowing = await _feedsService.toggleFollow(avatarId);
-      
+
       // Sync with actual result
       _stateAdapter.setFollowStatus(avatarId, isFollowing);
 
@@ -302,7 +319,7 @@ class _FeedsScreenState extends State<FeedsScreen>
     } catch (e) {
       // Revert optimistic update on error
       _stateAdapter.optimisticToggleFollow(avatarId);
-      
+
       debugPrint('Error toggling follow: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -335,11 +352,8 @@ class _FeedsScreenState extends State<FeedsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    
-    return Scaffold(
-      backgroundColor: Color(0xFF002B36),
-      body: _buildBody(),
-    );
+
+    return Scaffold(backgroundColor: Color(0xFF002B36), body: _buildBody());
   }
 
   Widget _buildBody() {
@@ -376,7 +390,8 @@ class _FeedsScreenState extends State<FeedsScreen>
           return VideoFeedItem(
             post: post,
             avatar: avatar,
-            user: null, // User data will be handled by VideoFeedItem itself or removed
+            user:
+                null, // User data will be handled by VideoFeedItem itself or removed
             isActive: index == _currentIndex,
             isLiked: isLiked,
             isFollowing: isFollowing,
@@ -396,18 +411,11 @@ class _FeedsScreenState extends State<FeedsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            color: Colors.white,
-            size: 64,
-          ),
+          const Icon(Icons.error_outline, color: Colors.white, size: 64),
           const SizedBox(height: 16),
           Text(
             _errorMessage ?? 'An error occurred',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 18),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -425,26 +433,16 @@ class _FeedsScreenState extends State<FeedsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.video_library_outlined,
-            color: Colors.white,
-            size: 64,
-          ),
+          Icon(Icons.video_library_outlined, color: Colors.white, size: 64),
           SizedBox(height: 16),
           Text(
             'No videos available',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 18),
           ),
           SizedBox(height: 8),
           Text(
             'Check back later for new content!',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),

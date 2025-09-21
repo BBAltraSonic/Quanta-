@@ -17,13 +17,11 @@ class CommentService {
 
   final AuthService _authService = AuthService();
   final OwnershipGuardService _ownershipGuard = OwnershipGuardService();
-  
+
   // Comment counts cache for demo mode
   final Map<String, int> _commentCounts = {};
   final AIService _aiService = AIService();
   final AvatarService _avatarService = AvatarService();
-  
-
 
   /// Add a comment to a post
   Future<Comment> addComment({
@@ -88,19 +86,25 @@ class CommentService {
       final avatars = await _avatarService.getUserAvatar(); // Get user's avatar
       final avatarList = avatars != null ? [avatars] : <AvatarModel>[];
       final aiComments = <Comment>[];
-      
+
       // Select random avatars to comment
       avatarList.shuffle();
       final commentingAvatars = avatarList.take(maxReplies);
-      
+
       for (final avatar in commentingAvatars) {
         // Skip if avatar already commented
-        final hasCommented = existingComments.any((c) => c.authorId == avatar.id);
+        final hasCommented = existingComments.any(
+          (c) => c.authorId == avatar.id,
+        );
         if (hasCommented) continue;
-        
+
         try {
-          final aiCommentText = await _generateAIComment(post, avatar, existingComments);
-          
+          final aiCommentText = await _generateAIComment(
+            post,
+            avatar,
+            existingComments,
+          );
+
           final aiComment = Comment.create(
             postId: postId,
             text: aiCommentText,
@@ -109,16 +113,13 @@ class CommentService {
             avatarId: avatar.id,
             isAiGenerated: true,
           );
-          
-          aiComments.add(aiComment);
-          
 
-          
+          aiComments.add(aiComment);
         } catch (e) {
           debugPrint('Error generating AI comment for ${avatar.name}: $e');
         }
       }
-      
+
       return aiComments;
     } catch (e) {
       debugPrint('Error generating AI comment replies: $e');
@@ -131,7 +132,7 @@ class CommentService {
     try {
       // Guard comment edit to ensure only the comment owner can edit
       await _ownershipGuard.guardCommentEdit(commentId);
-      
+
       return _editCommentSupabase(commentId, newText);
     } catch (e) {
       debugPrint('Error editing comment: $e');
@@ -144,7 +145,7 @@ class CommentService {
     try {
       // Guard comment deletion to ensure only the comment owner can delete
       await _ownershipGuard.guardCommentDelete(commentId);
-      
+
       return _deleteCommentSupabase(commentId);
     } catch (e) {
       debugPrint('Error deleting comment: $e');
@@ -176,19 +177,24 @@ class CommentService {
     }
   }
 
-
-
-  Future<String> _generateAIComment(PostModel post, AvatarModel avatar, List<Comment> existingComments) async {
+  Future<String> _generateAIComment(
+    PostModel post,
+    AvatarModel avatar,
+    List<Comment> existingComments,
+  ) async {
     try {
       // Get conversation context from existing comments
-      final commentContext = existingComments.take(3).map((c) => c.text).toList();
-      
+      final commentContext = existingComments
+          .take(3)
+          .map((c) => c.text)
+          .toList();
+
       final response = await _aiService.generateComment(
         avatar: avatar,
         postContent: post.caption,
         postType: post.type == PostType.video ? 'video' : 'image',
       );
-      
+
       return response;
     } catch (e) {
       // Fallback to contextual comment generation
@@ -196,26 +202,34 @@ class CommentService {
     }
   }
 
-  String _generateContextualComment(PostModel post, AvatarModel avatar, List<Comment> existingComments) {
+  String _generateContextualComment(
+    PostModel post,
+    AvatarModel avatar,
+    List<Comment> existingComments,
+  ) {
     final caption = post.caption.toLowerCase();
     final avatarName = avatar.name;
     final niche = avatar.niche.displayName.toLowerCase();
-    
+
     // Niche-specific responses
     if (niche.contains('technology') || niche.contains('tech')) {
-      if (caption.contains(RegExp(r'\b(ai|technology|innovation|code|dev)\b'))) {
+      if (caption.contains(
+        RegExp(r'\b(ai|technology|innovation|code|dev)\b'),
+      )) {
         final techComments = [
           'This is exactly the kind of innovation we need! 💻',
           'The tech behind this is fascinating! How did you approach it?',
           'Love seeing technology being used creatively like this! 🚀',
-          'This could revolutionize how we think about ${niche}!',
+          'This could revolutionize how we think about $niche!',
           'The implementation details here are impressive! 👨‍💻',
         ];
         techComments.shuffle();
         return techComments.first;
       }
     } else if (niche.contains('art') || niche.contains('creative')) {
-      if (caption.contains(RegExp(r'\b(art|creative|design|beautiful|aesthetic)\b'))) {
+      if (caption.contains(
+        RegExp(r'\b(art|creative|design|beautiful|aesthetic)\b'),
+      )) {
         final artComments = [
           'The creativity here is absolutely stunning! 🎨',
           'I love how you\'ve approached the composition! 💫',
@@ -227,7 +241,9 @@ class CommentService {
         return artComments.first;
       }
     } else if (niche.contains('fitness') || niche.contains('health')) {
-      if (caption.contains(RegExp(r'\b(workout|fitness|health|strong|training)\b'))) {
+      if (caption.contains(
+        RegExp(r'\b(workout|fitness|health|strong|training)\b'),
+      )) {
         final fitnessComments = [
           'This is so motivating! Keep crushing those goals! 💪',
           'Your dedication to fitness is inspiring! 🏋️‍♀️',
@@ -239,7 +255,7 @@ class CommentService {
         return fitnessComments.first;
       }
     }
-    
+
     // General engagement comments based on post type
     if (post.type == PostType.video) {
       final videoComments = [
@@ -266,18 +282,20 @@ class CommentService {
     }
   }
 
-
-
   // Supabase implementations
-  Future<Comment> _addCommentSupabase(String postId, String text, String? parentCommentId) async {
+  Future<Comment> _addCommentSupabase(
+    String postId,
+    String text,
+    String? parentCommentId,
+  ) async {
     // Verify authentication state
     final user = _authService.currentUser;
     final session = _authService.supabase.auth.currentSession;
-    
+
     if (user == null || session == null) {
       throw Exception('User not authenticated');
     }
-    
+
     // Double-check the user ID matches the session
     if (user.id != session.user.id) {
       throw Exception('Authentication state mismatch');
@@ -297,10 +315,14 @@ class CommentService {
     return Comment.fromJson(response);
   }
 
-  Future<List<Comment>> _getPostCommentsSupabase(String postId, int limit, int offset) async {
+  Future<List<Comment>> _getPostCommentsSupabase(
+    String postId,
+    int limit,
+    int offset,
+  ) async {
     try {
       debugPrint('🔍 Loading comments for post: $postId');
-      
+
       // Get top-level comments first - simplified query to isolate the issue
       final response = await _authService.supabase
           .from(DbConfig.commentsTable)
@@ -322,13 +344,13 @@ class CommentService {
       for (final json in response) {
         try {
           debugPrint('🔧 Processing comment JSON: $json');
-          
+
           // Validate required fields
           if (json['id'] == null) {
             debugPrint('⚠️ Skipping comment with null ID');
             continue;
           }
-          
+
           if (json['text'] == null) {
             debugPrint('⚠️ Skipping comment with null text');
             continue;
@@ -339,9 +361,10 @@ class CommentService {
             'replies_count': 0, // Start simple, no replies count for now
           });
 
-          comments.add(comment.copyWith(hasLiked: false)); // Start simple, no likes check
+          comments.add(
+            comment.copyWith(hasLiked: false),
+          ); // Start simple, no likes check
           debugPrint('✅ Successfully created comment: ${comment.id}');
-          
         } catch (e, stackTrace) {
           debugPrint('❌ Error parsing comment JSON: $e');
           debugPrint('📍 Stack trace: $stackTrace');
@@ -353,7 +376,6 @@ class CommentService {
 
       debugPrint('✅ Successfully loaded ${comments.length} comments');
       return comments;
-      
     } catch (e, stackTrace) {
       debugPrint('❌ Error in _getPostCommentsSupabase: $e');
       debugPrint('📍 Stack trace: $stackTrace');
@@ -374,7 +396,7 @@ class CommentService {
   Future<bool> _toggleCommentLikeSupabase(String commentId) async {
     final user = _authService.currentUser;
     final session = _authService.supabase.auth.currentSession;
-    
+
     if (user == null || session == null) {
       throw Exception('User not authenticated');
     }
@@ -398,12 +420,10 @@ class CommentService {
         return false; // Unliked
       } else {
         // Like the comment
-        await _authService.supabase
-            .from(DbConfig.commentLikesTable)
-            .insert({
-              'user_id': user.id,
-              'comment_id': commentId,
-            });
+        await _authService.supabase.from(DbConfig.commentLikesTable).insert({
+          'user_id': user.id,
+          'comment_id': commentId,
+        });
         return true; // Liked
       }
     } catch (e) {
@@ -412,10 +432,13 @@ class CommentService {
     }
   }
 
-  Future<Comment?> _editCommentSupabase(String commentId, String newText) async {
+  Future<Comment?> _editCommentSupabase(
+    String commentId,
+    String newText,
+  ) async {
     final user = _authService.currentUser;
     final session = _authService.supabase.auth.currentSession;
-    
+
     if (user == null || session == null) {
       throw Exception('User not authenticated');
     }
@@ -443,7 +466,7 @@ class CommentService {
   Future<bool> _deleteCommentSupabase(String commentId) async {
     final user = _authService.currentUser;
     final session = _authService.supabase.auth.currentSession;
-    
+
     if (user == null || session == null) {
       throw Exception('User not authenticated');
     }
@@ -474,7 +497,11 @@ class CommentService {
     }
   }
 
-  Future<List<Comment>> _getCommentRepliesSupabase(String commentId, int limit, int offset) async {
+  Future<List<Comment>> _getCommentRepliesSupabase(
+    String commentId,
+    int limit,
+    int offset,
+  ) async {
     final response = await _authService.supabase
         .from(DbConfig.commentsTable)
         .select()

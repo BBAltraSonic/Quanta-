@@ -29,15 +29,15 @@ class _FollowersScreenState extends State<FollowersScreen>
     with SingleTickerProviderStateMixin {
   final FollowService _followService = FollowService();
   final ScrollController _scrollController = ScrollController();
-  
+
   List<AvatarModel> _avatars = [];
   List<UserModel> _users = [];
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _error;
-  
+
   late TabController _tabController;
-  int _currentPage = 0;
+  final int _currentPage = 0;
 
   @override
   void initState() {
@@ -142,9 +142,7 @@ class _FollowersScreenState extends State<FollowersScreen>
           });
           break;
         case FollowersScreenType.trending:
-          final newAvatars = await _followService.getTrendingAvatars(
-            limit: 20,
-          );
+          final newAvatars = await _followService.getTrendingAvatars(limit: 20);
           setState(() {
             _avatars.addAll(newAvatars);
           });
@@ -206,10 +204,7 @@ class _FollowersScreenState extends State<FollowersScreen>
       body: widget.type == FollowersScreenType.recommended
           ? TabBarView(
               controller: _tabController,
-              children: [
-                _buildRecommendedTab(),
-                _buildTrendingTab(),
-              ],
+              children: [_buildRecommendedTab(), _buildTrendingTab()],
             )
           : _buildMainContent(),
     );
@@ -232,11 +227,7 @@ class _FollowersScreenState extends State<FollowersScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 64,
-            ),
+            const Icon(Icons.error_outline, color: Colors.red, size: 64),
             const SizedBox(height: 16),
             Text(
               'Something went wrong',
@@ -255,9 +246,7 @@ class _FollowersScreenState extends State<FollowersScreen>
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: _loadData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryColor,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
               child: const Text('Try Again'),
             ),
           ],
@@ -304,11 +293,7 @@ class _FollowersScreenState extends State<FollowersScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people_outline,
-              color: kLightTextColor,
-              size: 64,
-            ),
+            Icon(Icons.people_outline, color: kLightTextColor, size: 64),
             SizedBox(height: 16),
             Text(
               'No avatars found',
@@ -361,11 +346,7 @@ class _FollowersScreenState extends State<FollowersScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people_outline,
-              color: kLightTextColor,
-              size: 64,
-            ),
+            Icon(Icons.people_outline, color: kLightTextColor, size: 64),
             SizedBox(height: 16),
             Text(
               'No followers yet',
@@ -411,10 +392,7 @@ class _AvatarCard extends StatelessWidget {
   final AvatarModel avatar;
   final VoidCallback? onFollowChanged;
 
-  const _AvatarCard({
-    required this.avatar,
-    this.onFollowChanged,
-  });
+  const _AvatarCard({required this.avatar, this.onFollowChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -447,8 +425,9 @@ class _AvatarCard extends StatelessWidget {
                   radius: 28,
                   backgroundImage: avatar.avatarImageUrl != null
                       ? (avatar.avatarImageUrl!.startsWith('assets/')
-                          ? AssetImage(avatar.avatarImageUrl!) as ImageProvider
-                          : NetworkImage(avatar.avatarImageUrl!))
+                            ? AssetImage(avatar.avatarImageUrl!)
+                                  as ImageProvider
+                            : NetworkImage(avatar.avatarImageUrl!))
                       : const AssetImage('assets/images/p.jpg'),
                 ),
                 // AI indicator
@@ -474,7 +453,7 @@ class _AvatarCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          
+
           // Avatar info
           Expanded(
             child: Column(
@@ -491,10 +470,7 @@ class _AvatarCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   avatar.bio,
-                  style: const TextStyle(
-                    color: kLightTextColor,
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(color: kLightTextColor, fontSize: 14),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -532,7 +508,7 @@ class _AvatarCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Follow button
           FollowButton(
             avatarId: avatar.id,
@@ -572,12 +548,12 @@ class _UserCard extends StatelessWidget {
             radius: 28,
             backgroundImage: user.profileImageUrl != null
                 ? (user.profileImageUrl!.startsWith('assets/')
-                    ? AssetImage(user.profileImageUrl!) as ImageProvider
-                    : NetworkImage(user.profileImageUrl!))
+                      ? AssetImage(user.profileImageUrl!) as ImageProvider
+                      : NetworkImage(user.profileImageUrl!))
                 : const AssetImage('assets/images/p.jpg'),
           ),
           const SizedBox(width: 12),
-          
+
           // User info
           Expanded(
             child: Column(
@@ -594,15 +570,12 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '@${user.username}',
-                  style: const TextStyle(
-                    color: kLightTextColor,
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(color: kLightTextColor, fontSize: 14),
                 ),
               ],
             ),
           ),
-          
+
           // Message button
           IconButton(
             onPressed: () {
@@ -614,10 +587,7 @@ class _UserCard extends StatelessWidget {
                 ),
               );
             },
-            icon: const Icon(
-              Icons.message_outlined,
-              color: kPrimaryColor,
-            ),
+            icon: const Icon(Icons.message_outlined, color: kPrimaryColor),
           ),
         ],
       ),

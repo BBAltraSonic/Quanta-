@@ -16,17 +16,11 @@ import 'package:quanta/widgets/report_content_dialog.dart';
 import 'package:quanta/services/analytics_service.dart';
 import 'package:quanta/widgets/skeleton_widgets.dart';
 
-
-
 class PostDetailScreen extends StatefulWidget {
   final String? postId;
   final PostModel? initialPost;
-  
-  const PostDetailScreen({
-    super.key,
-    this.postId,
-    this.initialPost,
-  });
+
+  const PostDetailScreen({super.key, this.postId, this.initialPost});
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -39,16 +33,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   final ShareService _shareService = ShareService();
   final ChatValidationService _chatValidationService = ChatValidationService();
   final AnalyticsService _analyticsService = AnalyticsService();
-  
+
   // State for interactions
-  Map<String, bool> _likedStatus = {};
-  Map<String, bool> _followingStatus = {};
-  Map<String, bool> _bookmarkedStatus = {};
+  final Map<String, bool> _likedStatus = {};
+  final Map<String, bool> _followingStatus = {};
+  final Map<String, bool> _bookmarkedStatus = {};
   // Settings
   bool _isMuted = false;
 
   List<PostModel> _posts = [];
-  Map<String, AvatarModel> _avatarCache = {};
+  final Map<String, AvatarModel> _avatarCache = {};
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -65,7 +59,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _initializeServices() async {
     try {
       await _videoService.initialize();
-      
+
       if (widget.initialPost != null) {
         _loadSinglePost(widget.initialPost!);
       } else if (widget.postId != null) {
@@ -75,10 +69,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error initializing services: $e');
-      _setError('Failed to initialize feed. Please check your connection and try again.');
+      _setError(
+        'Failed to initialize feed. Please check your connection and try again.',
+      );
     }
   }
-  
+
   void _setupVideoAnalytics() {
     _videoService.onAnalyticsEvent = (url, event, data) {
       // Find post ID from URL and track analytics
@@ -86,18 +82,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         (p) => p.videoUrl == url,
         orElse: () => _posts.first,
       );
-      
+
       _trackAnalyticsEvent(post.id, event, data);
     };
   }
-  
-  void _trackAnalyticsEvent(String postId, String event, Map<String, dynamic> data) {
+
+  void _trackAnalyticsEvent(
+    String postId,
+    String event,
+    Map<String, dynamic> data,
+  ) {
     // Track analytics events using the analytics service
     try {
-      _analyticsService.trackEvent(event, {
-        'post_id': postId,
-        ...data,
-      });
+      _analyticsService.trackEvent(event, {'post_id': postId, ...data});
     } catch (e) {
       debugPrint('Failed to track analytics event: $e');
     }
@@ -171,7 +168,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         // Cache avatars for loaded posts
         await _cacheAvatarsForPosts(posts);
         await _loadLikedAndFollowingStatus(posts);
-        
+
         // Preload video controllers for better playback
         await _preloadVideosForPosts(posts);
 
@@ -179,9 +176,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _posts = posts;
           _isLoading = false;
         });
-        
+
         // Start playing the first video if it's a video post
-        if (posts.isNotEmpty && posts[0].type == PostType.video && posts[0].videoUrl != null) {
+        if (posts.isNotEmpty &&
+            posts[0].type == PostType.video &&
+            posts[0].videoUrl != null) {
           _playVideoForPost(posts[0]);
         }
       } else {
@@ -190,7 +189,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error loading posts: $e');
-      _setError('Failed to load posts. Please check your connection and try again.');
+      _setError(
+        'Failed to load posts. Please check your connection and try again.',
+      );
     }
   }
 
@@ -219,7 +220,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (newPosts.isNotEmpty) {
         await _cacheAvatarsForPosts(newPosts);
         await _loadLikedAndFollowingStatus(newPosts);
-        
+
         // Preload video controllers for new posts
         await _preloadVideosForPosts(newPosts);
 
@@ -257,9 +258,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   /// Preload video controllers for posts to ensure smooth playback
   Future<void> _preloadVideosForPosts(List<PostModel> posts) async {
     final videoTasks = <Future<void>>[];
-    
+
     for (final post in posts) {
-      if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+      if (post.type == PostType.video &&
+          post.videoUrl != null &&
+          post.videoUrl!.isNotEmpty) {
         // Create video controller and initialize it
         final task = () async {
           try {
@@ -272,7 +275,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         videoTasks.add(task);
       }
     }
-    
+
     // Wait for all video preloading tasks to complete (with timeout)
     if (videoTasks.isNotEmpty) {
       await Future.wait(videoTasks).timeout(
@@ -284,10 +287,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       );
     }
   }
-  
+
   /// Play video for a specific post
   Future<void> _playVideoForPost(PostModel post) async {
-    if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+    if (post.type == PostType.video &&
+        post.videoUrl != null &&
+        post.videoUrl!.isNotEmpty) {
       try {
         await _videoService.playVideo(post.videoUrl!);
         debugPrint('▶️ Playing video: ${post.videoUrl}');
@@ -296,10 +301,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       }
     }
   }
-  
+
   /// Pause video for a specific post
   Future<void> _pauseVideoForPost(PostModel post) async {
-    if (post.type == PostType.video && post.videoUrl != null && post.videoUrl!.isNotEmpty) {
+    if (post.type == PostType.video &&
+        post.videoUrl != null &&
+        post.videoUrl!.isNotEmpty) {
       try {
         await _videoService.pauseVideo(post.videoUrl!);
         debugPrint('⏸️ Paused video: ${post.videoUrl}');
@@ -320,18 +327,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       _likedStatus.addAll(likedStatus);
 
       // Batch load following status
-      final followingStatus = await _feedsService.getFollowingStatusBatch(avatarIds);
+      final followingStatus = await _feedsService.getFollowingStatusBatch(
+        avatarIds,
+      );
       _followingStatus.addAll(followingStatus);
 
       // Batch load bookmarked status
-      final bookmarkedStatus = await _feedsService.getBookmarkedStatusBatch(postIds);
+      final bookmarkedStatus = await _feedsService.getBookmarkedStatusBatch(
+        postIds,
+      );
       _bookmarkedStatus.addAll(bookmarkedStatus);
     } catch (e) {
       debugPrint('Error loading engagement status: $e');
     }
   }
-
-
 
   void _onPostLike(PostModel post) async {
     try {
@@ -339,20 +348,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       setState(() {
         _likedStatus[post.id] = newLikedStatus;
-        
+
         // Update post likes count optimistically
         final postIndex = _posts.indexWhere((p) => p.id == post.id);
         if (postIndex != -1) {
           final increment = newLikedStatus ? 1 : -1;
           _posts[postIndex] = _posts[postIndex].copyWith(
-            likesCount: (_posts[postIndex].likesCount + increment).clamp(0, double.infinity).toInt(),
+            likesCount: (_posts[postIndex].likesCount + increment)
+                .clamp(0, double.infinity)
+                .toInt(),
           );
         }
       });
 
       // Track analytics
       _analyticsService.trackLikeToggle(
-        post.id, 
+        post.id,
         newLikedStatus,
         postType: post.type.toString(),
         authorId: post.avatarId,
@@ -380,16 +391,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
 
     openCommentsModal(
-      context, 
+      context,
       postId: post.id,
       onCommentCountChanged: (int newCount) {
         // Update the post's comment count in real time
         final index = _posts.indexWhere((p) => p.id == post.id);
         if (index != -1) {
           setState(() {
-            _posts[index] = _posts[index].copyWith(
-              commentsCount: newCount,
-            );
+            _posts[index] = _posts[index].copyWith(commentsCount: newCount);
           });
         }
 
@@ -434,14 +443,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
             ListTile(
               leading: Icon(
-                _bookmarkedStatus[_posts[_currentPage].id] == true 
-                    ? Icons.bookmark 
-                    : Icons.bookmark_border, 
-                color: Colors.white
+                _bookmarkedStatus[_posts[_currentPage].id] == true
+                    ? Icons.bookmark
+                    : Icons.bookmark_border,
+                color: Colors.white,
               ),
               title: Text(
-                _bookmarkedStatus[_posts[_currentPage].id] == true ? 'Unsave' : 'Save', 
-                style: TextStyle(color: Colors.white)
+                _bookmarkedStatus[_posts[_currentPage].id] == true
+                    ? 'Unsave'
+                    : 'Save',
+                style: TextStyle(color: Colors.white),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -450,7 +461,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.report, color: Colors.white),
-              title: const Text('Report', style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Report',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _showReportDialog(_posts[_currentPage]);
@@ -462,8 +476,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
     );
   }
-
-
 
   void _onAvatarTap(PostModel post) {
     final avatar = _avatarCache[post.avatarId];
@@ -498,11 +510,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: avatar.avatarImageUrl != null && avatar.avatarImageUrl!.isNotEmpty && avatar.avatarImageUrl!.startsWith('http')
+                    backgroundImage:
+                        avatar.avatarImageUrl != null &&
+                            avatar.avatarImageUrl!.isNotEmpty &&
+                            avatar.avatarImageUrl!.startsWith('http')
                         ? NetworkImage(avatar.avatarImageUrl!) as ImageProvider
                         : null,
                     backgroundColor: Colors.grey[800],
-                    child: avatar.avatarImageUrl == null || avatar.avatarImageUrl!.isEmpty || !avatar.avatarImageUrl!.startsWith('http')
+                    child:
+                        avatar.avatarImageUrl == null ||
+                            avatar.avatarImageUrl!.isEmpty ||
+                            !avatar.avatarImageUrl!.startsWith('http')
                         ? Icon(Icons.person, color: Colors.white54, size: 24)
                         : null,
                   ),
@@ -539,8 +557,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             // Action buttons
             ListTile(
               leading: Icon(
-                _followingStatus[post.avatarId] == true 
-                    ? Icons.person_remove 
+                _followingStatus[post.avatarId] == true
+                    ? Icons.person_remove
                     : Icons.person_add,
                 color: Colors.white,
               ),
@@ -570,8 +588,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   void _onAvatarFollow(PostModel post) async {
     try {
-      final newFollowingStatus = await _feedsService.toggleFollow(post.avatarId);
-      
+      final newFollowingStatus = await _feedsService.toggleFollow(
+        post.avatarId,
+      );
+
       setState(() {
         _followingStatus[post.avatarId] = newFollowingStatus;
       });
@@ -580,9 +600,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            newFollowingStatus 
-                ? 'Now following ${avatar?.name ?? "avatar"}' 
-                : 'Unfollowed ${avatar?.name ?? "avatar"}'
+            newFollowingStatus
+                ? 'Now following ${avatar?.name ?? "avatar"}'
+                : 'Unfollowed ${avatar?.name ?? "avatar"}',
           ),
           duration: Duration(seconds: 2),
         ),
@@ -608,10 +628,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _onAvatarChat(PostModel post, AvatarModel avatar) async {
     try {
       // First, perform basic validation without network calls
-      final basicValidation = _chatValidationService.validateBasicRequirements(post.avatarId);
-      
+      final basicValidation = _chatValidationService.validateBasicRequirements(
+        post.avatarId,
+      );
+
       if (!basicValidation.isValid) {
-        _showChatValidationTooltip(basicValidation.errorType!, basicValidation.errorMessage!);
+        _showChatValidationTooltip(
+          basicValidation.errorType!,
+          basicValidation.errorMessage!,
+        );
         return;
       }
 
@@ -637,8 +662,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       );
 
       // Perform full validation
-      final validation = await _chatValidationService.validateChatAvailability(post.avatarId);
-      
+      final validation = await _chatValidationService.validateChatAvailability(
+        post.avatarId,
+      );
+
       // Close loading dialog
       if (mounted) Navigator.pop(context);
 
@@ -649,7 +676,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             builder: (context) => ChatScreen(
               name: avatar.name,
               avatar: avatar.avatarImageUrl ?? '',
-              avatarId: post.avatarId, // Pass the avatar ID for proper functionality
+              avatarId:
+                  post.avatarId, // Pass the avatar ID for proper functionality
             ),
           ),
         );
@@ -661,14 +689,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         });
       } else {
         // Validation failed, show error
-        _showChatValidationTooltip(validation.errorType!, validation.errorMessage!);
+        _showChatValidationTooltip(
+          validation.errorType!,
+          validation.errorMessage!,
+        );
       }
     } catch (e) {
       // Close loading dialog if still open
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       debugPrint('Error validating chat: $e');
       _showChatValidationTooltip(
         ChatValidationErrorType.unknown,
@@ -677,9 +708,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  void _showChatValidationTooltip(ChatValidationErrorType errorType, String errorMessage) {
+  void _showChatValidationTooltip(
+    ChatValidationErrorType errorType,
+    String errorMessage,
+  ) {
     final tooltip = _chatValidationService.getErrorTooltip(errorType);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -701,10 +735,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   if (errorMessage != tooltip)
                     Text(
                       errorMessage,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                 ],
               ),
@@ -715,9 +746,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         duration: Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -762,13 +791,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       final avatar = _avatarCache[post.avatarId];
       final shareText = '${avatar?.name ?? 'Avatar'}: ${post.caption}';
       final shareUrl = _shareService.generatePostLink(post.id);
-      
+
       // Share using ShareService.shareToExternal
       await _shareService.shareToExternal(shareText, shareUrl);
-      
+
       // Record the share in database
       await _feedsService.sharePost(post.id, platform: 'native_share');
-      
+
       // Track successful share
       _analyticsService.trackShareAttempt(
         post.id,
@@ -776,7 +805,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         postType: post.type.toString(),
         successful: true,
       );
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Post shared successfully!'),
@@ -797,14 +826,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _onPostSave(PostModel post) async {
     try {
       final newBookmarkedStatus = await _feedsService.toggleBookmark(post.id);
-      
+
       setState(() {
         _bookmarkedStatus[post.id] = newBookmarkedStatus;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(newBookmarkedStatus ? 'Post saved!' : 'Post removed from saved'),
+          content: Text(
+            newBookmarkedStatus ? 'Post saved!' : 'Post removed from saved',
+          ),
           duration: Duration(seconds: 2),
         ),
       );
@@ -825,8 +856,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       );
     }
   }
-
-
 
   String _formatCount(int count) {
     if (count < 1000) return count.toString();
@@ -943,7 +972,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                 if (index < _posts.length) {
                   final currentPost = _posts[index];
-                  
+
                   // Handle video playback - pause previous, play current
                   if (index > 0 && index - 1 < _posts.length) {
                     _pauseVideoForPost(_posts[index - 1]);
@@ -951,15 +980,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   if (index + 1 < _posts.length) {
                     _pauseVideoForPost(_posts[index + 1]);
                   }
-                  
+
                   // Play current video if it's a video post
                   if (currentPost.type == PostType.video) {
                     _playVideoForPost(currentPost);
                   }
-                  
+
                   // Update view count and track analytics
                   _feedsService.incrementViewCount(currentPost.id);
-                  
+
                   _trackAnalyticsEvent(currentPost.id, 'post_view', {
                     'post_type': currentPost.type.toString(),
                     'author_id': currentPost.avatarId,
@@ -1012,7 +1041,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     GestureDetector(
                       onTap: () => Navigator.of(context).pop(),
                       child: const OverlayIcon(
-                        assetPath: 'assets/icons/round-alt-arrow-left-svgrepo-com.svg',
+                        assetPath:
+                            'assets/icons/round-alt-arrow-left-svgrepo-com.svg',
                         size: 40,
                       ),
                     )
@@ -1030,7 +1060,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   GestureDetector(
                     onTap: _toggleVolume,
                     child: OverlayIcon(
-                      assetPath: _isMuted 
+                      assetPath: _isMuted
                           ? 'assets/icons/volume.svg'
                           : 'assets/icons/volume-loud-svgrepo-com.svg',
                       size: 40,
@@ -1101,4 +1131,3 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 }
-

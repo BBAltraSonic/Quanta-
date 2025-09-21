@@ -23,17 +23,18 @@ class OwnershipAwareProfileScreen extends StatefulWidget {
   const OwnershipAwareProfileScreen({super.key, this.userId});
 
   @override
-  State<OwnershipAwareProfileScreen> createState() => _OwnershipAwareProfileScreenState();
+  State<OwnershipAwareProfileScreen> createState() =>
+      _OwnershipAwareProfileScreenState();
 }
 
-class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScreen> 
+class _OwnershipAwareProfileScreenState
+    extends State<OwnershipAwareProfileScreen>
     with OwnershipAwareMixin {
-  
   final ProfileService _profileService = ProfileService();
   final StateServiceAdapter _stateAdapter = StateServiceAdapter();
   final OwnershipGuardService _guardService = OwnershipGuardService();
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
-  
+
   UserModel? _user;
   List<AvatarModel> _avatars = [];
   AvatarModel? _activeAvatar;
@@ -41,14 +42,14 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
   bool _isLoading = true;
   List<PostModel> _userPosts = [];
   bool _isPostsLoading = false;
-  
+
   String? get _targetUserId => widget.userId ?? _stateAdapter.currentUserId;
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
-    
+
     // Listen to state changes for reactive UI updates
     _stateAdapter.addListener(_onStateChange);
   }
@@ -74,8 +75,10 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
 
     try {
       // Load the profile data
-      final profileData = await _profileService.getUserProfileData(_targetUserId!);
-      
+      final profileData = await _profileService.getUserProfileData(
+        _targetUserId!,
+      );
+
       if (mounted) {
         setState(() {
           _user = profileData['user'] as UserModel;
@@ -85,10 +88,9 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
           _isLoading = false;
         });
       }
-      
+
       // Load user posts after profile data is loaded
       await _loadUserPosts();
-      
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -99,16 +101,16 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
 
   Future<void> _loadUserPosts() async {
     if (_user == null) return;
-    
+
     setState(() => _isPostsLoading = true);
-    
+
     try {
       final posts = await _feedsService.getUserPosts(
         userId: _user!.id,
         page: 1,
         limit: 20,
       );
-      
+
       setState(() {
         _userPosts = posts;
         _isPostsLoading = false;
@@ -125,7 +127,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
     try {
       // Guard the action - only owner can edit
       await _guardService.guardProfileEdit(_targetUserId!);
-      
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -133,7 +135,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
         ),
       );
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
@@ -141,24 +143,22 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
     try {
       // Guard the action - only owner can access settings
       await _guardService.guardProfilePrivateView(_targetUserId!);
-      
+
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const SettingsScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const SettingsScreen()),
       );
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
   Future<void> _onFollow() async {
     if (_activeAvatar == null) return;
-    
+
     try {
       await _guardService.guardFollowAction(_activeAvatar!.id);
-      
+
       final success = await _feedsService.toggleFollow(_activeAvatar!.id);
       if (success) {
         _showSuccessSnackbar('Successfully followed ${_activeAvatar!.name}');
@@ -166,67 +166,68 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
         _showSuccessSnackbar('Successfully unfollowed ${_activeAvatar!.name}');
       }
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
   Future<void> _onReport() async {
     try {
       await _guardService.guardReportAction(_user, 'profile');
-      
+
       showOwnershipAwareDialog(
         element: _user,
-        ownedDialog: (context, element) => _buildOwnedDialog('report your own profile'),
+        ownedDialog: (context, element) =>
+            _buildOwnedDialog('report your own profile'),
         otherDialog: (context, element) => _buildReportDialog(),
       );
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
   Future<void> _onBlock() async {
     if (_user == null) return;
-    
+
     try {
       await _guardService.guardBlockAction(_user!.id);
-      
+
       showOwnershipAwareDialog(
         element: _user,
         ownedDialog: (context, element) => _buildOwnedDialog('block yourself'),
         otherDialog: (context, element) => _buildBlockDialog(),
       );
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
   Future<void> _onEditPost(PostModel post) async {
     try {
       await _guardService.guardPostEdit(post.id);
-      
+
       // Navigate to edit post screen (note: current CreatePostScreen doesn't support editing)
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const CreatePostScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const CreatePostScreen()),
       );
-      
+
       // TODO: Implement post editing functionality
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
   Future<void> _onDeletePost(PostModel post) async {
     try {
       await _guardService.guardPostDelete(post.id);
-      
+
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Delete Post'),
-          content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
+          content: const Text(
+            'Are you sure you want to delete this post? This action cannot be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -240,7 +241,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
           ],
         ),
       );
-      
+
       if (confirmed == true) {
         // Implement actual post deletion
         setState(() {
@@ -249,7 +250,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
         _showSuccessSnackbar('Post deleted successfully');
       }
     } catch (e) {
-      _showErrorSnackbar('${e.toString()}');
+      _showErrorSnackbar(e.toString());
     }
   }
 
@@ -377,8 +378,14 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildStatItem('Posts', _stats['posts_count']?.toString() ?? '0'),
-            _buildStatItem('Followers', _stats['followers_count']?.toString() ?? '0'),
-            _buildStatItem('Following', _stats['following_count']?.toString() ?? '0'),
+            _buildStatItem(
+              'Followers',
+              _stats['followers_count']?.toString() ?? '0',
+            ),
+            _buildStatItem(
+              'Following',
+              _stats['following_count']?.toString() ?? '0',
+            ),
           ],
         ),
       ),
@@ -390,14 +397,11 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
       children: [
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -409,10 +413,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Posts',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            child: Text('Posts', style: Theme.of(context).textTheme.titleLarge),
           ),
           if (_isPostsLoading)
             const Center(child: CircularProgressIndicator())
@@ -479,7 +480,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
 
   List<PopupMenuEntry<String>> _buildMenuItems() {
     final menuItems = <PopupMenuEntry<String>>[];
-    
+
     // Ownership-aware menu items
     if (isOwnElement(_user)) {
       menuItems.addAll([
@@ -509,26 +510,18 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
         const PopupMenuItem(
           value: 'report',
           child: Row(
-            children: [
-              Icon(Icons.report),
-              SizedBox(width: 8),
-              Text('Report'),
-            ],
+            children: [Icon(Icons.report), SizedBox(width: 8), Text('Report')],
           ),
         ),
         const PopupMenuItem(
           value: 'block',
           child: Row(
-            children: [
-              Icon(Icons.block),
-              SizedBox(width: 8),
-              Text('Block'),
-            ],
+            children: [Icon(Icons.block), SizedBox(width: 8), Text('Block')],
           ),
         ),
       ]);
     }
-    
+
     return menuItems;
   }
 
@@ -611,10 +604,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
   void _showErrorSnackbar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
   }
@@ -622,10 +612,7 @@ class _OwnershipAwareProfileScreenState extends State<OwnershipAwareProfileScree
   void _showSuccessSnackbar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
       );
     }
   }

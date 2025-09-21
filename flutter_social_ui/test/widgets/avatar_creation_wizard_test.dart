@@ -3,11 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:quanta/screens/avatar_creation_wizard.dart';
-import 'package:quanta/screens/app_shell.dart';
 import 'package:quanta/services/avatar_service.dart';
 import 'package:quanta/services/auth_service.dart';
 import 'package:quanta/models/avatar_model.dart';
-import 'package:quanta/constants.dart';
 
 // Generate mocks
 @GenerateMocks([AvatarService, AuthService])
@@ -21,7 +19,7 @@ void main() {
     setUp(() {
       mockAvatarService = MockAvatarService();
       mockAuthService = MockAuthService();
-      
+
       // Setup default auth service responses
       when(mockAuthService.currentUser).thenReturn(null);
       when(mockAuthService.currentUserId).thenReturn('test-user-id');
@@ -29,13 +27,13 @@ void main() {
 
     Widget createTestWidget({bool returnResultOnCreate = false}) {
       return MaterialApp(
-        home: AvatarCreationWizard(
-          returnResultOnCreate: returnResultOnCreate,
-        ),
+        home: AvatarCreationWizard(returnResultOnCreate: returnResultOnCreate),
       );
     }
 
-    testWidgets('should display initial wizard state correctly', (tester) async {
+    testWidgets('should display initial wizard state correctly', (
+      tester,
+    ) async {
       // Arrange & Act
       await tester.pumpWidget(createTestWidget());
 
@@ -45,7 +43,7 @@ void main() {
       expect(find.text('Bio *'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('Continue'), findsOneWidget);
-      
+
       // Continue button should be disabled initially
       final continueButton = tester.widget<ElevatedButton>(
         find.widgetWithText(ElevatedButton, 'Continue'),
@@ -53,7 +51,9 @@ void main() {
       expect(continueButton.onPressed, isNull);
     });
 
-    testWidgets('should show validation errors for invalid input', (tester) async {
+    testWidgets('should show validation errors for invalid input', (
+      tester,
+    ) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
 
@@ -72,13 +72,18 @@ void main() {
       expect(find.text('Bio must be at least 10 characters'), findsOneWidget);
     });
 
-    testWidgets('should enable Continue button with valid input', (tester) async {
+    testWidgets('should enable Continue button with valid input', (
+      tester,
+    ) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
 
       // Act - enter valid name and bio
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
 
       // Assert - Continue button should be enabled
@@ -88,13 +93,18 @@ void main() {
       expect(continueButton.onPressed, isNotNull);
     });
 
-    testWidgets('should navigate to next step when Continue is pressed', (tester) async {
+    testWidgets('should navigate to next step when Continue is pressed', (
+      tester,
+    ) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
-      
+
       // Fill valid data for step 1
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
 
       // Act - tap Continue
@@ -111,7 +121,10 @@ void main() {
       // Arrange - navigate to step 2
       await tester.pumpWidget(createTestWidget());
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
       await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
       await tester.pumpAndSettle();
@@ -125,11 +138,16 @@ void main() {
       expect(find.text('Back'), findsNothing); // Back button should be hidden
     });
 
-    testWidgets('should require 3-5 personality traits on step 2', (tester) async {
+    testWidgets('should require 3-5 personality traits on step 2', (
+      tester,
+    ) async {
       // Arrange - navigate to step 2
       await tester.pumpWidget(createTestWidget());
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
       await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
       await tester.pumpAndSettle();
@@ -143,7 +161,7 @@ void main() {
       // Act - select some traits (look for FilterChip widgets)
       final traitChips = find.byType(FilterChip);
       expect(traitChips, findsWidgets);
-      
+
       // Select first 3 traits
       for (int i = 0; i < 3; i++) {
         await tester.tap(traitChips.at(i));
@@ -160,10 +178,13 @@ void main() {
     testWidgets('should show image picker on step 3', (tester) async {
       // Arrange - navigate to step 3
       await tester.pumpWidget(createTestWidget());
-      
+
       // Navigate through steps
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
       await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
       await tester.pumpAndSettle();
@@ -184,13 +205,18 @@ void main() {
       expect(find.byType(Switch), findsOneWidget);
     });
 
-    testWidgets('should show preview and Create Avatar button on step 4', (tester) async {
+    testWidgets('should show preview and Create Avatar button on step 4', (
+      tester,
+    ) async {
       // Arrange - navigate to step 4
       await tester.pumpWidget(createTestWidget());
-      
+
       // Navigate through all steps
       await tester.enterText(find.byType(TextField).first, 'Valid Avatar Name');
-      await tester.enterText(find.byType(TextField).at(1), 'This is a valid bio that is long enough for validation');
+      await tester.enterText(
+        find.byType(TextField).at(1),
+        'This is a valid bio that is long enough for validation',
+      );
       await tester.pump();
       await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
       await tester.pumpAndSettle();
@@ -211,13 +237,18 @@ void main() {
       // Assert - should be on step 4 (preview)
       expect(find.text('Create Avatar (4/4)'), findsOneWidget);
       expect(find.text('Create Avatar'), findsOneWidget);
-      expect(find.text('Valid Avatar Name'), findsOneWidget); // Should show avatar name in preview
+      expect(
+        find.text('Valid Avatar Name'),
+        findsOneWidget,
+      ); // Should show avatar name in preview
     });
 
-    testWidgets('should show unsaved changes dialog when closing with changes', (tester) async {
+    testWidgets('should show unsaved changes dialog when closing with changes', (
+      tester,
+    ) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
-      
+
       // Make some changes
       await tester.enterText(find.byType(TextField).first, 'Some Name');
       await tester.pump();
@@ -228,7 +259,12 @@ void main() {
 
       // Assert - should show confirmation dialog
       expect(find.text('Discard Changes?'), findsOneWidget);
-      expect(find.text('You have unsaved changes. Are you sure you want to exit without creating your avatar?'), findsOneWidget);
+      expect(
+        find.text(
+          'You have unsaved changes. Are you sure you want to exit without creating your avatar?',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Exit'), findsOneWidget);
     });
@@ -245,7 +281,9 @@ void main() {
       expect(find.text('Discard Changes?'), findsNothing);
     });
 
-    testWidgets('should stay open when Cancel is pressed in close dialog', (tester) async {
+    testWidgets('should stay open when Cancel is pressed in close dialog', (
+      tester,
+    ) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
       await tester.enterText(find.byType(TextField).first, 'Some Name');
@@ -262,46 +300,55 @@ void main() {
       expect(find.text('Discard Changes?'), findsNothing);
     });
 
-    testWidgets('should create avatar and navigate correctly when not returning result', (tester) async {
+    testWidgets(
+      'should create avatar and navigate correctly when not returning result',
+      (tester) async {
+        // Arrange
+        final mockAvatar = AvatarModel.create(
+          ownerUserId: 'test-user-id',
+          name: 'Test Avatar',
+          bio: 'Test bio for the avatar',
+          niche: AvatarNiche.tech,
+          personalityTraits: [PersonalityTrait.friendly],
+        );
+
+        when(
+          mockAvatarService.createAvatar(
+            name: anyNamed('name'),
+            bio: anyNamed('bio'),
+            niche: anyNamed('niche'),
+            personalityTraits: anyNamed('personalityTraits'),
+            backstory: anyNamed('backstory'),
+            avatarImage: anyNamed('avatarImage'),
+            voiceStyle: anyNamed('voiceStyle'),
+            allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
+          ),
+        ).thenAnswer((_) async => mockAvatar);
+
+        await tester.pumpWidget(createTestWidget());
+
+        // Navigate to final step and create avatar
+        // (This would require completing all steps, which is complex to set up in tests)
+        // For now, this test shows the structure for testing avatar creation
+      },
+    );
+
+    testWidgets('should show loading state when creating avatar', (
+      tester,
+    ) async {
       // Arrange
-      final mockAvatar = AvatarModel.create(
-        ownerUserId: 'test-user-id',
-        name: 'Test Avatar',
-        bio: 'Test bio for the avatar',
-        niche: AvatarNiche.tech,
-        personalityTraits: [PersonalityTrait.friendly],
-      );
-
-      when(mockAvatarService.createAvatar(
-        name: anyNamed('name'),
-        bio: anyNamed('bio'),
-        niche: anyNamed('niche'),
-        personalityTraits: anyNamed('personalityTraits'),
-        backstory: anyNamed('backstory'),
-        avatarImage: anyNamed('avatarImage'),
-        voiceStyle: anyNamed('voiceStyle'),
-        allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
-      )).thenAnswer((_) async => mockAvatar);
-
-      await tester.pumpWidget(createTestWidget());
-      
-      // Navigate to final step and create avatar
-      // (This would require completing all steps, which is complex to set up in tests)
-      // For now, this test shows the structure for testing avatar creation
-    });
-
-    testWidgets('should show loading state when creating avatar', (tester) async {
-      // Arrange
-      when(mockAvatarService.createAvatar(
-        name: anyNamed('name'),
-        bio: anyNamed('bio'),
-        niche: anyNamed('niche'),
-        personalityTraits: anyNamed('personalityTraits'),
-        backstory: anyNamed('backstory'),
-        avatarImage: anyNamed('avatarImage'),
-        voiceStyle: anyNamed('voiceStyle'),
-        allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
-      )).thenAnswer((_) async {
+      when(
+        mockAvatarService.createAvatar(
+          name: anyNamed('name'),
+          bio: anyNamed('bio'),
+          niche: anyNamed('niche'),
+          personalityTraits: anyNamed('personalityTraits'),
+          backstory: anyNamed('backstory'),
+          avatarImage: anyNamed('avatarImage'),
+          voiceStyle: anyNamed('voiceStyle'),
+          allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
+        ),
+      ).thenAnswer((_) async {
         // Simulate delay
         await Future.delayed(Duration(seconds: 1));
         return AvatarModel.create(
@@ -317,36 +364,47 @@ void main() {
       // when Create Avatar button is pressed and avatar creation is in progress
     });
 
-    testWidgets('should show error message when avatar creation fails', (tester) async {
+    testWidgets('should show error message when avatar creation fails', (
+      tester,
+    ) async {
       // Arrange
-      when(mockAvatarService.createAvatar(
-        name: anyNamed('name'),
-        bio: anyNamed('bio'),
-        niche: anyNamed('niche'),
-        personalityTraits: anyNamed('personalityTraits'),
-        backstory: anyNamed('backstory'),
-        avatarImage: anyNamed('avatarImage'),
-        voiceStyle: anyNamed('voiceStyle'),
-        allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
-      )).thenThrow(Exception('Failed to create avatar'));
+      when(
+        mockAvatarService.createAvatar(
+          name: anyNamed('name'),
+          bio: anyNamed('bio'),
+          niche: anyNamed('niche'),
+          personalityTraits: anyNamed('personalityTraits'),
+          backstory: anyNamed('backstory'),
+          avatarImage: anyNamed('avatarImage'),
+          voiceStyle: anyNamed('voiceStyle'),
+          allowAutonomousPosting: anyNamed('allowAutonomousPosting'),
+        ),
+      ).thenThrow(Exception('Failed to create avatar'));
 
       // This test would verify that error SnackBar is shown when creation fails
     });
 
     group('Navigation behavior tests', () {
-      testWidgets('should navigate to AppShell when returnResultOnCreate is false', (tester) async {
-        // This test would verify navigation to AppShell after successful creation
-        // when the wizard is launched from onboarding
-      });
+      testWidgets(
+        'should navigate to AppShell when returnResultOnCreate is false',
+        (tester) async {
+          // This test would verify navigation to AppShell after successful creation
+          // when the wizard is launched from onboarding
+        },
+      );
 
-      testWidgets('should return result when returnResultOnCreate is true', (tester) async {
+      testWidgets('should return result when returnResultOnCreate is true', (
+        tester,
+      ) async {
         // This test would verify that the wizard pops with the created avatar
         // when launched from avatar management screen
       });
     });
 
     group('Voice style and autonomous posting tests', () {
-      testWidgets('should show voice style and autonomous posting in preview', (tester) async {
+      testWidgets('should show voice style and autonomous posting in preview', (
+        tester,
+      ) async {
         // This test would verify that voice style and autonomous posting
         // are correctly displayed in the preview step when set
       });

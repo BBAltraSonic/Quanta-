@@ -5,6 +5,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/skeleton_widgets.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -73,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 60),
-                
+
                 // Logo and Title
                 Center(
                   child: Column(
@@ -104,17 +105,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       const Text(
                         'Create and grow your AI avatar',
-                        style: TextStyle(
-                          color: kLightTextColor,
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: kLightTextColor, fontSize: 16),
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Error Message
                 if (_errorMessage != null) ...[
                   Container(
@@ -122,7 +120,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(kDefaultBorderRadius),
-                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -131,7 +131,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red, fontSize: 14),
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
@@ -139,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 // Email Field
                 CustomTextField(
                   controller: _emailController,
@@ -151,15 +154,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value?.isEmpty ?? true) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value!)) {
                       return 'Please enter a valid email';
                     }
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Password Field
                 CustomTextField(
                   controller: _passwordController,
@@ -169,7 +174,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
                       color: kLightTextColor,
                     ),
                     onPressed: () {
@@ -188,37 +195,38 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // Forgot Password
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {
-                      // TODO: Implement forgot password
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordScreen(),
+                        ),
+                      );
                     },
                     child: const Text(
                       'Forgot Password?',
-                      style: TextStyle(
-                        color: kPrimaryColor,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: kPrimaryColor, fontSize: 14),
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Login Button
                 CustomButton(
                   text: 'Sign In',
                   onPressed: _handleLogin,
                   isLoading: _isLoading,
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Divider
                 Row(
                   children: const [
@@ -233,9 +241,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(child: Divider(color: kLightTextColor)),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Sign Up Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -262,9 +270,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Footer
                 Center(
                   child: Column(
@@ -287,7 +295,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           Text(
                             ' and ',
-                            style: TextStyle(color: kLightTextColor, fontSize: 12),
+                            style: TextStyle(
+                              color: kLightTextColor,
+                              fontSize: 12,
+                            ),
                           ),
                           Text(
                             'Privacy Policy',

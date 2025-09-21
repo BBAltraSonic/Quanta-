@@ -763,18 +763,21 @@ class SmartContentService {
         case PersonalityTrait.friendly:
           if (lowerCaption.contains(
             RegExp(r'\b(hi|hello|thanks|please|love)\b'),
-          ))
+          )) {
             score += 0.1;
+          }
           break;
         case PersonalityTrait.humorous:
-          if (lowerCaption.contains(RegExp(r'😄|😅|😊|haha|lol|funny')))
+          if (lowerCaption.contains(RegExp(r'😄|😅|😊|haha|lol|funny'))) {
             score += 0.1;
+          }
           break;
         case PersonalityTrait.inspiring:
           if (lowerCaption.contains(
             RegExp(r'\b(inspire|motivate|dream|achieve|believe)\b'),
-          ))
+          )) {
             score += 0.1;
+          }
           break;
         default:
           break;

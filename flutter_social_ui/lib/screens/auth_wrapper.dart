@@ -5,6 +5,9 @@ import 'app_shell.dart';
 import 'auth/login_screen.dart';
 import 'onboarding/onboarding_screen.dart';
 
+// Flag to skip authentication for development/testing
+const bool _skipAuth = true;
+
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -24,6 +27,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _initializeApp() async {
+    // If skipping auth, we don't need to initialize the auth service
+    if (_skipAuth) {
+      setState(() {
+        _isInitializing = false;
+      });
+      return;
+    }
+    
     try {
       await _authService.initialize();
       setState(() {
@@ -43,8 +54,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
       return const _LoadingScreen();
     }
 
-    if (_initializationError != null) {
+    if (_initializationError != null && !_skipAuth) {
       return _ErrorScreen(error: _initializationError!);
+    }
+
+    // If skipping auth, go directly to AppShell
+    if (_skipAuth) {
+      return const AppShell();
     }
 
     // Check authentication status

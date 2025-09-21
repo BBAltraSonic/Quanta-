@@ -1,11 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'lib/services/user_safety_service.dart';
 import 'lib/services/enhanced_feeds_service.dart';
-import 'lib/services/auth_service.dart';
-import 'lib/config/db_config.dart';
 
 /// Integration test for safety features migration
 /// This test verifies that the migration from SharedPreferences to Supabase works correctly
@@ -13,12 +10,12 @@ void main() {
   group('Safety Features Migration Integration Tests', () {
     late UserSafetyService safetyService;
     late EnhancedFeedsService feedsService;
-    
+
     setUpAll(() async {
       // Initialize services
       safetyService = UserSafetyService();
       feedsService = EnhancedFeedsService();
-      
+
       // Note: These tests require a running Supabase instance with the proper schema
       await safetyService.initialize();
     });
@@ -28,16 +25,16 @@ void main() {
         // Setup: Add some test data to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setStringList('blocked_users', ['user1', 'user2', 'user3']);
-        
+
         // Trigger migration
         await safetyService.forceMigration();
-        
+
         // Verify: Check that data was migrated to Supabase
         final blockedUsers = await safetyService.getBlockedUsers();
         expect(blockedUsers, contains('user1'));
         expect(blockedUsers, contains('user2'));
         expect(blockedUsers, contains('user3'));
-        
+
         // Verify: Check that local data was cleared
         final localBlocked = prefs.getStringList('blocked_users');
         expect(localBlocked, isNull);
@@ -51,7 +48,9 @@ void main() {
           {
             'userId': 'muted_user_1',
             'mutedAt': now.subtract(Duration(minutes: 30)).toIso8601String(),
-            'duration': Duration(hours: 1).inMilliseconds, // Should still be active
+            'duration': Duration(
+              hours: 1,
+            ).inMilliseconds, // Should still be active
           },
           {
             'userId': 'muted_user_2',
@@ -64,38 +63,47 @@ void main() {
             'duration': null, // Indefinite mute
           },
         ];
-        
+
         await prefs.setString('muted_users', json.encode(mutedData));
-        
+
         // Trigger migration
         await safetyService.forceMigration();
-        
+
         // Verify: Check that only non-expired mutes were migrated
         final mutedUsers = await safetyService.getMutedUsers();
         final mutedIds = mutedUsers.map((m) => m['userId']).toList();
-        
-        expect(mutedIds, contains('muted_user_1')); // Should be migrated (not expired)
-        expect(mutedIds, isNot(contains('muted_user_2'))); // Should not be migrated (expired)
-        expect(mutedIds, contains('muted_user_3')); // Should be migrated (indefinite)
+
+        expect(
+          mutedIds,
+          contains('muted_user_1'),
+        ); // Should be migrated (not expired)
+        expect(
+          mutedIds,
+          isNot(contains('muted_user_2')),
+        ); // Should not be migrated (expired)
+        expect(
+          mutedIds,
+          contains('muted_user_3'),
+        ); // Should be migrated (indefinite)
       });
     });
 
     group('Database Operations', () {
       test('should block and unblock users correctly', () async {
         const testUserId = 'test_block_user';
-        
+
         // Test blocking
         final blockResult = await safetyService.blockUser(testUserId);
         expect(blockResult, isTrue);
-        
+
         // Verify blocked
         final isBlocked = await safetyService.isUserBlocked(testUserId);
         expect(isBlocked, isTrue);
-        
+
         // Test unblocking
         final unblockResult = await safetyService.unblockUser(testUserId);
         expect(unblockResult, isTrue);
-        
+
         // Verify unblocked
         final isStillBlocked = await safetyService.isUserBlocked(testUserId);
         expect(isStillBlocked, isFalse);
@@ -103,22 +111,22 @@ void main() {
 
       test('should mute and unmute users with duration handling', () async {
         const testUserId = 'test_mute_user';
-        
+
         // Test muting with duration
         final muteResult = await safetyService.muteUser(
-          testUserId, 
+          testUserId,
           duration: Duration(minutes: 30),
         );
         expect(muteResult, isTrue);
-        
+
         // Verify muted
         final isMuted = await safetyService.isUserMuted(testUserId);
         expect(isMuted, isTrue);
-        
+
         // Test unmuting
         final unmuteResult = await safetyService.unmuteUser(testUserId);
         expect(unmuteResult, isTrue);
-        
+
         // Verify unmuted
         final isStillMuted = await safetyService.isUserMuted(testUserId);
         expect(isStillMuted, isFalse);
@@ -126,7 +134,7 @@ void main() {
 
       test('should handle report creation correctly', () async {
         const testPostId = 'test_post_123';
-        
+
         // Test reporting
         final reportResult = await safetyService.reportContent(
           contentId: testPostId,
@@ -135,7 +143,7 @@ void main() {
           additionalInfo: 'Test report for integration testing',
         );
         expect(reportResult, isTrue);
-        
+
         // Verify report was created
         final reports = await safetyService.getReportedContent();
         expect(reports, isNotEmpty);
@@ -152,37 +160,40 @@ void main() {
           limit: 10,
           applySafetyFiltering: true,
         );
-        
+
         // Should not throw an error
         expect(feed, isA<List>());
       });
 
-      test('should provide mute/block functionality through feeds service', () async {
-        const testUserId = 'feeds_test_user';
-        
-        // Test feeds service mute/block methods
-        final muteResult = await feedsService.muteUser(testUserId);
-        expect(muteResult, isTrue);
-        
-        final isMuted = await feedsService.isUserMuted(testUserId);
-        expect(isMuted, isTrue);
-        
-        final blockResult = await feedsService.blockUser(testUserId);
-        expect(blockResult, isTrue);
-        
-        final isBlocked = await feedsService.isUserBlocked(testUserId);
-        expect(isBlocked, isTrue);
-        
-        // Cleanup
-        await feedsService.unmuteUser(testUserId);
-        await feedsService.unblockUser(testUserId);
-      });
+      test(
+        'should provide mute/block functionality through feeds service',
+        () async {
+          const testUserId = 'feeds_test_user';
+
+          // Test feeds service mute/block methods
+          final muteResult = await feedsService.muteUser(testUserId);
+          expect(muteResult, isTrue);
+
+          final isMuted = await feedsService.isUserMuted(testUserId);
+          expect(isMuted, isTrue);
+
+          final blockResult = await feedsService.blockUser(testUserId);
+          expect(blockResult, isTrue);
+
+          final isBlocked = await feedsService.isUserBlocked(testUserId);
+          expect(isBlocked, isTrue);
+
+          // Cleanup
+          await feedsService.unmuteUser(testUserId);
+          await feedsService.unblockUser(testUserId);
+        },
+      );
     });
 
     group('Safety Statistics', () {
       test('should provide accurate safety statistics', () async {
         final stats = await safetyService.getSafetyStats();
-        
+
         expect(stats, containsPair('blockedUsers', isA<int>()));
         expect(stats, containsPair('mutedUsers', isA<int>()));
         expect(stats, containsPair('reportedContent', isA<int>()));
@@ -201,35 +212,38 @@ void main() {
 /// Manual test runner for when running outside of test framework
 void runManualTests() async {
   print('🧪 Starting Safety Migration Integration Tests...');
-  
+
   try {
     final safetyService = UserSafetyService();
     await safetyService.initialize();
-    
+
     // Test basic functionality
     print('📊 Testing safety statistics...');
     final stats = await safetyService.getSafetyStats();
     print('Stats: $stats');
-    
+
     // Test migration status
     print('🔄 Migration completed: ${stats['migrationCompleted']}');
-    
+
     // Test blocking
     print('🚫 Testing block functionality...');
     await safetyService.blockUser('test_user_manual');
     final isBlocked = await safetyService.isUserBlocked('test_user_manual');
     print('Block test successful: $isBlocked');
-    
+
     // Test muting
     print('🔇 Testing mute functionality...');
-    await safetyService.muteUser('test_user_manual', duration: Duration(minutes: 1));
+    await safetyService.muteUser(
+      'test_user_manual',
+      duration: Duration(minutes: 1),
+    );
     final isMuted = await safetyService.isUserMuted('test_user_manual');
     print('Mute test successful: $isMuted');
-    
+
     // Cleanup
     await safetyService.unblockUser('test_user_manual');
     await safetyService.unmuteUser('test_user_manual');
-    
+
     print('✅ All manual tests completed successfully!');
   } catch (e) {
     print('❌ Test failed: $e');

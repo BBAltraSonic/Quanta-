@@ -15,56 +15,53 @@ import '../constants.dart';
 import '../services/user_safety_service.dart';
 
 /// @deprecated Enhanced Post Detail Screen with full functionality
-/// This screen is deprecated. Use PostDetailScreen instead, which now has feature parity 
+/// This screen is deprecated. Use PostDetailScreen instead, which now has feature parity
 /// and is the default home screen. This file will be removed in a future version.
 class EnhancedPostDetailScreen extends StatefulWidget {
   final String? postId;
   final PostModel? initialPost;
-  
-  const EnhancedPostDetailScreen({
-    super.key,
-    this.postId,
-    this.initialPost,
-  });
+
+  const EnhancedPostDetailScreen({super.key, this.postId, this.initialPost});
 
   @override
-  State<EnhancedPostDetailScreen> createState() => _EnhancedPostDetailScreenState();
+  State<EnhancedPostDetailScreen> createState() =>
+      _EnhancedPostDetailScreenState();
 }
 
-class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen> 
+class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   final EnhancedFeedsService _feedsService = EnhancedFeedsService();
   final EnhancedVideoService _videoService = EnhancedVideoService();
-  
+
   // State management
   List<PostModel> _posts = [];
-  Map<String, AvatarModel> _avatarCache = {};
+  final Map<String, AvatarModel> _avatarCache = {};
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
   int _currentPage = 0;
   bool _isLoadingMore = false;
-  
+
   // Interaction states
-  Map<String, bool> _likedStatus = {};
-  Map<String, bool> _followingStatus = {};
-  Map<String, bool> _bookmarkedStatus = {};
-  
+  final Map<String, bool> _likedStatus = {};
+  final Map<String, bool> _followingStatus = {};
+  final Map<String, bool> _bookmarkedStatus = {};
+
   // Optimistic update states
-  Map<String, bool> _optimisticLikes = {};
-  Map<String, bool> _optimisticFollows = {};
-  Map<String, bool> _optimisticBookmarks = {};
-  
+  final Map<String, bool> _optimisticLikes = {};
+  final Map<String, bool> _optimisticFollows = {};
+  final Map<String, bool> _optimisticBookmarks = {};
+
   // Error handling
-  Map<String, String> _errors = {};
-  
+  final Map<String, String> _errors = {};
+
   // Video analytics
-  Map<String, DateTime> _viewStartTimes = {};
-  Map<String, int> _totalWatchTimes = {};
-  
+  final Map<String, DateTime> _viewStartTimes = {};
+  final Map<String, int> _totalWatchTimes = {};
+
   // UI state
-  bool _showControls = true;
+  final bool _showControls = true;
   bool _isMuted = false;
   late AnimationController _controlsAnimationController;
   late Animation<double> _controlsAnimation;
@@ -82,19 +79,18 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _controlsAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controlsAnimationController,
-      curve: Curves.easeInOut,
-    ));
+    _controlsAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controlsAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   Future<void> _initializeServices() async {
     try {
       await _videoService.initialize();
-      
+
       if (widget.initialPost != null) {
         await _loadSinglePost(widget.initialPost!);
       } else if (widget.postId != null) {
@@ -107,7 +103,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       _setError('Failed to load content');
     }
   }
-  
+
   void _setupVideoAnalytics() {
     _videoService.onAnalyticsEvent = (url, event, data) {
       PostModel? post;
@@ -116,7 +112,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       } catch (e) {
         post = _posts.isNotEmpty ? _posts.first : null;
       }
-      
+
       if (post != null) {
         _trackAnalyticsEvent(post.id, event, data);
       }
@@ -299,59 +295,64 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   // ===== INTERACTION HANDLERS =====
 
   Future<void> _onPostLike(PostModel post) async {
-    final wasLiked = (_optimisticLikes[post.id] ?? _likedStatus[post.id]) ?? false;
+    final wasLiked =
+        (_optimisticLikes[post.id] ?? _likedStatus[post.id]) ?? false;
     final newLikedStatus = !wasLiked;
-    
+
     // Optimistic update
     setState(() {
       _optimisticLikes[post.id] = newLikedStatus;
       _errors.remove('like_${post.id}');
-      
+
       final postIndex = _posts.indexWhere((p) => p.id == post.id);
       if (postIndex != -1) {
         _posts[postIndex] = _posts[postIndex].copyWith(
-          likesCount: newLikedStatus 
-              ? _posts[postIndex].likesCount + 1 
+          likesCount: newLikedStatus
+              ? _posts[postIndex].likesCount + 1
               : _posts[postIndex].likesCount - 1,
         );
       }
     });
-    
+
     try {
       final actualStatus = await _feedsService.toggleLike(post.id);
-      
+
       setState(() {
         _likedStatus[post.id] = actualStatus;
         _optimisticLikes.remove(post.id);
       });
-      
+
       _trackAnalyticsEvent(post.id, DbConfig.likeEvent, {
         'liked': actualStatus,
         'timestamp': DateTime.now().toIso8601String(),
       });
-      
+
       if (actualStatus) {
         HapticFeedback.lightImpact();
       }
     } catch (e) {
       debugPrint('Error toggling like: $e');
-      
+
       // Revert optimistic update
       setState(() {
         _optimisticLikes.remove(post.id);
-        _errors['like_${post.id}'] = 'Failed to ${newLikedStatus ? 'like' : 'unlike'} post';
-        
+        _errors['like_${post.id}'] =
+            'Failed to ${newLikedStatus ? 'like' : 'unlike'} post';
+
         final postIndex = _posts.indexWhere((p) => p.id == post.id);
         if (postIndex != -1) {
           _posts[postIndex] = _posts[postIndex].copyWith(
-            likesCount: wasLiked 
-                ? _posts[postIndex].likesCount + 1 
+            likesCount: wasLiked
+                ? _posts[postIndex].likesCount + 1
                 : _posts[postIndex].likesCount - 1,
           );
         }
       });
-      
-      _showErrorSnackBar('Failed to ${newLikedStatus ? 'like' : 'unlike'} post', () => _onPostLike(post));
+
+      _showErrorSnackBar(
+        'Failed to ${newLikedStatus ? 'like' : 'unlike'} post',
+        () => _onPostLike(post),
+      );
     }
   }
 
@@ -360,7 +361,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       'action': 'open_modal',
       'timestamp': DateTime.now().toIso8601String(),
     });
-    
+
     await openCommentsModal(
       context,
       postId: post.id,
@@ -369,14 +370,12 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
         final index = _posts.indexWhere((p) => p.id == post.id);
         if (index != -1) {
           setState(() {
-            _posts[index] = _posts[index].copyWith(
-              commentsCount: newCount,
-            );
+            _posts[index] = _posts[index].copyWith(commentsCount: newCount);
           });
         }
       },
     );
-    
+
     // Refresh post data when returning from comments
     await _refreshCurrentPost();
   }
@@ -384,21 +383,19 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   Future<void> _onPostShare(PostModel post) async {
     try {
       final avatar = _avatarCache[post.avatarId];
-      final shareText = '${avatar?.name ?? 'Avatar'}: ${post.caption}\n\nWatch on Quanta: https://quanta.app/post/${post.id}';
-      
-      await Share.share(
-        shareText,
-        subject: 'Check out this post on Quanta',
-      );
-      
+      final shareText =
+          '${avatar?.name ?? 'Avatar'}: ${post.caption}\n\nWatch on Quanta: https://quanta.app/post/${post.id}';
+
+      await Share.share(shareText, subject: 'Check out this post on Quanta');
+
       // Record the share
       await _feedsService.sharePost(post.id, platform: 'native_share');
-      
+
       _trackAnalyticsEvent(post.id, DbConfig.shareEvent, {
         'platform': 'native_share',
         'timestamp': DateTime.now().toIso8601String(),
       });
-      
+
       HapticFeedback.selectionClick();
     } catch (e) {
       debugPrint('Error sharing post: $e');
@@ -407,41 +404,48 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   }
 
   Future<void> _onPostSave(PostModel post) async {
-    final wasBookmarked = (_optimisticBookmarks[post.id] ?? _bookmarkedStatus[post.id]) ?? false;
+    final wasBookmarked =
+        (_optimisticBookmarks[post.id] ?? _bookmarkedStatus[post.id]) ?? false;
     final newBookmarkedStatus = !wasBookmarked;
-    
+
     // Optimistic update
     setState(() {
       _optimisticBookmarks[post.id] = newBookmarkedStatus;
       _errors.remove('bookmark_${post.id}');
     });
-    
+
     try {
       final actualStatus = await _feedsService.toggleBookmark(post.id);
-      
+
       setState(() {
         _bookmarkedStatus[post.id] = actualStatus;
         _optimisticBookmarks.remove(post.id);
       });
-      
+
       HapticFeedback.selectionClick();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(actualStatus ? 'Post saved' : 'Post removed from saved'),
+          content: Text(
+            actualStatus ? 'Post saved' : 'Post removed from saved',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
       debugPrint('Error toggling bookmark: $e');
-      
+
       // Revert optimistic update
       setState(() {
         _optimisticBookmarks.remove(post.id);
-        _errors['bookmark_${post.id}'] = 'Failed to ${newBookmarkedStatus ? 'save' : 'unsave'} post';
+        _errors['bookmark_${post.id}'] =
+            'Failed to ${newBookmarkedStatus ? 'save' : 'unsave'} post';
       });
-      
-      _showErrorSnackBar('Failed to ${newBookmarkedStatus ? 'save' : 'unsave'} post', () => _onPostSave(post));
+
+      _showErrorSnackBar(
+        'Failed to ${newBookmarkedStatus ? 'save' : 'unsave'} post',
+        () => _onPostSave(post),
+      );
     }
   }
 
@@ -464,42 +468,53 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   Future<void> _onFollowToggle(PostModel post) async {
     final avatar = _avatarCache[post.avatarId];
     if (avatar == null) return;
-    
-    final wasFollowing = (_optimisticFollows[post.avatarId] ?? _followingStatus[post.avatarId]) ?? false;
+
+    final wasFollowing =
+        (_optimisticFollows[post.avatarId] ??
+            _followingStatus[post.avatarId]) ??
+        false;
     final newFollowingStatus = !wasFollowing;
-    
+
     // Optimistic update
     setState(() {
       _optimisticFollows[post.avatarId] = newFollowingStatus;
       _errors.remove('follow_${post.avatarId}');
     });
-    
+
     try {
       final actualStatus = await _feedsService.toggleFollow(post.avatarId);
-      
+
       setState(() {
         _followingStatus[post.avatarId] = actualStatus;
         _optimisticFollows.remove(post.avatarId);
       });
-      
+
       HapticFeedback.selectionClick();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(actualStatus ? 'Following ${avatar.name}' : 'Unfollowed ${avatar.name}'),
+          content: Text(
+            actualStatus
+                ? 'Following ${avatar.name}'
+                : 'Unfollowed ${avatar.name}',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
       debugPrint('Error toggling follow: $e');
-      
+
       // Revert optimistic update
       setState(() {
         _optimisticFollows.remove(post.avatarId);
-        _errors['follow_${post.avatarId}'] = 'Failed to ${newFollowingStatus ? 'follow' : 'unfollow'} ${avatar.name}';
+        _errors['follow_${post.avatarId}'] =
+            'Failed to ${newFollowingStatus ? 'follow' : 'unfollow'} ${avatar.name}';
       });
-      
-      _showErrorSnackBar('Failed to ${newFollowingStatus ? 'follow' : 'unfollow'} ${avatar.name}', () => _onFollowToggle(post));
+
+      _showErrorSnackBar(
+        'Failed to ${newFollowingStatus ? 'follow' : 'unfollow'} ${avatar.name}',
+        () => _onFollowToggle(post),
+      );
     }
   }
 
@@ -578,7 +593,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     try {
       final link = 'https://quanta.app/post/${post.id}';
       await Clipboard.setData(ClipboardData(text: link));
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Link copied to clipboard'),
@@ -597,7 +612,9 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Report Post'),
-        content: const Text('Report functionality is coming soon. Thank you for helping keep our community safe.'),
+        content: const Text(
+          'Report functionality is coming soon. Thank you for helping keep our community safe.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -608,17 +625,17 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     );
   }
 
-
-
   Future<void> _blockUser(PostModel post) async {
     final avatar = _avatarCache[post.avatarId];
     if (avatar == null) return;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Block User'),
-        content: Text('Are you sure you want to block ${avatar.name}? You won\'t see their posts anymore.'),
+        content: Text(
+          'Are you sure you want to block ${avatar.name}? You won\'t see their posts anymore.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -632,18 +649,18 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       try {
         await _feedsService.blockUser(avatar.ownerUserId);
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Blocked ${avatar.name}'),
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // Remove blocked user's posts from current feed
         setState(() {
           _posts.removeWhere((p) => p.avatarId == post.avatarId);
@@ -657,7 +674,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
 
   Future<void> _downloadPost(PostModel post) async {
     if (post.videoUrl == null) return;
-    
+
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -665,12 +682,12 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       // Track download event
       _trackAnalyticsEvent(post.id, DbConfig.downloadEvent, {
         'timestamp': DateTime.now().toIso8601String(),
       });
-      
+
       // Note: Actual download implementation would require additional packages
       // and platform-specific code for saving to device storage
     } catch (e) {
@@ -681,13 +698,14 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
 
   // ===== VIDEO ANALYTICS =====
 
-  void _trackAnalyticsEvent(String postId, String event, Map<String, dynamic> data) {
+  void _trackAnalyticsEvent(
+    String postId,
+    String event,
+    Map<String, dynamic> data,
+  ) {
     // Record analytics event using analytics service
     try {
-      AnalyticsService().trackEvent(event, {
-        'post_id': postId,
-        ...data,
-      });
+      AnalyticsService().trackEvent(event, {'post_id': postId, ...data});
     } catch (e) {
       debugPrint('Failed to track analytics event: $e');
     }
@@ -702,7 +720,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     if (startTime != null) {
       final duration = DateTime.now().difference(startTime).inSeconds;
       _totalWatchTimes[postId] = (_totalWatchTimes[postId] ?? 0) + duration;
-      
+
       // Record view if significant watch time
       if (duration >= DbConfig.viewThresholdSeconds) {
         _feedsService.recordViewEvent(
@@ -756,10 +774,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
               const SizedBox(height: 16),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ],
           ),
@@ -788,9 +803,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _initializeServices,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
                 child: const Text('Retry'),
               ),
             ],
@@ -858,7 +871,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
                 if (index < _posts.length) {
                   final post = _posts[index];
                   _onVideoViewStarted(post.id);
-                  
+
                   // Stop previous video and start current one
                   if (index > 0) {
                     _onVideoViewEnded(_posts[index - 1].id);
@@ -872,7 +885,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
 
                 final post = _posts[index];
                 final avatar = _avatarCache[post.avatarId];
-                
+
                 return _buildPostItem(post, avatar, index == _currentPage);
               },
             ),
@@ -886,30 +899,45 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
   }
 
   Widget _buildPostItem(PostModel post, AvatarModel? avatar, bool isActive) {
-    final isLiked = (_optimisticLikes[post.id] ?? _likedStatus[post.id]) ?? false;
-    final isFollowing = (_optimisticFollows[post.avatarId] ?? _followingStatus[post.avatarId]) ?? false;
-    final isBookmarked = (_optimisticBookmarks[post.id] ?? _bookmarkedStatus[post.id]) ?? false;
+    final isLiked =
+        (_optimisticLikes[post.id] ?? _likedStatus[post.id]) ?? false;
+    final isFollowing =
+        (_optimisticFollows[post.avatarId] ??
+            _followingStatus[post.avatarId]) ??
+        false;
+    final isBookmarked =
+        (_optimisticBookmarks[post.id] ?? _bookmarkedStatus[post.id]) ?? false;
 
     return Stack(
       children: [
         // Background media
-        Positioned.fill(
-          child: _buildMediaBackground(post, isActive),
-        ),
+        Positioned.fill(child: _buildMediaBackground(post, isActive)),
 
         // Content overlay
         Positioned(
           left: 16,
           right: 16,
           bottom: 90,
-          child: _buildContentOverlay(post, avatar, isLiked, isFollowing, isBookmarked),
+          child: _buildContentOverlay(
+            post,
+            avatar,
+            isLiked,
+            isFollowing,
+            isBookmarked,
+          ),
         ),
 
         // Side actions
         Positioned(
           right: 16,
           bottom: 120,
-          child: _buildSideActions(post, avatar, isLiked, isFollowing, isBookmarked),
+          child: _buildSideActions(
+            post,
+            avatar,
+            isLiked,
+            isFollowing,
+            isBookmarked,
+          ),
         ),
       ],
     );
@@ -921,9 +949,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
           ? VideoPlayer(_videoService.getVideoController(post.videoUrl!)!)
           : Container(
               color: Colors.black,
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             );
     } else {
       // Handle image posts or video error state
@@ -958,11 +984,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: Colors.white54,
-                      size: 48,
-                    ),
+                    Icon(Icons.error_outline, color: Colors.white54, size: 48),
                     SizedBox(height: 8),
                     Text(
                       'Content not available',
@@ -975,7 +997,13 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     }
   }
 
-  Widget _buildContentOverlay(PostModel post, AvatarModel? avatar, bool isLiked, bool isFollowing, bool isBookmarked) {
+  Widget _buildContentOverlay(
+    PostModel post,
+    AvatarModel? avatar,
+    bool isLiked,
+    bool isFollowing,
+    bool isBookmarked,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -990,7 +1018,8 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
                     radius: 20,
                     backgroundImage: avatar?.avatarImageUrl != null
                         ? NetworkImage(avatar!.avatarImageUrl!)
-                        : const AssetImage('assets/images/p.jpg') as ImageProvider,
+                        : const AssetImage('assets/images/p.jpg')
+                              as ImageProvider,
                   ),
                   Positioned(
                     bottom: 0,
@@ -1046,7 +1075,10 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
               GestureDetector(
                 onTap: () => _onFollowToggle(post),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: kPrimaryColor,
                     borderRadius: BorderRadius.circular(20),
@@ -1064,9 +1096,9 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
             ],
           ],
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Caption
         Text(
           post.caption,
@@ -1082,7 +1114,13 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
     );
   }
 
-  Widget _buildSideActions(PostModel post, AvatarModel? avatar, bool isLiked, bool isFollowing, bool isBookmarked) {
+  Widget _buildSideActions(
+    PostModel post,
+    AvatarModel? avatar,
+    bool isLiked,
+    bool isFollowing,
+    bool isBookmarked,
+  ) {
     return Column(
       children: [
         _buildActionButton(
@@ -1134,11 +1172,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
               color: Colors.black26,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, color: color, size: 24),
           ),
           if (count != null) ...[
             const SizedBox(height: 4),
@@ -1172,10 +1206,7 @@ class _EnhancedPostDetailScreenState extends State<EnhancedPostDetailScreen>
                     color: Colors.black26,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.arrow_back, color: Colors.white),
                 ),
               )
             else

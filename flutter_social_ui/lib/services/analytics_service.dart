@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/db_config.dart';
 import 'auth_service.dart';
 
 /// Analytics service for tracking user interactions and events
@@ -11,12 +10,12 @@ class AnalyticsService {
 
   final AuthService _authService = AuthService();
   final SupabaseClient _supabase = Supabase.instance.client;
-  
+
   // Event queue for batch processing
   final List<Map<String, dynamic>> _eventQueue = [];
   static const int _batchSize = 20; // Increased batch size
   static const int _flushIntervalMs = 15000; // Increased to 15 seconds
-  
+
   /// Initialize analytics service
   Future<void> initialize() async {
     // Start periodic flush of events
@@ -25,9 +24,12 @@ class AnalyticsService {
   }
 
   /// Track a user interaction event
-  Future<void> trackEvent(String eventType, Map<String, dynamic> properties) async {
+  Future<void> trackEvent(
+    String eventType,
+    Map<String, dynamic> properties,
+  ) async {
     final userId = _authService.currentUserId;
-    
+
     if (userId == null && !_isSystemEvent(eventType)) {
       // Skip user events if not authenticated
       return;
@@ -43,7 +45,7 @@ class AnalyticsService {
 
     // Add to queue for batch processing
     _eventQueue.add(event);
-    
+
     // Flush if queue is full
     if (_eventQueue.length >= _batchSize) {
       await _flushEvents();
@@ -56,7 +58,8 @@ class AnalyticsService {
   }
 
   /// Track post view event
-  Future<void> trackPostView(String postId, {
+  Future<void> trackPostView(
+    String postId, {
     int? durationSeconds,
     double? watchPercentage,
     String? postType,
@@ -72,7 +75,9 @@ class AnalyticsService {
   }
 
   /// Track like toggle event
-  Future<void> trackLikeToggle(String postId, bool liked, {
+  Future<void> trackLikeToggle(
+    String postId,
+    bool liked, {
     String? postType,
     String? authorId,
     int? likesCount,
@@ -87,7 +92,9 @@ class AnalyticsService {
   }
 
   /// Track comment add event
-  Future<void> trackCommentAdd(String postId, String commentId, {
+  Future<void> trackCommentAdd(
+    String postId,
+    String commentId, {
     String? postType,
     String? authorId,
     int? commentLength,
@@ -102,7 +109,9 @@ class AnalyticsService {
   }
 
   /// Track share attempt event
-  Future<void> trackShareAttempt(String postId, String shareMethod, {
+  Future<void> trackShareAttempt(
+    String postId,
+    String shareMethod, {
     String? postType,
     String? authorId,
     bool? successful,
@@ -117,7 +126,9 @@ class AnalyticsService {
   }
 
   /// Track bookmark toggle event
-  Future<void> trackBookmarkToggle(String postId, bool bookmarked, {
+  Future<void> trackBookmarkToggle(
+    String postId,
+    bool bookmarked, {
     String? postType,
     String? authorId,
   }) async {
@@ -130,7 +141,9 @@ class AnalyticsService {
   }
 
   /// Track follow toggle event
-  Future<void> trackFollowToggle(String avatarId, bool followed, {
+  Future<void> trackFollowToggle(
+    String avatarId,
+    bool followed, {
     String? avatarName,
     String? niche,
   }) async {
@@ -143,15 +156,17 @@ class AnalyticsService {
   }
 
   /// Track video playback events
-  Future<void> trackVideoEvent(String eventType, String postId, Map<String, dynamic> data) async {
-    await trackEvent(eventType, {
-      'post_id': postId,
-      ...data,
-    });
+  Future<void> trackVideoEvent(
+    String eventType,
+    String postId,
+    Map<String, dynamic> data,
+  ) async {
+    await trackEvent(eventType, {'post_id': postId, ...data});
   }
 
   /// Track comment modal events
-  Future<void> trackCommentModalOpen(String postId, {
+  Future<void> trackCommentModalOpen(
+    String postId, {
     String? postType,
     String? authorId,
     int? commentsCount,
@@ -165,7 +180,10 @@ class AnalyticsService {
   }
 
   /// Track screen navigation events
-  Future<void> trackScreenView(String screenName, {Map<String, dynamic>? properties}) async {
+  Future<void> trackScreenView(
+    String screenName, {
+    Map<String, dynamic>? properties,
+  }) async {
     await trackEvent(AnalyticsEvents.screenView, {
       'screen_name': screenName,
       ...?properties,
@@ -173,7 +191,9 @@ class AnalyticsService {
   }
 
   /// Track error events
-  Future<void> trackError(String errorType, String errorMessage, {
+  Future<void> trackError(
+    String errorType,
+    String errorMessage, {
     String? stackTrace,
     String? context,
   }) async {
@@ -186,7 +206,8 @@ class AnalyticsService {
   }
 
   /// Track search events
-  Future<void> trackSearch(String query, {
+  Future<void> trackSearch(
+    String query, {
     int? resultsCount,
     String? searchType,
   }) async {
@@ -198,7 +219,8 @@ class AnalyticsService {
   }
 
   /// Track content upload events
-  Future<void> trackContentUpload(String eventType, {
+  Future<void> trackContentUpload(
+    String eventType, {
     String? contentType,
     int? fileSizeBytes,
     int? durationSeconds,
@@ -245,21 +267,24 @@ class AnalyticsService {
     try {
       // Store in analytics_events table
       await _supabase.from('analytics_events').insert(eventsToFlush);
-      
+
       if (kDebugMode) {
         debugPrint('📊 Flushed ${eventsToFlush.length} analytics events');
       }
     } catch (e) {
       // If flush fails, only retry if it's a temporary network error
-      if (e.toString().contains('network') || e.toString().contains('timeout')) {
+      if (e.toString().contains('network') ||
+          e.toString().contains('timeout')) {
         _eventQueue.addAll(eventsToFlush);
       } else {
         // For 404 errors or schema errors, don't retry to avoid endless loops
         if (kDebugMode) {
-          debugPrint('⚠️ Discarding ${eventsToFlush.length} analytics events due to persistent error');
+          debugPrint(
+            '⚠️ Discarding ${eventsToFlush.length} analytics events due to persistent error',
+          );
         }
       }
-      
+
       if (kDebugMode) {
         debugPrint('❌ Failed to flush analytics events: $e');
       }
@@ -286,34 +311,34 @@ class AnalyticsEvents {
   static const String shareAttempt = 'share_attempt';
   static const String bookmarkToggle = 'bookmark_toggle';
   static const String followToggle = 'follow_toggle';
-  
+
   // Video events
   static const String videoPlay = 'video_play';
   static const String videoPause = 'video_pause';
   static const String videoSeek = 'video_seek';
   static const String videoComplete = 'video_complete';
-  
+
   // UI interactions
   static const String commentModalOpen = 'comment_modal_open';
   static const String screenView = 'screen_view';
   static const String search = 'search';
-  
+
   // Content creation
   static const String uploadStart = 'upload_start';
   static const String uploadComplete = 'upload_complete';
   static const String uploadFailed = 'upload_failed';
-  
+
   // System events
   static const String appStart = 'app_start';
   static const String appBackground = 'app_background';
   static const String error = 'error';
-  
+
   // Social interactions
   static const String commentLike = 'comment_like';
   static const String reportContent = 'report_content';
   static const String blockUser = 'block_user';
   static const String muteUser = 'mute_user';
-  
+
   // Navigation
   static const String tabSwitch = 'tab_switch';
   static const String profileView = 'profile_view';
